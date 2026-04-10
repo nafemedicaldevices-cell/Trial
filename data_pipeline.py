@@ -34,7 +34,7 @@ def build_overdue_pipeline(overdue, codes):
     df["Old Rep Name"] = None
 
     # =========================
-    # 🔎 REP HEADER
+    # 🔎 EXTRACT REP HEADER
     # =========================
     mask = df["Client Name"].astype(str).str.strip().eq("كود المندوب")
 
@@ -86,7 +86,7 @@ def build_overdue_pipeline(overdue, codes):
     df = df.merge(codes, on="Rep Code", how="left")
 
     # =========================
-    # 📦 GROUP CONFIG
+    # 📦 GROUPS
     # =========================
     GROUPS = {
         "rep_value": (["Rep Code"], ["Overdue"]),
