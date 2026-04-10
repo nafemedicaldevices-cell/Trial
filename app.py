@@ -1,10 +1,15 @@
 import streamlit as st
+import data_loader as dl
 import data_pipeline as dp
 
-data = dp.run_pipeline()
+st.title("Sales Dashboard")
 
-st.title("📊 KPI Dashboard")
+data = dl.load_data()
 
-st.subheader("🎯 Sales vs Target")
+rep = dp.build_target_pipeline(
+    data["target_rep"],
+    "Rep Code",
+    data["mapping"]
+)
 
-st.dataframe(data["kpi"])
+st.write(rep["value_full"].head())
