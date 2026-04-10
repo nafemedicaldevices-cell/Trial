@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 
+
 # =========================
 # 📥 LOAD DATA
 # =========================
@@ -19,13 +20,14 @@ def load_data():
 
 
 # =========================
-# 💰 SALES CLEAN ONLY (NO MERGE YET)
+# 🧹 CLEAN SALES ONLY
 # =========================
-def build_sales_pipeline(sales, mapping, codes):
+def clean_sales(df):
 
-    df = sales.copy()
+    df = df.copy()
     df.columns = df.columns.str.strip()
 
+    # ---------- expected structure fix ----------
     expected_cols = [
         'Date','Warehouse Name','Client Code','Client Name','Notes','MF','Mostanad',
         'Rep Code','Sales Unit Before Edit','Returns Unit Before Edit',
@@ -35,7 +37,7 @@ def build_sales_pipeline(sales, mapping, codes):
     if len(df.columns) == len(expected_cols):
         df.columns = expected_cols
 
-    # numeric
+    # ---------- numeric cleanup ----------
     num_cols = [
         'Sales Unit Before Edit',
         'Returns Unit Before Edit',
@@ -47,9 +49,15 @@ def build_sales_pipeline(sales, mapping, codes):
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
-    # product header fix
+    # ---------- product header fix ----------
     if 'Date' in df.columns:
+
         mask = df['Date'].astype(str).str.strip().eq("كود الصنف")
+
+        if 'Old Product Code' not in df.columns:
+            df['Old Product Code'] = np.nan
+        if 'Old Product Name' not in df.columns:
+            df['Old Product Name'] = np.nan
 
         df.loc[mask, 'Old Product Code'] = df.loc[mask, 'Warehouse Name']
         df.loc[mask, 'Old Product Name'] = df.loc[mask, 'Client Code']
@@ -58,26 +66,48 @@ def build_sales_pipeline(sales, mapping, codes):
             ['Old Product Code','Old Product Name']
         ].ffill()
 
-    # calculations
-    df['Total Sales Value'] = df['Sales Unit Before Edit'] * df['Sales Price']
-    df['Returns Value'] = df['Returns Unit Before Edit'] * df['Sales Price']
-    df['Sales After Returns'] = df['Total Sales Value'] - df['Returns Value']
+    # ---------- remove junk rows ----------
+    drop_keywords = 'المندوب|كود الفرع|تاريخ|كود الصنف'
+
+    if 'Date' in df.columns:
+        df = df[df['Date'].notna()]
+        df = df[~df['Date'].astype(str).str.contains(drop_keywords, na=False)]
+
+    # ---------- numeric conversion ----------
+    if 'Rep Code' in df.columns:
+        df['Rep Code'] = pd.to_numeric(df['Rep Code'], errors='coerce')
+
+    if 'Old Product Code' in df.columns:
+        df['Old Product Code'] = pd.to_numeric(df['Old Product Code'], errors='coerce')
+
+    # ---------- calculations ----------
+    if all(c in df.columns for c in ['Sales Unit Before Edit','Sales Price']):
+        df['Total Sales Value'] = df['Sales Unit Before Edit'] * df['Sales Price']
+
+    if all(c in df.columns for c in ['Returns Unit Before Edit','Sales Price']):
+        df['Returns Value'] = df['Returns Unit Before Edit'] * df['Sales Price']
+
+    if 'Total Sales Value' in df.columns and 'Returns Value' in df.columns:
+        df['Sales After Returns'] = df['Total Sales Value'] - df['Returns Value']
 
     return df
 
 
 # =========================
-# 🎯 TARGET CLEAN ONLY
+# 🧹 CLEAN TARGET ONLY
 # =========================
-def build_target_pipeline(target_df, key_col):
+def clean_target(df, key_col):
 
-    df = target_df.copy()
+    df = df.copy()
     df.columns = df.columns.str.strip()
 
     if key_col in df.columns:
         df[key_col] = df[key_col].astype(str)
 
-    num_cols = [c for c in df.columns if "Target" in c]
-    df[num_cols] = df[num_cols].apply(pd.to_numeric, errors="coerce").fillna(0)
+    # numeric only for target columns
+    target_cols = [c for c in df.columns if "Target" in c]
+
+    for c in target_cols:
+        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
     return df
