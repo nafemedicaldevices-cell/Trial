@@ -3,89 +3,104 @@ import numpy as np
 
 
 # =========================
-# 🧹 CLEAN SALES
+# 💰 SALES PIPELINE CLEAN
 # =========================
-def clean_sales(df):
+def build_sales_pipeline(sales, mapping, codes):
 
-    df = df.copy()
-    df.columns = df.columns.str.strip()
+    sales = sales.copy()
+    mapping = mapping.copy()
+    codes = codes.copy()
 
-    # remove empty rows
-    df = df.dropna(how="all")
+    # =========================
+    # 🧹 CLEAN COLUMNS
+    # =========================
+    sales.columns = sales.columns.str.strip()
 
-    # remove internal header rows (Arabic noise)
-    if "Date" in df.columns:
-        df = df[~df["Date"].astype(str).str.contains("المندوب|كود الصنف|تاريخ|كود الفرع", na=False)]
-
-    return df
-
-
-# =========================
-# 🔢 FIX TYPES
-# =========================
-def fix_types(df):
-
-    num_cols = [
-        "Sales Unit Before Edit",
-        "Returns Unit Before Edit",
-        "Sales Price",
-        "Invoice Discounts"
+    expected_cols = [
+        'Date','Warehouse Name','Client Code','Client Name','Notes','MF','Mostanad',
+        'Rep Code','Sales Unit Before Edit','Returns Unit Before Edit',
+        'Sales Price','Invoice Discounts','Sales Value'
     ]
 
-    for c in num_cols:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+    if len(sales.columns) == len(expected_cols):
+        sales.columns = expected_cols
 
-    return df
+    # =========================
+    # 🧼 REMOVE HEADER ROWS INSIDE DATA
+    # =========================
+    if 'Date' in sales.columns:
+        drop_keywords = 'المندوب|كود الفرع|تاريخ|كود الصنف'
+        sales = sales[sales['Date'].notna()]
+        sales = sales[~sales['Date'].astype(str).str.contains(drop_keywords, na=False)].copy()
 
+    # =========================
+    # 🔢 FIX TYPES
+    # =========================
+    num_cols = [
+        'Sales Unit Before Edit',
+        'Returns Unit Before Edit',
+        'Sales Price',
+        'Invoice Discounts'
+    ]
 
-# =========================
-# 💰 CALCULATIONS
-# =========================
-def calc_kpi(df):
+    for col in num_cols:
+        if col in sales.columns:
+            sales[col] = pd.to_numeric(sales[col], errors='coerce').fillna(0)
 
-    df["Total Sales Value"] = df["Sales Unit Before Edit"] * df["Sales Price"]
-    df["Returns Value"] = df["Returns Unit Before Edit"] * df["Sales Price"]
-    df["Sales After Returns"] = df["Total Sales Value"] - df["Returns Value"]
+    sales['Rep Code'] = pd.to_numeric(sales['Rep Code'], errors='coerce')
 
-    return df
+    # =========================
+    # 💰 CALCULATIONS
+    # =========================
+    sales['Total Sales Value'] = sales['Sales Unit Before Edit'] * sales['Sales Price']
+    sales['Returns Value'] = sales['Returns Unit Before Edit'] * sales['Sales Price']
+    sales['Sales After Returns'] = sales['Total Sales Value'] - sales['Returns Value']
 
+    # =========================
+    # 🧠 GROUP FUNCTION SAFE
+    # =========================
+    def safe_group(df, group_cols, sum_cols):
 
-# =========================
-# 🚀 MAIN SALES PIPELINE
-# =========================
-def build_sales_pipeline(df):
+        group_cols = [c for c in group_cols if c in df.columns]
+        sum_cols = [c for c in sum_cols if c in df.columns]
 
-    df = clean_sales(df)
-    df = fix_types(df)
-    df = calc_kpi(df)
+        if not group_cols:
+            return pd.DataFrame(columns=sum_cols)
 
-    # fix Rep Code
-    if "Rep Code" in df.columns:
-        df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce")
-        df = df.dropna(subset=["Rep Code"])
+        return df.groupby(group_cols, as_index=False)[sum_cols].sum()
 
-    # GROUP LEVELS
-    rep = df.groupby("Rep Code", as_index=False)[
-        ["Total Sales Value", "Returns Value", "Sales After Returns", "Invoice Discounts"]
-    ].sum()
+    # =========================
+    # 📊 GROUPS
+    # =========================
+    results = {}
 
-    manager = df.groupby("Manager Code", as_index=False)[
-        ["Total Sales Value", "Returns Value", "Sales After Returns", "Invoice Discounts"]
-    ].sum()
-
-    area = df.groupby("Area Code", as_index=False)[
-        ["Total Sales Value", "Returns Value", "Sales After Returns", "Invoice Discounts"]
-    ].sum()
-
-    supervisor = df.groupby("Supervisor Code", as_index=False)[
-        ["Total Sales Value", "Returns Value", "Sales After Returns", "Invoice Discounts"]
-    ].sum()
-
-    return {
-        "rep_value": rep,
-        "manager_value": manager,
-        "area_value": area,
-        "supervisor_value": supervisor,
-        "raw": df
+    GROUP_DEFS = {
+        "rep_value": {
+            "group": ['Rep Code'],
+            "sum": ['Total Sales Value','Returns Value','Sales After Returns','Invoice Discounts']
+        },
+        "manager_value": {
+            "group": ['Manager Code'],
+            "sum": ['Total Sales Value','Returns Value','Sales After Returns','Invoice Discounts']
+        },
+        "area_value": {
+            "group": ['Area Code'],
+            "sum": ['Total Sales Value','Returns Value','Sales After Returns','Invoice Discounts']
+        },
+        "supervisor_value": {
+            "group": ['Supervisor Code'],
+            "sum": ['Total Sales Value','Returns Value','Sales After Returns','Invoice Discounts']
+        },
+        "rep_products": {
+            "group": ['Rep Code','Product Code','Product Name'],
+            "sum": ['Sales Value','Sales After Returns']
+        }
     }
+
+    for name, cfg in GROUP_DEFS.items():
+        results[name] = safe_group(sales, cfg["group"], cfg["sum"])
+
+    # =========================
+    # 🧾 OUTPUT
+    # =========================
+    return results
