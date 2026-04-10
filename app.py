@@ -1,89 +1,71 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="Overdue Dashboard", layout="wide")
+st.title("Step 3 - Numeric + KPI + Merge")
 
-st.title("📊 Overdue Dashboard")
-
-# =========================
-# 📥 LOAD DATA
-# =========================
 overdue = pd.read_excel("Overdue.xlsx")
 codes = pd.read_excel("Code.xlsx")
 
 # =========================
-# BASIC CLEANING (OVERDUE)
+# BASIC CLEANING
 # =========================
 overdue = overdue.iloc[:, :9].copy()
 
 overdue.columns = [
-    "Client Name",
-    "Client Code",
-    "15 Days",
-    "30 Days",
-    "60 Days",
-    "90 Days",
-    "120 Days",
-    "More Than 120 Days",
-    "Balance"
+    "Client Name", "Client Code", "15 Days", "30 Days", "60 Days", "90 Days",
+    "120 Days", "More Than 120 Days", "Balance"
 ]
+
+# =========================
+# REP SETUP (from previous step assumed)
+# =========================
+overdue["Rep Code"] = pd.NA
+overdue["Old Rep Name"] = pd.NA
+
+mask = overdue["Client Name"].astype(str).str.strip().eq("كود المندوب")
+
+overdue.loc[mask, "Rep Code"] = overdue.loc[mask, "Client Code"]
+overdue.loc[mask, "Old Rep Name"] = overdue.loc[mask, "30 Days"]
+
+overdue[["Rep Code", "Old Rep Name"]] = overdue[["Rep Code", "Old Rep Name"]].ffill()
 
 # =========================
 # NUMERIC CONVERSION
 # =========================
 num_cols = [
     "15 Days", "30 Days", "60 Days", "90 Days",
-    "120 Days", "More Than 120 Days"
+    "120 Days", "More Than 120 Days",
+    "Client Code", "Rep Code"
 ]
 
 for col in num_cols:
     overdue[col] = pd.to_numeric(overdue[col], errors="coerce").fillna(0)
 
-# =========================
-# KPI CALCULATION
-# =========================
-overdue["Overdue"] = overdue["120 Days"] + overdue["More Than 120 Days"]
+overdue["Rep Code"] = overdue["Rep Code"].astype("Int64")
+overdue["Client Code"] = overdue["Client Code"].astype("Int64")
 
-# =========================
-# CLEAN CODES
-# =========================
-codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce").astype("Int64")
-
-# =========================
-# MERGE DATASETS
-# =========================
-if "Rep Code" in overdue.columns:
-    overdue = overdue.merge(codes, on="Rep Code", how="left")
-
-# =========================
-# DISPLAY DATA
-# =========================
-st.subheader("📄 Final Data")
+st.write("After Numeric Conversion")
 st.dataframe(overdue)
 
 # =========================
-# GROUPED KPI
+# OVERDUE KPI
 # =========================
-def safe_group(df, group_cols, sum_cols):
-    group_cols = [c for c in group_cols if c in df.columns]
-    sum_cols = [c for c in sum_cols if c in df.columns]
+overdue["Overdue"] = overdue["120 Days"] + overdue["More Than 120 Days"]
 
-    if not group_cols or not sum_cols:
-        return pd.DataFrame()
-
-    return df.groupby(group_cols, as_index=False)[sum_cols].sum()
-
-grouped = safe_group(
-    overdue,
-    ["Rep Code"],
-    ["Overdue", "Balance"]
-)
-
-st.subheader("📊 KPI by Rep")
-st.dataframe(grouped)
+st.write("After KPI Calculation")
+st.dataframe(overdue)
 
 # =========================
-# DEBUG INFO
+# MERGE CODES
 # =========================
-st.write("Rows:", overdue.shape[0])
-st.write("Columns:", overdue.columns.tolist())
+codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce").astype("Int64")
+
+overdue = overdue.merge(codes, on="Rep Code", how="left")
+
+# =========================
+# FINAL OUTPUT
+# =========================
+st.subheader("📊 Final Data After Merge")
+st.dataframe(overdue)
+
+st.write("Shape:", overdue.shape)
