@@ -52,7 +52,7 @@ def build_target_pipeline(df, id_name, mapping):
     mapping = mapping.drop_duplicates("Product Code")
 
     df = df.merge(
-        mapping[["Product Code", "Product Name"]],
+        mapping[["Product Code", "Product Name", "Category", "2 Classification"]],
         on="Product Code",
         how="left"
     )
@@ -77,29 +77,44 @@ def build_target_pipeline(df, id_name, mapping):
     df_ytd = add(df, current_month)
 
     # =========================
-    # GROUP
+    # GROUP VALUE
     # =========================
-    def group(d):
+    def group_value(d):
         return d.groupby([id_name], as_index=False)["Target (Value)"].sum()
 
-    full = group(df_full).rename(columns={"Target (Value)": "Full Year"})
-    month = group(df_month).rename(columns={"Target (Value)": "Month"})
-    quarter = group(df_quarter).rename(columns={"Target (Value)": "Quarter"})
-    ytd = group(df_ytd).rename(columns={"Target (Value)": "YTD"})
+    full = group_value(df_full).rename(columns={"Target (Value)": "Full Year"})
+    month = group_value(df_month).rename(columns={"Target (Value)": "Month"})
+    quarter = group_value(df_quarter).rename(columns={"Target (Value)": "Quarter"})
+    ytd = group_value(df_ytd).rename(columns={"Target (Value)": "YTD"})
 
-    # =========================
-    # FINAL TABLE
-    # =========================
     final = full.merge(month, on=id_name, how="left") \
                 .merge(quarter, on=id_name, how="left") \
                 .merge(ytd, on=id_name, how="left")
 
     final = final[[id_name, "Full Year", "YTD", "Quarter", "Month"]]
 
+    # =========================
+    # PRODUCTS
+    # =========================
+    def group_products(d):
+        return d.groupby(
+            [id_name, "Product Code", "Product Name"],
+            as_index=False
+        )["Target (Value)"].sum()
+
     return {
+        # SUMMARY
         "final": final,
+
+        # VALUES
         "full": full,
         "month": month,
         "quarter": quarter,
-        "ytd": ytd
+        "ytd": ytd,
+
+        # PRODUCTS
+        "products_full": group_products(df_full),
+        "products_month": group_products(df_month),
+        "products_quarter": group_products(df_quarter),
+        "products_uptodate": group_products(df_ytd),
     }
