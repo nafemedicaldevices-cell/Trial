@@ -1,73 +1,102 @@
-import pandas as pd
-import numpy as np
+import streamlit as st
+import data_pipeline as dp
+
+st.set_page_config(layout="wide")
+st.title("📊 Sales vs Target Dashboard")
 
 
 # =========================
-# 📥 LOAD DATA
+# LOAD
 # =========================
-def load_data():
-    return {
-        "sales": pd.read_excel("Sales.xlsx"),
+data = dp.load_data()
 
-        "target_rep": pd.read_excel("Target Rep.xlsx"),
-        "target_manager": pd.read_excel("Target Manager.xlsx"),
-        "target_area": pd.read_excel("Target Area.xlsx"),
-        "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
+sales = dp.build_sales_pipeline(
+    data["sales"],
+    data["mapping"],
+    data["codes"]
+)
 
-        "mapping": pd.read_excel("Mapping.xlsx"),
-        "codes": pd.read_excel("Code.xlsx")
-    }
-
-
-# =========================
-# 💰 SALES CLEAN ONLY (NO MERGE, NO RENAMING)
-# =========================
-def build_sales_pipeline(sales):
-
-    df = sales.copy()
-    df.columns = df.columns.str.strip()
-
-    # =========================
-    # 🔢 NUMERIC CLEAN ONLY
-    # =========================
-    num_cols = [
-        "Sales Unit Before Edit",
-        "Returns Unit Before Edit",
-        "Sales Price",
-        "Invoice Discounts",
-        "Sales Value"
-    ]
-
-    for col in num_cols:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-
-    # =========================
-    # 💰 CALCULATIONS ONLY
-    # =========================
-    if "Sales Unit Before Edit" in df.columns and "Sales Price" in df.columns:
-        df["Total Sales Value"] = df["Sales Unit Before Edit"] * df["Sales Price"]
-
-    if "Returns Unit Before Edit" in df.columns and "Sales Price" in df.columns:
-        df["Returns Value"] = df["Returns Unit Before Edit"] * df["Sales Price"]
-
-    if "Total Sales Value" in df.columns and "Returns Value" in df.columns:
-        df["Sales After Returns"] = df["Total Sales Value"] - df["Returns Value"]
-
-    return df
+rep_target = dp.build_target_pipeline(data["target_rep"], "Rep Code")
+manager_target = dp.build_target_pipeline(data["target_manager"], "Manager Code")
+area_target = dp.build_target_pipeline(data["target_area"], "Area Code")
+supervisor_target = dp.build_target_pipeline(data["target_supervisor"], "Supervisor Code")
 
 
 # =========================
-# 🎯 TARGET CLEAN ONLY
+# SAFE GROUP SALES
 # =========================
-def build_target_pipeline(df):
+def group_sales(df, key):
+    if key not in df.columns:
+        return df.iloc[0:0]
 
-    df = df.copy()
-    df.columns = df.columns.str.strip()
+    return df.groupby(key, as_index=False).agg({
+        "Total Sales Value": "sum",
+        "Returns Value": "sum",
+        "Sales After Returns": "sum",
+        "Invoice Discounts": "sum"
+    })
 
-    # numeric only
-    for col in df.columns:
-        if "Target" in col:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    return df
+# =========================
+# SAFE MERGE
+# =========================
+def safe_merge(left, right, key):
+
+    if key not in left.columns:
+        st.warning(f"Missing {key} in sales")
+        return left.iloc[0:0]
+
+    if key not in right.columns:
+        st.warning(f"Missing {key} in target")
+        return left.iloc[0:0]
+
+    return left.merge(right, on=key, how="left")
+
+
+# =========================
+# BUILD KPI LEVEL
+# =========================
+def build_level(target_df, key):
+
+    sales_grp = group_sales(sales, key)
+
+    merged = safe_merge(sales_grp, target_df, key)
+
+    if "Target Value" not in merged.columns:
+        merged["Target Value"] = 0
+
+    merged["Achievement %"] = 0
+
+    mask = merged["Target Value"] > 0
+
+    merged.loc[mask, "Achievement %"] = (
+        merged.loc[mask, "Total Sales Value"] /
+        merged.loc[mask, "Target Value"]
+    ) * 100
+
+    return merged
+
+
+# =========================
+# RESULTS
+# =========================
+rep = build_level(rep_target, "Rep Code")
+manager = build_level(manager_target, "Manager Code")
+area = build_level(area_target, "Area Code")
+supervisor = build_level(supervisor_target, "Supervisor Code")
+
+
+# =========================
+# DASHBOARD
+# =========================
+st.header("👨‍💼 Rep")
+st.dataframe(rep, use_container_width=True)
+
+st.header("🏢 Manager")
+st.dataframe(manager, use_container_width=True)
+
+st.header("🌍 Area")
+st.dataframe(area, use_container_width=True)
+
+st.header("🧑‍💼 Supervisor")
+st.dataframe(supervisor, use_container_width=True)
