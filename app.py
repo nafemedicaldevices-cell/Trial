@@ -1,11 +1,11 @@
 import streamlit as st
 import data_pipeline as dp
 
+
 # =========================
 # 🎨 CONFIG
 # =========================
 st.set_page_config(layout="wide")
-
 st.title("📊 Sales Performance Dashboard")
 
 
@@ -16,7 +16,7 @@ data = dp.load_data()
 
 
 # =========================
-# 🚀 SALES PIPELINE
+# 🚀 RUN PIPELINE
 # =========================
 sales = dp.build_sales_pipeline(
     data["sales"],
@@ -28,7 +28,7 @@ sales = dp.build_sales_pipeline(
 # =========================
 # 📊 VALUE KPI
 # =========================
-st.header("💰 SALES VALUE KPI")
+st.header("💰 VALUE KPI")
 
 st.dataframe(sales["rep_value"], use_container_width=True)
 st.dataframe(sales["manager_value"], use_container_width=True)
