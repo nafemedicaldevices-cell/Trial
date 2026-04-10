@@ -46,6 +46,30 @@ def run_pipeline():
 
     target = rep_target(data)
 
+    def run_pipeline():
+
+    data = load_data()
+
+    target = rep_target(data)
+
+    sales = data["sales"]
+
+    # نجمع Sales على Rep Code
+    sales["Sales Value"] = pd.to_numeric(sales.get("Sales Value", 0), errors="coerce").fillna(0)
+
+    sales_grouped = sales.groupby("Rep Code", as_index=False)["Sales Value"].sum()
+
+    # دمج Target + Sales
+    final = target.merge(sales_grouped, on="Rep Code", how="left")
+
+    final["Sales Value"] = final["Sales Value"].fillna(0)
+
+    final["Achievement %"] = (final["Sales Value"] / final["Target Value"]) * 100
+
+    return {
+        "kpi": final
+    }
+
     return {
         "target": target
     }
