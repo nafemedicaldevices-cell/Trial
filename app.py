@@ -1,116 +1,73 @@
-import streamlit as st
-import data_pipeline as dp
+import pandas as pd
+import numpy as np
 
 
 # =========================
-# 🎨 UI
+# 📥 LOAD DATA
 # =========================
-st.set_page_config(layout="wide")
-st.title("📊 Sales vs Target Dashboard")
+def load_data():
+    return {
+        "sales": pd.read_excel("Sales.xlsx"),
 
+        "target_rep": pd.read_excel("Target Rep.xlsx"),
+        "target_manager": pd.read_excel("Target Manager.xlsx"),
+        "target_area": pd.read_excel("Target Area.xlsx"),
+        "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
 
-# =========================
-# 📥 LOAD
-# =========================
-data = dp.load_data()
-
-
-# =========================
-# 💰 SALES
-# =========================
-sales = dp.build_sales_pipeline(
-    data["sales"],
-    data["mapping"],
-    data["codes"]
-)
+        "mapping": pd.read_excel("Mapping.xlsx"),
+        "codes": pd.read_excel("Code.xlsx")
+    }
 
 
 # =========================
-# 🎯 TARGETS
+# 💰 SALES CLEAN ONLY (NO MERGE, NO RENAMING)
 # =========================
-rep_target = dp.build_target_pipeline(data["target_rep"], "Rep Code")
-manager_target = dp.build_target_pipeline(data["target_manager"], "Manager Code")
-area_target = dp.build_target_pipeline(data["target_area"], "Area Code")
-supervisor_target = dp.build_target_pipeline(data["target_supervisor"], "Supervisor Code")
+def build_sales_pipeline(sales):
 
+    df = sales.copy()
+    df.columns = df.columns.str.strip()
 
-# =========================
-# 📊 GROUP SALES
-# =========================
-rep_sales = sales.groupby("rep_code", as_index=False).agg({
-    "total_sales_value": "sum",
-    "returns_value": "sum",
-    "sales_after_returns": "sum"
-})
+    # =========================
+    # 🔢 NUMERIC CLEAN ONLY
+    # =========================
+    num_cols = [
+        "Sales Unit Before Edit",
+        "Returns Unit Before Edit",
+        "Sales Price",
+        "Invoice Discounts",
+        "Sales Value"
+    ]
 
-manager_sales = sales.groupby("manager_code", as_index=False).agg({
-    "total_sales_value": "sum",
-    "returns_value": "sum",
-    "sales_after_returns": "sum"
-})
+    for col in num_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-area_sales = sales.groupby("area_code", as_index=False).agg({
-    "total_sales_value": "sum",
-    "returns_value": "sum",
-    "sales_after_returns": "sum"
-})
+    # =========================
+    # 💰 CALCULATIONS ONLY
+    # =========================
+    if "Sales Unit Before Edit" in df.columns and "Sales Price" in df.columns:
+        df["Total Sales Value"] = df["Sales Unit Before Edit"] * df["Sales Price"]
 
-supervisor_sales = sales.groupby("supervisor_code", as_index=False).agg({
-    "total_sales_value": "sum",
-    "returns_value": "sum",
-    "sales_after_returns": "sum"
-})
+    if "Returns Unit Before Edit" in df.columns and "Sales Price" in df.columns:
+        df["Returns Value"] = df["Returns Unit Before Edit"] * df["Sales Price"]
 
-
-# =========================
-# 🔗 MERGE
-# =========================
-rep = rep_sales.merge(rep_target, on="rep_code", how="left")
-manager = manager_sales.merge(manager_target, on="manager_code", how="left")
-area = area_sales.merge(area_target, on="area_code", how="left")
-supervisor = supervisor_sales.merge(supervisor_target, on="supervisor_code", how="left")
-
-
-# =========================
-# 📊 ACHIEVEMENT %
-# =========================
-def achievement(df):
-
-    if "target_value" not in df.columns:
-        df["target_value"] = 0
-
-    df["target_value"] = df["target_value"].fillna(0)
-
-    df["achievement_%"] = 0
-
-    mask = df["target_value"] > 0
-
-    df.loc[mask, "achievement_%"] = (
-        df.loc[mask, "total_sales_value"] / df.loc[mask, "target_value"]
-    ) * 100
+    if "Total Sales Value" in df.columns and "Returns Value" in df.columns:
+        df["Sales After Returns"] = df["Total Sales Value"] - df["Returns Value"]
 
     return df
 
 
-rep = achievement(rep)
-manager = achievement(manager)
-area = achievement(area)
-supervisor = achievement(supervisor)
-
-
 # =========================
-# 📊 OUTPUT
+# 🎯 TARGET CLEAN ONLY
 # =========================
-st.header("🔥 SALES VS TARGET")
+def build_target_pipeline(df):
 
-st.subheader("👨‍💼 Rep")
-st.dataframe(rep, use_container_width=True)
+    df = df.copy()
+    df.columns = df.columns.str.strip()
 
-st.subheader("🏢 Manager")
-st.dataframe(manager, use_container_width=True)
+    # numeric only
+    for col in df.columns:
+        if "Target" in col:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-st.subheader("🌍 Area")
-st.dataframe(area, use_container_width=True)
-
-st.subheader("🧑‍💼 Supervisor")
-st.dataframe(supervisor, use_container_width=True)
+    return df
