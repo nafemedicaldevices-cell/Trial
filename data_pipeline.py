@@ -9,7 +9,7 @@ def load_data(path="Overdue.xlsx"):
 
 
 # =========================
-# 🧼 CLEANING PIPELINE
+# 🧼 CLEAN DATA
 # =========================
 def clean_data(df):
     df = df.copy()
@@ -17,10 +17,10 @@ def clean_data(df):
     # 1️⃣ تنظيف أسماء الأعمدة
     df.columns = df.columns.str.strip()
 
-    # 2️⃣ حذف الصفوف الفاضية
+    # 2️⃣ حذف الصفوف الفاضية بالكامل
     df = df.dropna(how="all")
 
-    # 3️⃣ حذف التكرار
+    # 3️⃣ حذف التكرارات
     df = df.drop_duplicates()
 
     # 4️⃣ تنظيف النصوص
