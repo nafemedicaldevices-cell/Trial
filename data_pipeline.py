@@ -117,3 +117,173 @@ def build_target_pipeline(df, id_name, mapping):
         "products_quarter": product_group(quarter),
         "products_ytd": product_group(ytd),
     }
+
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
+# Sales
+#---------------------------------------------------------------------------------------------------------------------------------------------------------
+import pandas as pd
+import numpy as np
+
+# =========================
+# 📊 SALES PIPELINE CLEAN
+# =========================
+def build_sales_pipeline(sales, mapping, codes):
+
+    sales = sales.copy()
+    mapping = mapping.copy()
+    codes = codes.copy()
+
+    # =========================
+    # 🧹 CLEAN COLUMNS
+    # =========================
+    sales.columns = sales.columns.str.strip()
+
+    expected_cols = [
+        'Date','Warehouse Name','Client Code','Client Name','Notes','MF','Mostanad',
+        'Rep Code','Sales Unit Before Edit','Returns Unit Before Edit',
+        'Sales Price','Invoice Discounts','Sales Value'
+    ]
+
+    if len(sales.columns) == len(expected_cols):
+        sales.columns = expected_cols
+
+    # =========================
+    # 🔢 FIX TYPES
+    # =========================
+    num_cols = [
+        'Sales Unit Before Edit',
+        'Returns Unit Before Edit',
+        'Sales Price',
+        'Invoice Discounts',
+        'Sales Value'
+    ]
+
+    for col in num_cols:
+        if col in sales.columns:
+            sales[col] = pd.to_numeric(sales[col], errors='coerce').fillna(0)
+
+    # =========================
+    # 🧠 FIX PRODUCT HEADER ROWS (important)
+    # =========================
+    for col in ['Old Product Code', 'Old Product Name']:
+        if col not in sales.columns:
+            sales[col] = np.nan
+        sales[col] = sales[col].astype('object')
+
+    if 'Date' in sales.columns:
+        mask = sales['Date'].astype(str).str.strip().eq("كود الصنف")
+
+        sales.loc[mask, 'Old Product Code'] = sales.loc[mask, 'Warehouse Name']
+        sales.loc[mask, 'Old Product Name'] = sales.loc[mask, 'Client Code']
+
+        sales[['Old Product Code','Old Product Name']] = sales[
+            ['Old Product Code','Old Product Name']
+        ].ffill()
+
+    # =========================
+    # 🧹 FILTER CLEAN ROWS
+    # =========================
+    if 'Date' in sales.columns:
+        drop_keywords = 'المندوب|كود الفرع|تاريخ|كود الصنف'
+        sales = sales[sales['Date'].notna()]
+        sales = sales[~sales['Date'].astype(str).str.contains(drop_keywords, na=False)]
+
+    # =========================
+    # 🔢 FINAL NUMERIC CLEAN
+    # =========================
+    sales['Old Product Code'] = pd.to_numeric(sales['Old Product Code'], errors='coerce')
+    sales['Rep Code'] = pd.to_numeric(sales['Rep Code'], errors='coerce')
+
+    # =========================
+    # 🔗 MERGE MAPPING
+    # =========================
+    mapping_cols = [
+        'Old Product Code','4 Classification','Product Name',
+        'Product Code','Category','Next Factor','2 Classification'
+    ]
+    mapping_cols = [c for c in mapping_cols if c in mapping.columns]
+
+    sales = sales.merge(mapping[mapping_cols], on='Old Product Code', how='left')
+
+    sales['Next Factor'] = sales['Next Factor'].fillna(1)
+
+    # =========================
+    # 🔗 MERGE CODES
+    # =========================
+    sales = sales.merge(codes, on='Rep Code', how='left')
+
+    # =========================
+    # 💰 KPI CALCULATION
+    # =========================
+    sales['Total Sales Value'] = sales['Sales Unit Before Edit'] * sales['Sales Price']
+    sales['Returns Value'] = sales['Returns Unit Before Edit'] * sales['Sales Price']
+
+    sales['Net Sales Value'] = sales['Total Sales Value'] - sales['Returns Value']
+
+    sales['Net Units'] = (
+        sales['Sales Unit Before Edit'] - sales['Returns Unit Before Edit']
+    ) * sales['Next Factor']
+
+    # =========================
+    # 📊 SAFE GROUP ENGINE
+    # =========================
+    def safe_group(df, group_cols, sum_cols):
+        group_cols = [c for c in group_cols if c in df.columns]
+        sum_cols = [c for c in sum_cols if c in df.columns]
+
+        if not group_cols:
+            return pd.DataFrame()
+
+        return df.groupby(group_cols, as_index=False)[sum_cols].sum()
+
+    # =========================
+    # 📦 OUTPUT LEVELS
+    # =========================
+    return {
+
+        # 👨‍💼 REP
+        "rep_value": safe_group(
+            sales,
+            ['Rep Code'],
+            ['Total Sales Value','Returns Value','Net Sales Value','Net Units']
+        ),
+        "rep_products": safe_group(
+            sales,
+            ['Rep Code','Product Code','Product Name'],
+            ['Net Sales Value','Net Units']
+        ),
+
+        # 🏢 MANAGER
+        "manager_value": safe_group(
+            sales,
+            ['Manager Code'],
+            ['Total Sales Value','Returns Value','Net Sales Value','Net Units']
+        ),
+        "manager_products": safe_group(
+            sales,
+            ['Manager Code','Product Code','Product Name'],
+            ['Net Sales Value','Net Units']
+        ),
+
+        # 🌍 AREA
+        "area_value": safe_group(
+            sales,
+            ['Area Code'],
+            ['Total Sales Value','Returns Value','Net Sales Value','Net Units']
+        ),
+        "area_products": safe_group(
+            sales,
+            ['Area Code','Product Code','Product Name'],
+            ['Net Sales Value','Net Units']
+        ),
+
+        # 🧑‍💼 SUPERVISOR
+        "supervisor_value": safe_group(
+            sales,
+            ['Supervisor Code'],
+            ['Total Sales Value','Returns Value','Net Sales Value','Net Units']
+        ),
+
+        # 📦 RAW
+        "raw": sales
+    }
