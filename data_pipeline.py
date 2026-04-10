@@ -17,16 +17,33 @@ def load_data():
 
 
 # =========================
-# CLEAN SALES (SAFE)
+# CLEAN SALES (100% SAFE)
 # =========================
 def clean_sales(sales, mapping, codes):
 
     sales.columns = sales.columns.str.strip()
 
-    # SAFE CREATE COLUMNS
-    sales["Old Product Code"] = np.nan
-    sales["Old Product Name"] = np.nan
+    # -------------------------
+    # CREATE ALL POSSIBLE COLUMNS SAFELY
+    # -------------------------
+    needed_cols = [
+        "Rep Code",
+        "Old Product Code",
+        "Old Product Name",
+        "Manager Code",
+        "Area Code",
+        "Sales Unit Before Edit",
+        "Returns Unit Before Edit",
+        "Sales Price"
+    ]
 
+    for col in needed_cols:
+        if col not in sales.columns:
+            sales[col] = np.nan
+
+    # -------------------------
+    # PRODUCT HEADER EXTRACTION
+    # -------------------------
     if "Date" in sales.columns:
 
         mask = sales["Date"].astype(str).str.strip().eq("كود الصنف")
@@ -41,25 +58,41 @@ def clean_sales(sales, mapping, codes):
             ["Old Product Code","Old Product Name"]
         ].ffill()
 
-    sales["Old Product Code"] = pd.to_numeric(sales["Old Product Code"], errors="coerce")
-    sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
+    # -------------------------
+    # NUMERIC CONVERSION SAFE
+    # -------------------------
+    for col in ["Rep Code", "Old Product Code", "Manager Code", "Area Code"]:
+        if col in sales.columns:
+            sales[col] = pd.to_numeric(sales[col], errors="coerce")
 
+    # -------------------------
     # MERGE SAFE
-    sales = sales.merge(mapping, on="Old Product Code", how="left")
-    sales = sales.merge(codes, on="Rep Code", how="left")
+    # -------------------------
+    if mapping is not None and "Old Product Code" in sales.columns:
+        sales = sales.merge(mapping, on="Old Product Code", how="left")
 
-    # KPI SAFE
-    if "Sales Unit Before Edit" in sales.columns and "Sales Price" in sales.columns:
-        sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
-    else:
-        sales["Total Sales Value"] = 0
+    if codes is not None and "Rep Code" in sales.columns:
+        sales = sales.merge(codes, on="Rep Code", how="left")
 
-    if "Returns Unit Before Edit" in sales.columns:
-        sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
-    else:
-        sales["Returns Value"] = 0
+    # -------------------------
+    # KPI CALCULATION SAFE
+    # -------------------------
+    sales["Total Sales Value"] = (
+        sales["Sales Unit Before Edit"].fillna(0) *
+        sales["Sales Price"].fillna(0)
+    )
+
+    sales["Returns Value"] = (
+        sales["Returns Unit Before Edit"].fillna(0) *
+        sales["Sales Price"].fillna(0)
+    )
 
     sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
+
+    sales["Net Sales Unit"] = (
+        sales["Sales Unit Before Edit"].fillna(0) -
+        sales["Returns Unit Before Edit"].fillna(0)
+    )
 
     return sales
 
@@ -72,11 +105,14 @@ def clean_overdue(overdue):
     overdue = overdue.iloc[:, :9].copy()
 
     overdue.columns = [
-        "Client Name","Client Code","15 Days","30 Days","60 Days","90 Days",
-        "120 Days","More Than 120 Days","Balance"
+        "Client Name","Client Code","15 Days","30 Days","60 Days",
+        "90 Days","120 Days","More Than 120 Days","Balance"
     ]
 
-    overdue["Overdue"] = overdue["120 Days"] + overdue["More Than 120 Days"]
+    overdue["Overdue"] = (
+        overdue["120 Days"].fillna(0) +
+        overdue["More Than 120 Days"].fillna(0)
+    )
 
     return overdue
 
