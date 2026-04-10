@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-st.title("Overdue Step 3")
+st.title("Overdue Step 4")
 
 overdue = pd.read_excel("Overdue.xlsx")
 
@@ -10,9 +10,6 @@ overdue = pd.read_excel("Overdue.xlsx")
 # =========================
 overdue = overdue.iloc[:, :9].copy()
 
-# =========================
-# RENAME COLUMNS
-# =========================
 overdue.columns = [
     "Client Name",
     "Client Code",
@@ -26,7 +23,13 @@ overdue.columns = [
 ]
 
 # =========================
+# FIX DTYPE (IMPORTANT 🚨)
+# =========================
+overdue["Rep Code"] = pd.Series(dtype="object")
+overdue["Old Rep Name"] = pd.Series(dtype="object")
+
+# =========================
 # SHOW RESULT
 # =========================
-st.subheader("📄 After Renaming Columns")
+st.subheader("📄 After Adding Empty Columns")
 st.dataframe(overdue)
