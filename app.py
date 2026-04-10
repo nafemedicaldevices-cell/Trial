@@ -18,20 +18,21 @@ data = dp.load_data()
 # =========================
 # 🎯 TARGETS
 # =========================
-rep_target = dp.build_target_pipeline(data["target_rep"], "Rep Code")
-manager_target = dp.build_target_pipeline(data["target_manager"], "Manager Code")
-area_target = dp.build_target_pipeline(data["target_area"], "Area Code")
-supervisor_target = dp.build_target_pipeline(data["target_supervisor"], "Supervisor Code")
+rep_target = dp.build_target(data["target_rep"], "Rep Code")
+manager_target = dp.build_target(data["target_manager"], "Manager Code")
+area_target = dp.build_target(data["target_area"], "Area Code")
+supervisor_target = dp.build_target(data["target_supervisor"], "Supervisor Code")
 
 
 # =========================
 # 💰 SALES
 # =========================
-sales = dp.build_sales_pipeline(
+sales = dp.build_sales(
     data["sales"],
     data["mapping"],
     data["codes"]
 )
+
 
 groups = dp.build_groups(sales)
 
@@ -39,7 +40,7 @@ groups = dp.build_groups(sales)
 # =========================
 # 🔗 MERGE SAFE
 # =========================
-def safe_merge(left, right, key):
+def merge_safe(left, right, key):
 
     if key in left.columns and key in right.columns:
         return left.merge(right, on=key, how="left")
@@ -47,10 +48,10 @@ def safe_merge(left, right, key):
     return left
 
 
-rep = safe_merge(groups["rep"], rep_target, "Rep Code")
-manager = safe_merge(groups["manager"], manager_target, "Manager Code")
-area = safe_merge(groups["area"], area_target, "Area Code")
-supervisor = safe_merge(groups["supervisor"], supervisor_target, "Supervisor Code")
+rep = merge_safe(groups["rep"], rep_target, "Rep Code")
+manager = merge_safe(groups["manager"], manager_target, "Manager Code")
+area = merge_safe(groups["area"], area_target, "Area Code")
+supervisor = merge_safe(groups["supervisor"], supervisor_target, "Supervisor Code")
 
 
 # =========================
