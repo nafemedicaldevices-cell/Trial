@@ -1,12 +1,11 @@
 import pandas as pd
-import numpy as np
 
 # =========================
-# 📅 TIME
+# 📅 TIME SETTINGS
 # =========================
 current_month = pd.Timestamp.today().month
 current_quarter = (current_month - 1) // 3 + 1
-past_quarters = max(current_quarter - 1, 1)
+past_quarters = max(current_quarter - 1, 0)
 
 
 # =========================
@@ -32,7 +31,7 @@ def load_data():
 
 
 # =========================
-# 🚀 TARGET PIPELINE (NO MERGE WITH SALES)
+# 🚀 PIPELINE
 # =========================
 def build_target_pipeline(df, id_name, mapping):
 
@@ -40,12 +39,11 @@ def build_target_pipeline(df, id_name, mapping):
     mapping = mapping.copy()
 
     df.columns = df.columns.str.strip()
-    mapping.columns = mapping.columns.str.strip()
 
     fixed_cols = [c for c in ["Year", "Product Code", "Old Product Name", "Sales Price"] if c in df.columns]
     dynamic_cols = [c for c in df.columns if c not in fixed_cols]
 
-    # reshape
+    # 🔄 reshape
     df = df.melt(
         id_vars=fixed_cols,
         value_vars=dynamic_cols,
@@ -53,7 +51,7 @@ def build_target_pipeline(df, id_name, mapping):
         value_name="Target (Unit)"
     )
 
-    # clean IDs
+    # 🧹 clean IDs
     df[id_name] = pd.to_numeric(
         df[id_name].astype(str).str.replace(r"[^0-9]", "", regex=True),
         errors="coerce"
@@ -64,34 +62,33 @@ def build_target_pipeline(df, id_name, mapping):
 
     mapping = mapping.drop_duplicates("Product Code")
 
-    # merge mapping (TARGET ONLY)
+    # 🔗 merge
     df = df.merge(mapping, on="Product Code", how="left")
 
-    # numeric clean
+    # 🔢 numeric
     df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
     df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
 
-    # value
+    # 💰 value
     df["Full Value"] = df["Target (Unit)"] * df["Sales Price"]
 
     # =========================
-    # KPI LOGIC
+    # 📊 KPI CALCULATION
     # =========================
     full = df.copy()
+    full["Value"] = full["Full Value"]
 
     month = df.copy()
     month["Value"] = full["Full Value"] * (current_month / 12)
 
-    ytd = df.copy()
-    ytd["Value"] = full["Full Value"] * (current_month / 12)
-
     quarter = df.copy()
     quarter["Value"] = full["Full Value"] * (past_quarters / 4)
 
-    full["Value"] = full["Full Value"]
+    ytd = df.copy()
+    ytd["Value"] = full["Full Value"] * (current_month / 12)
 
     # =========================
-    # VALUE TABLE
+    # 📊 VALUE TABLE
     # =========================
     def group(d):
         return d.groupby([id_name], as_index=False)["Value"].sum()
@@ -102,7 +99,7 @@ def build_target_pipeline(df, id_name, mapping):
     value_table["YTD 📈"] = group(ytd)["Value"]
 
     # =========================
-    # PRODUCTS TABLE
+    # 📦 PRODUCTS TABLE
     # =========================
     def product_group(d):
         return d.groupby(
