@@ -1,12 +1,18 @@
 import streamlit as st
 import pandas as pd
 
-st.title("Overdue Step 8 - KPI")
+st.set_page_config(page_title="Overdue Dashboard", layout="wide")
 
-overdue = pd.read_excel("Overdue.xlsx")
+st.title("📊 Overdue Dashboard")
 
 # =========================
-# BASIC CLEANING
+# 📥 LOAD DATA
+# =========================
+overdue = pd.read_excel("Overdue.xlsx")
+codes = pd.read_excel("Code.xlsx")
+
+# =========================
+# BASIC CLEANING (OVERDUE)
 # =========================
 overdue = overdue.iloc[:, :9].copy()
 
@@ -23,7 +29,7 @@ overdue.columns = [
 ]
 
 # =========================
-# NUMERIC CONVERSION (safe minimal)
+# NUMERIC CONVERSION
 # =========================
 num_cols = [
     "15 Days", "30 Days", "60 Days", "90 Days",
@@ -34,25 +40,29 @@ for col in num_cols:
     overdue[col] = pd.to_numeric(overdue[col], errors="coerce").fillna(0)
 
 # =========================
-# OVERDUE KPI
+# KPI CALCULATION
 # =========================
 overdue["Overdue"] = overdue["120 Days"] + overdue["More Than 120 Days"]
 
 # =========================
-# MERGE CODES (if exists)
+# CLEAN CODES
 # =========================
-try:
-    codes = pd.read_excel("Codes.xlsx")
+codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce").astype("Int64")
 
-    codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce").astype("Int64")
+# =========================
+# MERGE DATASETS
+# =========================
+if "Rep Code" in overdue.columns:
     overdue = overdue.merge(codes, on="Rep Code", how="left")
 
-except Exception as e:
-    st.warning("Codes file not found or merge skipped")
-    st.write(e)
+# =========================
+# DISPLAY DATA
+# =========================
+st.subheader("📄 Final Data")
+st.dataframe(overdue)
 
 # =========================
-# SAFE GROUP FUNCTION
+# GROUPED KPI
 # =========================
 def safe_group(df, group_cols, sum_cols):
     group_cols = [c for c in group_cols if c in df.columns]
@@ -63,20 +73,17 @@ def safe_group(df, group_cols, sum_cols):
 
     return df.groupby(group_cols, as_index=False)[sum_cols].sum()
 
-# =========================
-# EXAMPLE GROUPING
-# =========================
 grouped = safe_group(
     overdue,
     ["Rep Code"],
     ["Overdue", "Balance"]
 )
 
-# =========================
-# SHOW RESULTS
-# =========================
-st.subheader("📊 KPI Data")
-st.dataframe(overdue)
-
-st.subheader("📈 Grouped KPI (Rep Level)")
+st.subheader("📊 KPI by Rep")
 st.dataframe(grouped)
+
+# =========================
+# DEBUG INFO
+# =========================
+st.write("Rows:", overdue.shape[0])
+st.write("Columns:", overdue.columns.tolist())
