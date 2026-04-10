@@ -59,3 +59,18 @@ st.dataframe(sales["area_products"])
 
 st.write("SALES SHAPE:", data["sales"].shape)
 st.write("SALES COLS
+
+sales = dp.build_sales_pipeline(
+    data["sales"],
+    data["mapping"],
+    data["codes"]
+)
+
+st.header("DEBUG SALES")
+
+st.write("RAW SHAPE:", sales["raw"].shape)
+st.write("RAW HEAD:")
+st.dataframe(sales["raw"].head())
+
+st.write("REP VALUE SHAPE:", sales["rep_value"].shape)
+st.dataframe(sales["rep_value"].head())
