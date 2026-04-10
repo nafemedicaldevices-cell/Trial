@@ -1,7 +1,8 @@
 import pandas as pd
-import numpy as np
 
-# 📅 Time setup
+# =========================
+# 📅 TIME SETTINGS
+# =========================
 current_month = pd.Timestamp.today().month
 current_quarter = (current_month - 1) // 3 + 1
 past_quarters = max(current_quarter - 1, 0)
@@ -30,7 +31,7 @@ def load_data():
 
 
 # =========================
-# 🚀 PIPELINE FUNCTION
+# 🚀 PIPELINE
 # =========================
 def build_target_pipeline(df, id_name, mapping):
 
@@ -42,7 +43,7 @@ def build_target_pipeline(df, id_name, mapping):
     fixed_cols = [c for c in ["Year", "Product Code", "Old Product Name", "Sales Price"] if c in df.columns]
     dynamic_cols = [c for c in df.columns if c not in fixed_cols]
 
-    # 🔄 melt
+    # 🔄 reshape
     df = df.melt(
         id_vars=fixed_cols,
         value_vars=dynamic_cols,
@@ -64,7 +65,7 @@ def build_target_pipeline(df, id_name, mapping):
     # 🔗 merge
     df = df.merge(mapping, on="Product Code", how="left")
 
-    # 🔢 numeric cleanup
+    # 🔢 numeric
     df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
     df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
 
@@ -89,29 +90,28 @@ def build_target_pipeline(df, id_name, mapping):
     # =========================
     # 📊 VALUE TABLE
     # =========================
-    def group_value(d):
+    def group(d):
         return d.groupby([id_name], as_index=False)["Value"].sum()
 
-    value_table = group_value(full).rename(columns={"Value": "🏆 Full Year"})
-    value_table["📅 Month"] = group_value(month)["Value"]
-    value_table["📊 Quarter"] = group_value(quarter)["Value"]
-    value_table["📈 YTD"] = group_value(ytd)["Value"]
+    value_table = group(full).rename(columns={"Value": "Full Year 🏆"})
+    value_table["Month 📅"] = group(month)["Value"]
+    value_table["Quarter 📊"] = group(quarter)["Value"]
+    value_table["YTD 📈"] = group(ytd)["Value"]
 
     # =========================
-    # 📦 PRODUCTS TABLE (Units + Value)
+    # 📦 PRODUCTS TABLE
     # =========================
     def product_group(d):
         return d.groupby(
             [id_name, "Product Code", "Product Name"],
             as_index=False
         ).agg(
-            📦_Units=("Target (Unit)", "sum"),
-            💰_Value=("Value", "sum")
+            Units=("Target (Unit)", "sum"),
+            Value=("Value", "sum")
         )
 
     return {
         "value_table": value_table,
-
         "products_full": product_group(full),
         "products_month": product_group(month),
         "products_quarter": product_group(quarter),
