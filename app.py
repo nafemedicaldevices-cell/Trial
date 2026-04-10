@@ -1,18 +1,43 @@
 import streamlit as st
-import data_pipeline as dp
-
-data = dp.load_data()
-
-st.title("Test Load Data")
-
-st.write(data["sales"].head())
-
-
 import pandas as pd
 import data_pipeline as dp
 
-mapping = pd.read_excel("Mapping.xlsx")
+# =========================
+# TITLE
+# =========================
+st.title("📊 Sales Dashboard - Test Version")
 
-rep = dp.build_target_pipeline("Target Rep.xlsx", "Rep Code", mapping)
+# =========================
+# LOAD DATA
+# =========================
+data = dp.load_data()
 
-print(rep["value_full"].head())
+# =========================
+# SHOW RAW DATA (STEP 1)
+# =========================
+st.subheader("📌 Raw Sales Data")
+st.write(data["sales"].head())
+
+# =========================
+# TARGET PIPELINE (REP)
+# =========================
+st.subheader("🎯 Rep Target - Full Value")
+
+mapping = data["mapping"]
+
+rep = dp.build_target_pipeline(
+    "Target Rep.xlsx",
+    "Rep Code",
+    mapping
+)
+
+st.write(rep["value_full"].head())
+
+# =========================
+# OPTIONAL DEBUG INFO
+# =========================
+st.subheader("📌 Data Shapes")
+
+st.write("Sales shape:", data["sales"].shape)
+st.write("Mapping shape:", data["mapping"].shape)
+st.write("Codes shape:", data["codes"].shape)
