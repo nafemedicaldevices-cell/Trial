@@ -13,41 +13,36 @@ data = dp.load_data()
 
 
 # =========================
-# 🚀 BUILD KPI
+# 💰 SALES KPI
 # =========================
-kpi = dp.build_kpi(data)
+st.header("💰 SALES KPI")
+
+sales = dp.build_sales_pipeline(data["sales"])
+
+st.subheader("Rep Sales")
+st.dataframe(sales["rep_value"], use_container_width=True)
+
+st.subheader("Manager Sales")
+st.dataframe(sales["manager_value"], use_container_width=True)
+
+st.subheader("Area Sales")
+st.dataframe(sales["area_value"], use_container_width=True)
+
+st.subheader("Supervisor Sales")
+st.dataframe(sales["supervisor_value"], use_container_width=True)
 
 
 # =========================
-# 👨‍💼 REP
+# 🎯 TARGET KPI
 # =========================
-st.header("👨‍💼 Rep KPI")
-st.dataframe(kpi["rep"], use_container_width=True)
+st.header("🎯 TARGET KPI")
 
+rep_target = dp.build_target(data["target_rep"], "Rep Code", data["mapping"])
+manager_target = dp.build_target(data["target_manager"], "Manager Code", data["mapping"])
+area_target = dp.build_target(data["target_area"], "Area Code", data["mapping"])
+supervisor_target = dp.build_target(data["target_supervisor"], "Supervisor Code", data["mapping"])
 
-# =========================
-# 🏢 MANAGER
-# =========================
-st.header("🏢 Manager KPI")
-st.dataframe(kpi["manager"], use_container_width=True)
-
-
-# =========================
-# 🌍 AREA
-# =========================
-st.header("🌍 Area KPI")
-st.dataframe(kpi["area"], use_container_width=True)
-
-
-# =========================
-# 🧑‍💼 SUPERVISOR
-# =========================
-st.header("🧑‍💼 Supervisor KPI")
-st.dataframe(kpi["supervisor"], use_container_width=True)
-
-
-# =========================
-# 🧬 EVAK
-# =========================
-st.header("🧬 Evak KPI")
-st.dataframe(kpi["evak"], use_container_width=True)
+st.dataframe(rep_target)
+st.dataframe(manager_target)
+st.dataframe(area_target)
+st.dataframe(supervisor_target)
