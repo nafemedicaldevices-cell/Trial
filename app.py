@@ -56,3 +56,6 @@ st.header("📦 SALES PRODUCTS")
 st.dataframe(sales["rep_products"])
 st.dataframe(sales["manager_products"])
 st.dataframe(sales["area_products"])
+
+st.write("SALES SHAPE:", data["sales"].shape)
+st.write("SALES COLS
