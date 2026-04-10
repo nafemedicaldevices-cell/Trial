@@ -1,18 +1,44 @@
 import streamlit as st
 import data_pipeline as dp
 
-st.title("📊 Sales Dashboard")
-
-# LOAD DATA
 data = dp.load_data()
 
-# BUILD TARGET
-rep_target = dp.build_target_pipeline(
+st.title("📊 Sales Dashboard")
+
+# =========================
+# REP
+# =========================
+rep = dp.build_target_pipeline(
     data["target_rep"],
     "Rep Code",
     data["mapping"]
 )
 
-# SHOW RESULT
-st.subheader("Rep Target Value")
-st.write(rep_target["value_full"])
+st.subheader("Rep KPI")
+st.write(rep["value_full"])
+
+
+# =========================
+# MANAGER
+# =========================
+manager = dp.build_target_pipeline(
+    data["target_manager"],
+    "Manager Code",
+    data["mapping"]
+)
+
+st.subheader("Manager KPI")
+st.write(manager["value_full"])
+
+
+# =========================
+# AREA
+# =========================
+area = dp.build_target_pipeline(
+    data["target_area"],
+    "Area Code",
+    data["mapping"]
+)
+
+st.subheader("Area KPI")
+st.write(area["value_full"])
