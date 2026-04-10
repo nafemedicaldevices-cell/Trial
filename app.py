@@ -6,17 +6,17 @@ import data_pipeline as dp
 # 🎨 UI
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 Sales Performance Dashboard")
+st.title("📊 Sales vs Target Dashboard")
 
 
 # =========================
-# 📥 LOAD
+# 📥 DATA
 # =========================
 data = dp.load_data()
 
 
 # =========================
-# 🎯 STEP 1: TARGET FIRST
+# 🚀 TARGETS FIRST
 # =========================
 rep_target = dp.build_target_pipeline(data["target_rep"], "Rep Code")
 manager_target = dp.build_target_pipeline(data["target_manager"], "Manager Code")
@@ -25,7 +25,7 @@ supervisor_target = dp.build_target_pipeline(data["target_supervisor"], "Supervi
 
 
 # =========================
-# 💰 STEP 2: SALES SECOND
+# 💰 SALES SECOND
 # =========================
 sales = dp.build_sales_pipeline(
     data["sales"],
@@ -34,19 +34,22 @@ sales = dp.build_sales_pipeline(
 )
 
 
+groups = dp.build_groups(sales)
+
+
 # =========================
-# 🔗 STEP 3: MERGE
+# 🔗 MERGE
 # =========================
-rep = sales["rep_value"].merge(rep_target, on="Rep Code", how="left")
-manager = sales["manager_value"].merge(manager_target, on="Manager Code", how="left")
-area = sales["area_value"].merge(area_target, on="Area Code", how="left")
-supervisor = sales["supervisor_value"].merge(supervisor_target, on="Supervisor Code", how="left")
+rep = groups["rep"].merge(rep_target, on="Rep Code", how="left")
+manager = groups["manager"].merge(manager_target, on="Manager Code", how="left")
+area = groups["area"].merge(area_target, on="Area Code", how="left")
+supervisor = groups["supervisor"].merge(supervisor_target, on="Supervisor Code", how="left")
 
 
 # =========================
 # 📊 ACHIEVEMENT
 # =========================
-def add_achievement(df, target_col):
+def achievement(df, target_col):
 
     if target_col not in df.columns:
         df[target_col] = 0
@@ -64,10 +67,10 @@ def add_achievement(df, target_col):
     return df
 
 
-rep = add_achievement(rep, "Target Value")
-manager = add_achievement(manager, "Target Value")
-area = add_achievement(area, "Target Value")
-supervisor = add_achievement(supervisor, "Target Value")
+rep = achievement(rep, "Target Value")
+manager = achievement(manager, "Target Value")
+area = achievement(area, "Target Value")
+supervisor = achievement(supervisor, "Target Value")
 
 
 # =========================
