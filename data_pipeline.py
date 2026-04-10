@@ -1,8 +1,36 @@
 
 import pandas as pd
+
+
+# =========================
+# 📂 GET DATA
+# =========================
+def load_data():
+    return {
+        "sales": pd.read_excel("Sales.xlsx"),
+        "overdue": pd.read_excel("Overdue.xlsx"),
+        "extra_discounts": pd.read_excel("Extradiscounts.xlsx"),
+        "opening": pd.read_excel("Opening.xlsx"),
+        "opening_detail": pd.read_excel("Opening Detail.xlsx"),
+
+        "target_manager": pd.read_excel("Target Manager.xlsx"),
+        "target_area": pd.read_excel("Target Area.xlsx"),
+        "target_rep": pd.read_excel("Target Rep.xlsx"),
+        "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
+        "target_evak": pd.read_excel("Target Evak.xlsx"),
+
+        "mapping": pd.read_excel("Mapping.xlsx"),
+        "codes": pd.read_excel("Code.xlsx")
+    }
+
+
+import pandas as pd
 import numpy as np
 
 
+# =========================
+# 📊 SAFE GROUP
+# =========================
 def safe_group(df, group_cols, sum_cols):
     group_cols = [c for c in group_cols if c in df.columns]
     sum_cols = [c for c in sum_cols if c in df.columns]
@@ -13,13 +41,16 @@ def safe_group(df, group_cols, sum_cols):
     return df.groupby(group_cols, as_index=False)[sum_cols].sum()
 
 
+# =========================
+# 🚀 PIPELINE
+# =========================
 def build_overdue_pipeline(overdue, codes):
 
     df = overdue.copy()
     df.columns = df.columns.str.strip()
 
     # =========================
-    # 📌 BASIC CLEANING
+    # 📌 CLEAN
     # =========================
     df = df.iloc[:, :9]
     df.columns = [
@@ -28,13 +59,13 @@ def build_overdue_pipeline(overdue, codes):
     ]
 
     # =========================
-    # 🧩 INIT FIELDS
+    # 🧩 INIT
     # =========================
     df["Rep Code"] = None
     df["Old Rep Name"] = None
 
     # =========================
-    # 🔎 EXTRACT REP HEADER
+    # 🔎 HEADER EXTRACT
     # =========================
     mask = df["Client Name"].astype(str).str.strip().eq("كود المندوب")
 
