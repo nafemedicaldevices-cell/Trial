@@ -7,138 +7,102 @@ import numpy as np
 def load_data():
     return {
         "sales": pd.read_excel("Sales.xlsx"),
-        "overdue": pd.read_excel("Overdue.xlsx"),
-        "extra_discounts": pd.read_excel("Extradiscounts.xlsx"),
-        "opening": pd.read_excel("Opening.xlsx"),
-        "opening_detail": pd.read_excel("Opening Detail.xlsx"),
-
+        "target_rep": pd.read_excel("Target Rep.xlsx"),
         "target_manager": pd.read_excel("Target Manager.xlsx"),
         "target_area": pd.read_excel("Target Area.xlsx"),
-        "target_rep": pd.read_excel("Target Rep.xlsx"),
         "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
         "target_evak": pd.read_excel("Target Evak.xlsx"),
-
         "mapping": pd.read_excel("Mapping.xlsx"),
         "codes": pd.read_excel("Code.xlsx")
     }
 
 
 # =========================
-# 🎯 TARGET PIPELINE
+# 🎯 TARGET PIPELINE (VALUE ONLY)
 # =========================
-def build_target_pipeline(df, id_name, mapping):
+def build_target(df, id_name, mapping):
 
     df = df.copy()
     mapping = mapping.copy()
 
     df.columns = df.columns.str.strip()
 
-    fixed_cols = [c for c in ["Year", "Product Code", "Old Product Name", "Sales Price"] if c in df.columns]
+    fixed_cols = [c for c in ["Year", "Product Code", "Sales Price"] if c in df.columns]
     dynamic_cols = [c for c in df.columns if c not in fixed_cols]
 
     df = df.melt(
         id_vars=fixed_cols,
         value_vars=dynamic_cols,
         var_name=id_name,
-        value_name="Target (Unit)"
+        value_name="Target Units"
     )
 
     df[id_name] = pd.to_numeric(df[id_name].astype(str).str.replace(r"[^0-9]", "", regex=True), errors="coerce")
     df["Product Code"] = pd.to_numeric(df["Product Code"], errors="coerce")
-    mapping["Product Code"] = pd.to_numeric(mapping["Product Code"], errors="coerce")
 
+    mapping["Product Code"] = pd.to_numeric(mapping["Product Code"], errors="coerce")
     mapping = mapping.drop_duplicates("Product Code")
 
     df = df.merge(mapping, on="Product Code", how="left")
 
-    df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
+    df["Target Units"] = pd.to_numeric(df["Target Units"], errors="coerce").fillna(0)
     df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
 
-    df["Full Value"] = df["Target (Unit)"] * df["Sales Price"]
+    df["Target Value"] = df["Target Units"] * df["Sales Price"]
 
-    def group(d):
-        return d.groupby([id_name], as_index=False)["Full Value"].sum()
-
-    return {
-        "value_table": group(df),
-        "products_full": df.groupby(
-            [id_name, "Product Code", "Product Name"],
-            as_index=False
-        )["Full Value"].sum()
-    }
+    return df.groupby([id_name], as_index=False)["Target Value"].sum()
 
 
 # =========================
-# 💰 SALES PIPELINE (FIXED)
+# 💰 SALES PIPELINE
 # =========================
-def build_sales_pipeline(sales, mapping, codes):
+def build_sales(df):
 
-    sales = sales.copy()
-    mapping = mapping.copy()
-    codes = codes.copy()
+    df = df.copy()
+    df.columns = df.columns.str.strip()
 
-    sales.columns = sales.columns.str.strip()
-
-    # 🔢 numeric fix
     for c in [
         "Sales Unit Before Edit",
         "Returns Unit Before Edit",
-        "Sales Price"
+        "Sales Price",
+        "Invoice Discounts"
     ]:
-        if c in sales.columns:
-            sales[c] = pd.to_numeric(sales[c], errors="coerce").fillna(0)
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
-    # 💰 KPIs
-    sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
-    sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
-    sales["Net Sales Value"] = sales["Total Sales Value"] - sales["Returns Value"]
-    sales["Net Units"] = sales["Sales Unit Before Edit"] - sales["Returns Unit Before Edit"]
+    df["Total Sales Value"] = df["Sales Unit Before Edit"] * df["Sales Price"]
+    df["Returns Value"] = df["Returns Unit Before Edit"] * df["Sales Price"]
+    df["Sales After Returns"] = df["Total Sales Value"] - df["Returns Value"]
 
-    # 🔑 FIX IDS
-    if "Rep Code" in sales.columns:
-        sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
+    return df
 
-    if "Manager Code" in sales.columns:
-        sales["Manager Code"] = pd.to_numeric(sales["Manager Code"], errors="coerce")
 
-    if "Area Code" in sales.columns:
-        sales["Area Code"] = pd.to_numeric(sales["Area Code"], errors="coerce")
+# =========================
+# 📊 FINAL VALUE TABLE (MERGED)
+# =========================
+def build_kpi(data):
 
-    if "Supervisor Code" in sales.columns:
-        sales["Supervisor Code"] = pd.to_numeric(sales["Supervisor Code"], errors="coerce")
+    sales = build_sales(data["sales"])
 
-    # 🔗 merge codes
-    if "Rep Code" in sales.columns:
-        codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
-        sales = sales.merge(codes, on="Rep Code", how="left")
+    def group_sales(col):
+        return sales.groupby(col, as_index=False).agg({
+            "Total Sales Value": "sum",
+            "Returns Value": "sum",
+            "Sales After Returns": "sum",
+            "Invoice Discounts": "sum"
+        })
 
-    # =========================
-    # 📊 GROUP FUNCTION
-    # =========================
-    def group(df, key):
-        if key not in df.columns:
-            return pd.DataFrame()
-        return df.groupby([key], as_index=False)[
-            ["Total Sales Value", "Returns Value", "Net Sales Value", "Net Units"]
-        ].sum()
+    def build_level(df_target, key):
+        target = build_target(df_target, key, data["mapping"])
 
-    def group_products(df, key):
-        if key not in df.columns:
-            return pd.DataFrame()
-        return df.groupby(
-            [key, "Product Code", "Product Name"],
-            as_index=False
-        )[["Net Sales Value", "Net Units"]].sum()
+        sales_value = group_sales(key)
+
+        return target.merge(sales_value, on=key, how="left").fillna(0)
 
     return {
-        "rep_value": group(sales, "Rep Code"),
-        "manager_value": group(sales, "Manager Code"),
-        "area_value": group(sales, "Area Code"),
-        "supervisor_value": group(sales, "Supervisor Code"),
-
-        "rep_products": group_products(sales, "Rep Code"),
-        "manager_products": group_products(sales, "Manager Code"),
-        "area_products": group_products(sales, "Area Code"),
-
-        "raw": sales
+        "rep": build_level(data["target_rep"], "Rep Code"),
+        "manager": build_level(data["target_manager"], "Manager Code"),
+        "area": build_level(data["target_area"], "Area Code"),
+        "supervisor": build_level(data["target_supervisor"], "Supervisor Code"),
+        "evak": build_level(data["target_evak"], "Evak Code"),
     }
