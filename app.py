@@ -2,75 +2,48 @@ import streamlit as st
 import data_pipeline as dp
 
 st.set_page_config(layout="wide")
-st.title("📊 Sales Performance Dashboard")
+st.title("📊 Sales & Target Unified Dashboard")
 
-# =========================
-# 📂 LOAD DATA
-# =========================
 data = dp.load_data()
 
-
-# =========================
-# 🎯 TARGET
-# =========================
-rep = dp.build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
-manager = dp.build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"])
-area = dp.build_target_pipeline(data["target_area"], "Area Code", data["mapping"])
-supervisor = dp.build_target_pipeline(data["target_supervisor"], "Supervisor Code", data["mapping"])
-evak = dp.build_target_pipeline(data["target_evak"], "Evak Code", data["mapping"])
-
-st.header("🎯 TARGET KPI")
-st.dataframe(rep["value_table"])
-st.dataframe(manager["value_table"])
-st.dataframe(area["value_table"])
-st.dataframe(supervisor["value_table"])
-st.dataframe(evak["value_table"])
+kpi = dp.build_kpi(data)
 
 
 # =========================
-# 💰 SALES
+# 🎯 REP
 # =========================
-sales = dp.build_sales_pipeline(
-    data["sales"],
-    data["mapping"],
-    data["codes"]
-)
+st.header("👨‍💼 REP KPI")
 
-st.header("💰 SALES KPI")
-
-st.subheader("Rep")
-st.dataframe(sales["rep_value"])
-
-st.subheader("Manager")
-st.dataframe(sales["manager_value"])
-
-st.subheader("Area")
-st.dataframe(sales["area_value"])
-
-st.subheader("Supervisor")
-st.dataframe(sales["supervisor_value"])
+st.dataframe(kpi["rep"])
 
 
-st.header("📦 SALES PRODUCTS")
+# =========================
+# 🏢 MANAGER
+# =========================
+st.header("🏢 MANAGER KPI")
 
-st.dataframe(sales["rep_products"])
-st.dataframe(sales["manager_products"])
-st.dataframe(sales["area_products"])
+st.dataframe(kpi["manager"])
 
-st.write("SALES SHAPE:", data["sales"].shape)
-st.write("SALES COLS
 
-sales = dp.build_sales_pipeline(
-    data["sales"],
-    data["mapping"],
-    data["codes"]
-)
+# =========================
+# 🌍 AREA
+# =========================
+st.header("🌍 AREA KPI")
 
-st.header("DEBUG SALES")
+st.dataframe(kpi["area"])
 
-st.write("RAW SHAPE:", sales["raw"].shape)
-st.write("RAW HEAD:")
-st.dataframe(sales["raw"].head())
 
-st.write("REP VALUE SHAPE:", sales["rep_value"].shape)
-st.dataframe(sales["rep_value"].head())
+# =========================
+# 🧑‍💼 SUPERVISOR
+# =========================
+st.header("🧑‍💼 SUPERVISOR KPI")
+
+st.dataframe(kpi["supervisor"])
+
+
+# =========================
+# 🧬 EVAK
+# =========================
+st.header("🧬 EVAK KPI")
+
+st.dataframe(kpi["evak"])
