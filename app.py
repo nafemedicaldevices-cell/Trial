@@ -2,12 +2,10 @@ import streamlit as st
 import data_pipeline as dp
 
 # =========================
-# 🎨 PAGE CONFIG
+# 🎨 CONFIG
 # =========================
 st.set_page_config(layout="wide")
-
 st.title("📊 Sales Performance Dashboard")
-st.markdown("### 🚀 KPI System (Rep / Manager / Area / Supervisor / Evak)")
 
 
 # =========================
@@ -17,7 +15,7 @@ data = dp.load_data()
 
 
 # =========================
-# ⚙️ PIPELINES
+# 🚀 TARGET PIPELINES
 # =========================
 rep = dp.build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
 manager = dp.build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"])
@@ -27,66 +25,33 @@ evak = dp.build_target_pipeline(data["target_evak"], "Evak Code", data["mapping"
 
 
 # =========================
-# 📊 VALUE KPI
+# 📊 TARGET KPI
 # =========================
-st.header("📊 VALUE KPI")
+st.header("🎯 TARGET KPI")
 
-st.subheader("👨‍💼 Rep")
-st.dataframe(rep["value_table"], use_container_width=True)
-
-st.subheader("🏢 Manager")
-st.dataframe(manager["value_table"], use_container_width=True)
-
-st.subheader("🌍 Area")
-st.dataframe(area["value_table"], use_container_width=True)
-
-st.subheader("🧑‍💼 Supervisor")
-st.dataframe(supervisor["value_table"], use_container_width=True)
-
-st.subheader("🧬 Evak")
-st.dataframe(evak["value_table"], use_container_width=True)
+st.dataframe(rep["value_table"])
+st.dataframe(manager["value_table"])
+st.dataframe(area["value_table"])
+st.dataframe(supervisor["value_table"])
+st.dataframe(evak["value_table"])
 
 
 # =========================
-# 📦 PRODUCTS KPI
+# 📊 TARGET PRODUCTS
 # =========================
-st.header("📦 PRODUCTS KPI")
+st.header("📦 TARGET PRODUCTS")
 
-st.subheader("👨‍💼 Rep Products 🏆📅📊📈")
-st.dataframe(rep["products_full"], use_container_width=True)
-st.dataframe(rep["products_month"], use_container_width=True)
-st.dataframe(rep["products_quarter"], use_container_width=True)
-st.dataframe(rep["products_ytd"], use_container_width=True)
+st.dataframe(rep["products_full"])
+st.dataframe(manager["products_full"])
+st.dataframe(area["products_full"])
+st.dataframe(supervisor["products_full"])
+st.dataframe(evak["products_full"])
 
-st.subheader("🏢 Manager Products 🏆📅📊📈")
-st.dataframe(manager["products_full"], use_container_width=True)
-st.dataframe(manager["products_month"], use_container_width=True)
-st.dataframe(manager["products_quarter"], use_container_width=True)
-st.dataframe(manager["products_ytd"], use_container_width=True)
 
-st.subheader("🌍 Area Products 🏆📅📊📈")
-st.dataframe(area["products_full"], use_container_width=True)
-st.dataframe(area["products_month"], use_container_width=True)
-st.dataframe(area["products_quarter"], use_container_width=True)
-st.dataframe(area["products_ytd"], use_container_width=True)
-
-st.subheader("🧑‍💼 Supervisor Products 🏆📅📊📈")
-st.dataframe(supervisor["products_full"], use_container_width=True)
-st.dataframe(supervisor["products_month"], use_container_width=True)
-st.dataframe(supervisor["products_quarter"], use_container_width=True)
-st.dataframe(supervisor["products_ytd"], use_container_width=True)
-
-st.subheader("🧬 Evak Products 🏆📅📊📈")
-st.dataframe(evak["products_full"], use_container_width=True)
-st.dataframe(evak["products_month"], use_container_width=True)
-st.dataframe(evak["products_quarter"], use_container_width=True)
-st.dataframe(evak["products_ytd"], use_container_width=True)
-
-#--------------------------------------------------------------------------------------------------------------------------------------------------
 # =========================
-# 📊 SALES PIPELINE RUN
+# 📊 SALES PIPELINE
 # =========================
-sales_kpi = dp.build_sales_pipeline(
+sales = dp.build_sales_pipeline(
     data["sales"],
     data["mapping"],
     data["codes"]
@@ -94,27 +59,28 @@ sales_kpi = dp.build_sales_pipeline(
 
 
 # =========================
-# 📊 SALES DASHBOARD
+# 📊 SALES KPI
 # =========================
-st.header("📊 SALES KPI")
+st.header("💰 SALES KPI")
 
-st.subheader("👨‍💼 Rep Sales")
-st.dataframe(sales_kpi["rep_value"], use_container_width=True)
+st.subheader("Rep")
+st.dataframe(sales["rep_value"])
 
-st.subheader("📦 Rep Products")
-st.dataframe(sales_kpi["rep_products"], use_container_width=True)
+st.subheader("Manager")
+st.dataframe(sales["manager_value"])
 
-st.subheader("🏢 Manager Sales")
-st.dataframe(sales_kpi["manager_value"], use_container_width=True)
+st.subheader("Area")
+st.dataframe(sales["area_value"])
 
-st.subheader("📦 Manager Products")
-st.dataframe(sales_kpi["manager_products"], use_container_width=True)
+st.subheader("Supervisor")
+st.dataframe(sales["supervisor_value"])
 
-st.subheader("🌍 Area Sales")
-st.dataframe(sales_kpi["area_value"], use_container_width=True)
 
-st.subheader("📦 Area Products")
-st.dataframe(sales_kpi["area_products"], use_container_width=True)
+# =========================
+# 📦 SALES PRODUCTS
+# =========================
+st.header("📦 SALES PRODUCTS")
 
-st.subheader("🧑‍💼 Supervisor Sales")
-st.dataframe(sales_kpi["supervisor_value"], use_container_width=True)
+st.dataframe(sales["rep_products"])
+st.dataframe(sales["manager_products"])
+st.dataframe(sales["area_products"])
