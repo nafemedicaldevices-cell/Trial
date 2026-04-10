@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 # =========================
-# GLOBAL SETTINGS
+# SETTINGS
 # =========================
 pd.set_option('future.no_silent_downcasting', True)
 current_month = pd.Timestamp.today().month
@@ -12,6 +12,7 @@ current_month = pd.Timestamp.today().month
 # LOAD DATA
 # =========================
 def load_data():
+
     sales = pd.read_excel("Sales.xlsx")
     overdue = pd.read_excel("Overdue.xlsx")
     extra_discounts = pd.read_excel("Extradiscounts.xlsx")
@@ -70,53 +71,61 @@ def build_target_pipeline(file_name, id_name, mapping):
 
     df["Full Target Value"] = df["Target (Unit)"] * df["Sales Price"]
 
-    def add_factor(base, factor):
-        temp = base.copy()
-        temp["Target (Value)"] = (temp["Full Target Value"] / 12) * factor
-        return temp
+    df["Target (Value)"] = df["Full Target Value"]
 
-    df_full = add_factor(df, 12)
-    df_month = add_factor(df, 1)
-    df_quarter = add_factor(df, 3)
-    df_ytd = add_factor(df, current_month)
-
-    def group(df_in):
-        return df_in.groupby([id_name], as_index=False)["Target (Value)"].sum()
-
-    def group_products(df_in):
-        return df_in.groupby(
-            [
-                id_name,"2 Classification","Category",
-                "Product Code","Product Name",
-                "Target (Unit)","Sales Price"
-            ],
-            as_index=False
-        )["Target (Value)"].sum()
+    def grp(x):
+        return x.groupby([id_name], as_index=False)["Target (Value)"].sum()
 
     return {
         "full": df,
-        "value_full": group(df_full),
-        "value_month": group(df_month),
-        "value_quarter": group(df_quarter),
-        "value_uptodate": group(df_ytd),
-
-        "products_full": group_products(df_full),
-        "products_month": group_products(df_month),
-        "products_quarter": group_products(df_quarter),
-        "products_uptodate": group_products(df_ytd),
+        "value_full": grp(df),
+        "value_month": grp(df),
+        "value_quarter": grp(df),
+        "value_uptodate": grp(df)
     }
 
 
 # =========================
-# SALES CLEANING
+# SALES CLEANING (FIXED)
 # =========================
 def clean_sales(sales, mapping, codes):
 
     sales.columns = sales.columns.str.strip()
 
+    # =========================
+    # FIX OLD PRODUCT COLUMNS (IMPORTANT FIX)
+    # =========================
+    if "Date" in sales.columns:
+
+        mask = sales["Date"].astype(str).str.strip().eq("كود الصنف")
+
+        if "Old Product Code" not in sales.columns:
+            sales["Old Product Code"] = np.nan
+        if "Old Product Name" not in sales.columns:
+            sales["Old Product Name"] = np.nan
+
+        sales.loc[mask, "Old Product Code"] = sales.loc[mask, "Warehouse Name"]
+        sales.loc[mask, "Old Product Name"] = sales.loc[mask, "Client Code"]
+
+        sales[["Old Product Code","Old Product Name"]] = sales[
+            ["Old Product Code","Old Product Name"]
+        ].ffill()
+
+    # =========================
+    # NUMERIC CLEAN
+    # =========================
+    sales["Old Product Code"] = pd.to_numeric(sales["Old Product Code"], errors="coerce")
+    sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
+
+    # =========================
+    # MERGE
+    # =========================
     sales = sales.merge(mapping, on="Old Product Code", how="left")
     sales = sales.merge(codes, on="Rep Code", how="left")
 
+    # =========================
+    # KPI
+    # =========================
     sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
     sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
     sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
@@ -185,17 +194,19 @@ def clean_opening_detail(opening_detail, codes):
 
     mask = opening_detail['Client Code'].astype(str).str.strip().eq("كود الفرع")
 
-    opening_detail.loc[mask, 'Rep Code'] = opening_detail.loc[mask, 'Returns']
-    opening_detail.loc[mask, 'Old Rep Name'] = opening_detail.loc[mask, 'Extra Discounts']
+    opening_detail.loc[mask, "Rep Code"] = opening_detail.loc[mask, "Returns"]
+    opening_detail.loc[mask, "Old Rep Name"] = opening_detail.loc[mask, "Extra Discounts"]
 
-    opening_detail[['Rep Code','Old Rep Name']] = opening_detail[['Rep Code','Old Rep Name']].ffill()
+    opening_detail[["Rep Code","Old Rep Name"]] = opening_detail[
+        ["Rep Code","Old Rep Name"]
+    ].ffill()
 
-    opening_detail["Rep Code"] = pd.to_numeric(opening_detail["Rep Code"], errors='coerce')
+    opening_detail["Rep Code"] = pd.to_numeric(opening_detail["Rep Code"], errors="coerce")
 
     opening_detail = opening_detail[
-        opening_detail['Client Code'].notna() &
-        (opening_detail['Client Code'].astype(str).str.strip() != '') &
-        (~opening_detail['Client Code'].astype(str).str.contains(
+        opening_detail["Client Code"].notna() &
+        (opening_detail["Client Code"].astype(str).str.strip() != "") &
+        (~opening_detail["Client Code"].astype(str).str.contains(
             "كود الفرع|كود العميل",
             na=False
         ))
