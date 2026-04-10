@@ -1,19 +1,14 @@
 import streamlit as st
 import data_pipeline as dp
 
-st.set_page_config(page_title="Sales Dashboard", layout="wide")
+st.set_page_config(layout="wide")
+st.title("📊 Sales Dashboard")
 
-st.title("📊 Sales Performance Dashboard")
-
-
-# =========================
-# LOAD DATA 📂
-# =========================
 data = dp.load_data()
 
 
 # =========================
-# BUILD TARGETS 🚀
+# BUILD ALL LEVELS 🚀
 # =========================
 rep = dp.build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
 manager = dp.build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"])
@@ -23,42 +18,42 @@ evak = dp.build_target_pipeline(data["target_evak"], "Evak Code", data["mapping"
 
 
 # =========================
-# VALUE KPI 📊
+# VALUE TABLE 📊
 # =========================
-st.header("💰 VALUE KPI")
+st.header("VALUE KPI")
 
 st.subheader("Rep")
-st.dataframe(rep["value_uptodate"])
-
-st.subheader("Manager")
-st.dataframe(manager["value_uptodate"])
-
-st.subheader("Area")
-st.dataframe(area["value_uptodate"])
+st.dataframe(rep["value_table"])
 
 st.subheader("Supervisor")
-st.dataframe(supervisor["value_uptodate"])
+st.dataframe(supervisor["value_table"])
+
+st.subheader("Area")
+st.dataframe(area["value_table"])
+
+st.subheader("Manager")
+st.dataframe(manager["value_table"])
 
 st.subheader("Evak")
-st.dataframe(evak["value_uptodate"])
+st.dataframe(evak["value_table"])
 
 
 # =========================
-# PRODUCTS KPI 📦🔥
+# PRODUCTS TABLE 📦
 # =========================
-st.header("📦 PRODUCTS KPI")
+st.header("PRODUCTS KPI")
 
-st.subheader("Rep Products (YTD)")
-st.dataframe(rep["products_uptodate"])
+st.subheader("Rep Products")
+st.dataframe(rep["products_ytd"])
 
-st.subheader("Manager Products (YTD)")
-st.dataframe(manager["products_uptodate"])
+st.subheader("Supervisor Products")
+st.dataframe(supervisor["products_ytd"])
 
-st.subheader("Area Products (YTD)")
-st.dataframe(area["products_uptodate"])
+st.subheader("Area Products")
+st.dataframe(area["products_ytd"])
 
-st.subheader("Supervisor Products (YTD)")
-st.dataframe(supervisor["products_uptodate"])
+st.subheader("Manager Products")
+st.dataframe(manager["products_ytd"])
 
-st.subheader("Evak Products (YTD)")
-st.dataframe(evak["products_uptodate"])
+st.subheader("Evak Products")
+st.dataframe(evak["products_ytd"])
