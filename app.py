@@ -1,9 +1,12 @@
 import streamlit as st
+import pandas as pd
 
-st.set_page_config(page_title="Sales Dashboard", layout="wide")
+st.title("📊 Sales Dashboard")
 
-st.title("📊 Sales Performance Dashboard")
+sales = pd.read_excel("Sales.xlsx")
+overdue = pd.read_excel("Overdue.xlsx")
+opening = pd.read_excel("Opening.xlsx")
 
-st.success("Dashboard is running successfully ✅")
+st.success("Data loaded successfully ✅")
 
-st.write("Welcome 👋 This is your first working dashboard.")
+st.write(sales.head())
