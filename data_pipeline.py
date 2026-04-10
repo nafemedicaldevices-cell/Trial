@@ -77,3 +77,11 @@ def build_sales_pipeline(df):
         "supervisor_value": grp("Supervisor Code"),
         "raw": df
     }
+
+    return {
+        "rep_value": grp("Rep Code"),
+        "manager_value": grp("Manager Code"),
+        "area_value": grp("Area Code"),
+        "supervisor_value": grp("Supervisor Code"),
+        "raw": df
+    }
