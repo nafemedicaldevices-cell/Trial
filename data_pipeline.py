@@ -1,13 +1,14 @@
 import pandas as pd
 import numpy as np
 
+# 📅 Time setup
 current_month = pd.Timestamp.today().month
 current_quarter = (current_month - 1) // 3 + 1
 past_quarters = max(current_quarter - 1, 0)
 
 
 # =========================
-# LOAD DATA
+# 📂 LOAD DATA
 # =========================
 def load_data():
     return {
@@ -29,7 +30,7 @@ def load_data():
 
 
 # =========================
-# PIPELINE
+# 🚀 PIPELINE
 # =========================
 def build_target_pipeline(df, id_name, mapping):
 
@@ -41,6 +42,7 @@ def build_target_pipeline(df, id_name, mapping):
     fixed_cols = [c for c in ["Year", "Product Code", "Old Product Name", "Sales Price"] if c in df.columns]
     dynamic_cols = [c for c in df.columns if c not in fixed_cols]
 
+    # 🔄 reshape
     df = df.melt(
         id_vars=fixed_cols,
         value_vars=dynamic_cols,
@@ -48,23 +50,29 @@ def build_target_pipeline(df, id_name, mapping):
         value_name="Target (Unit)"
     )
 
-    # clean IDs
-    df[id_name] = pd.to_numeric(df[id_name].astype(str).str.replace(r"[^0-9]", "", regex=True), errors="coerce")
+    # 🧹 clean IDs
+    df[id_name] = pd.to_numeric(
+        df[id_name].astype(str).str.replace(r"[^0-9]", "", regex=True),
+        errors="coerce"
+    )
+
     df["Product Code"] = pd.to_numeric(df["Product Code"], errors="coerce")
     mapping["Product Code"] = pd.to_numeric(mapping["Product Code"], errors="coerce")
 
     mapping = mapping.drop_duplicates("Product Code")
 
+    # 🔗 merge
     df = df.merge(mapping, on="Product Code", how="left")
 
-    # numeric clean
+    # 🔢 numeric clean
     df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
     df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
 
+    # 💰 total value
     df["Full Value"] = df["Target (Unit)"] * df["Sales Price"]
 
     # =========================
-    # KPI LOGIC
+    # 📊 KPI LOGIC
     # =========================
     full = df.copy()
 
@@ -80,24 +88,27 @@ def build_target_pipeline(df, id_name, mapping):
     full["Value"] = full["Full Value"]
 
     # =========================
-    # VALUE TABLE
+    # 📊 VALUE TABLE
     # =========================
     def group(d):
         return d.groupby([id_name], as_index=False)["Value"].sum()
 
-    value_table = group(full).rename(columns={"Value": "Full"})
-    value_table["Month"] = group(month)["Value"]
-    value_table["Quarter"] = group(quarter)["Value"]
-    value_table["YTD"] = group(ytd)["Value"]
+    value_table = group(full).rename(columns={"Value": "Full Year 🏆"})
+    value_table["Month 📅"] = group(month)["Value"]
+    value_table["Quarter 📊"] = group(quarter)["Value"]
+    value_table["YTD 📈"] = group(ytd)["Value"]
 
     # =========================
-    # PRODUCTS TABLE
+    # 📦 PRODUCTS TABLE (FIXED)
     # =========================
     def product_group(d):
         return d.groupby(
             [id_name, "Product Code", "Product Name"],
             as_index=False
-        )["Value"].sum()
+        ).agg(
+            Units=("Target (Unit)", "sum"),
+            Value=("Value", "sum")
+        )
 
     return {
         "value_table": value_table,
