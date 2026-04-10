@@ -2,10 +2,10 @@ import streamlit as st
 import pandas as pd
 
 st.set_page_config(layout="wide")
-st.title("📊 Overdue KPI - Full Hierarchy")
+st.title("📊 Overdue KPI - Clean Levels")
 
 # =========================
-# 📥 LOAD DATA
+# LOAD DATA
 # =========================
 overdue = pd.read_excel("Overdue.xlsx")
 codes = pd.read_excel("Code.xlsx")
@@ -28,26 +28,15 @@ overdue.columns = [
 ]
 
 # =========================
-# NUMERIC CLEANING
+# NUMERIC
 # =========================
 num_cols = [
-    "15 Days", "30 Days", "60 Days", "90 Days",
-    "120 Days", "More Than 120 Days", "Balance"
+    "15 Days","30 Days","60 Days","90 Days",
+    "120 Days","More Than 120 Days","Balance"
 ]
 
 for col in num_cols:
     overdue[col] = pd.to_numeric(overdue[col], errors="coerce").fillna(0)
-
-# =========================
-# REP EXTRACTION (optional structure)
-# =========================
-overdue["Rep Code"] = pd.NA
-
-mask = overdue["Client Name"].astype(str).str.strip().eq("كود المندوب")
-
-overdue.loc[mask, "Rep Code"] = overdue.loc[mask, "Client Code"]
-
-overdue["Rep Code"] = overdue["Rep Code"].ffill()
 
 # =========================
 # KPI
@@ -55,64 +44,48 @@ overdue["Rep Code"] = overdue["Rep Code"].ffill()
 overdue["Overdue"] = overdue["120 Days"] + overdue["More Than 120 Days"]
 
 # =========================
+# REP EXTRACTION (optional)
+# =========================
+overdue["Rep Code"] = pd.NA
+
+mask = overdue["Client Name"].astype(str).str.strip().eq("كود المندوب")
+overdue.loc[mask, "Rep Code"] = overdue.loc[mask, "Client Code"]
+overdue["Rep Code"] = overdue["Rep Code"].ffill()
+
+# =========================
 # CLEAN CODES
 # =========================
 codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce").astype("Int64")
 overdue["Rep Code"] = pd.to_numeric(overdue["Rep Code"], errors="coerce").astype("Int64")
 
-# =========================
-# MERGE (adds: Manager / Area / Supervisor)
-# =========================
 overdue = overdue.merge(codes, on="Rep Code", how="left")
 
 # =========================
-# 🔥 HIERARCHY KPI ENGINE
+# 🔥 FUNCTION: STANDARD LEVEL BUILDER
 # =========================
+def build_level(df, level_code):
+    return df[[level_code, "Client Code", "Overdue"]].copy()
 
 # =========================
-# REP LEVEL
+# 🔥 LEVELS
 # =========================
-rep_value = overdue.groupby("Rep Code", as_index=False)["Overdue"].sum()
-rep_client = overdue.groupby(["Rep Code", "Client Code"], as_index=False)["Overdue"].sum()
+
+rep_kpi = build_level(overdue, "Rep Code")
+manager_kpi = build_level(overdue, "Manager Code")
+area_kpi = build_level(overdue, "Area Code")
+supervisor_kpi = build_level(overdue, "Supervisor Code")
 
 # =========================
-# MANAGER LEVEL
+# OUTPUT
 # =========================
-manager_value = overdue.groupby("Manager Code", as_index=False)["Overdue"].sum()
-manager_client = overdue.groupby(["Manager Code", "Client Code"], as_index=False)["Overdue"].sum()
+st.subheader("📌 Rep Level")
+st.dataframe(rep_kpi)
 
-# =========================
-# AREA LEVEL
-# =========================
-area_value = overdue.groupby("Area Code", as_index=False)["Overdue"].sum()
-area_client = overdue.groupby(["Area Code", "Client Code"], as_index=False)["Overdue"].sum()
+st.subheader("📌 Manager Level")
+st.dataframe(manager_kpi)
 
-# =========================
-# SUPERVISOR LEVEL
-# =========================
-supervisor_value = overdue.groupby("Supervisor Code", as_index=False)["Overdue"].sum()
-supervisor_client = overdue.groupby(["Supervisor Code", "Client Code"], as_index=False)["Overdue"].sum()
+st.subheader("📌 Area Level")
+st.dataframe(area_kpi)
 
-# =========================
-# 📊 OUTPUT
-# =========================
-st.subheader("📌 Main Data")
-st.dataframe(overdue)
-
-st.subheader("📊 Rep Level")
-st.dataframe(rep_value)
-
-st.subheader("📊 Manager Level")
-st.dataframe(manager_value)
-
-st.subheader("📊 Area Level")
-st.dataframe(area_value)
-
-st.subheader("📊 Supervisor Level")
-st.dataframe(supervisor_value)
-
-# =========================
-# DEBUG
-# =========================
-st.write("Rows:", overdue.shape[0])
-st.write("Columns:", overdue.columns.tolist())
+st.subheader("📌 Supervisor Level")
+st.dataframe(supervisor_kpi)
