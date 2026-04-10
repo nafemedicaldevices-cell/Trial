@@ -52,32 +52,71 @@ st.dataframe(evak["value_table"], use_container_width=True)
 # =========================
 st.header("📦 PRODUCTS KPI")
 
-st.subheader("👨‍💼 Rep Products")
+# 👨‍💼 REP
+st.subheader("👨‍💼 Rep Products - Full Year 🏆")
 st.dataframe(rep["products_full"], use_container_width=True)
+
+st.subheader("👨‍💼 Rep Products - Month 📅")
 st.dataframe(rep["products_month"], use_container_width=True)
+
+st.subheader("👨‍💼 Rep Products - Quarter 📊")
 st.dataframe(rep["products_quarter"], use_container_width=True)
+
+st.subheader("👨‍💼 Rep Products - YTD 📈")
 st.dataframe(rep["products_ytd"], use_container_width=True)
 
-st.subheader("🏢 Manager Products")
+
+# 🏢 MANAGER
+st.subheader("🏢 Manager Products - Full Year 🏆")
 st.dataframe(manager["products_full"], use_container_width=True)
+
+st.subheader("🏢 Manager Products - Month 📅")
 st.dataframe(manager["products_month"], use_container_width=True)
+
+st.subheader("🏢 Manager Products - Quarter 📊")
 st.dataframe(manager["products_quarter"], use_container_width=True)
+
+st.subheader("🏢 Manager Products - YTD 📈")
 st.dataframe(manager["products_ytd"], use_container_width=True)
 
-st.subheader("🌍 Area Products")
+
+# 🌍 AREA
+st.subheader("🌍 Area Products - Full Year 🏆")
 st.dataframe(area["products_full"], use_container_width=True)
+
+st.subheader("🌍 Area Products - Month 📅")
 st.dataframe(area["products_month"], use_container_width=True)
+
+st.subheader("🌍 Area Products - Quarter 📊")
 st.dataframe(area["products_quarter"], use_container_width=True)
+
+st.subheader("🌍 Area Products - YTD 📈")
 st.dataframe(area["products_ytd"], use_container_width=True)
 
-st.subheader("🧑‍💼 Supervisor Products")
+
+# 🧑‍💼 SUPERVISOR
+st.subheader("🧑‍💼 Supervisor Products - Full Year 🏆")
 st.dataframe(supervisor["products_full"], use_container_width=True)
+
+st.subheader("🧑‍💼 Supervisor Products - Month 📅")
 st.dataframe(supervisor["products_month"], use_container_width=True)
+
+st.subheader("🧑‍💼 Supervisor Products - Quarter 📊")
 st.dataframe(supervisor["products_quarter"], use_container_width=True)
+
+st.subheader("🧑‍💼 Supervisor Products - YTD 📈")
 st.dataframe(supervisor["products_ytd"], use_container_width=True)
 
-st.subheader("🧬 Evak Products")
+
+# 🧬 EVAK
+st.subheader("🧬 Evak Products - Full Year 🏆")
 st.dataframe(evak["products_full"], use_container_width=True)
+
+st.subheader("🧬 Evak Products - Month 📅")
 st.dataframe(evak["products_month"], use_container_width=True)
+
+st.subheader("🧬 Evak Products - Quarter 📊")
 st.dataframe(evak["products_quarter"], use_container_width=True)
+
+st.subheader("🧬 Evak Products - YTD 📈")
 st.dataframe(evak["products_ytd"], use_container_width=True)
