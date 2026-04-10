@@ -3,23 +3,17 @@ import data_pipeline as dp
 
 st.title("Target Dashboard")
 
-# =========================
-# LOAD DATA
-# =========================
+# LOAD
 data = dp.load_data()
 
-# =========================
-# BUILD ALL LEVELS
-# =========================
+# BUILD
 rep = dp.build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
 manager = dp.build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"])
 area = dp.build_target_pipeline(data["target_area"], "Area Code", data["mapping"])
 supervisor = dp.build_target_pipeline(data["target_supervisor"], "Supervisor Code", data["mapping"])
 evak = dp.build_target_pipeline(data["target_evak"], "Evak Code", data["mapping"])
 
-# =========================
 # SELECT LEVEL
-# =========================
 level = st.selectbox(
     "Choose Level",
     ["Rep", "Manager", "Area", "Supervisor", "Evak"]
@@ -36,24 +30,24 @@ data_map = {
 selected = data_map[level]
 
 # =========================
-# SHOW FINAL TABLE
+# SUMMARY
 # =========================
 st.subheader(f"{level} Target Summary")
-
 st.dataframe(selected["final"])
 
 # =========================
-# OPTIONAL DETAILS
+# PRODUCTS
 # =========================
-with st.expander("Show Details"):
-    st.write("Full Year")
-    st.dataframe(selected["full"])
+st.subheader(f"{level} Products")
 
-    st.write("Month")
-    st.dataframe(selected["month"])
+st.write("Full Year")
+st.dataframe(selected["products_full"])
 
-    st.write("Quarter")
-    st.dataframe(selected["quarter"])
+st.write("Month")
+st.dataframe(selected["products_month"])
 
-    st.write("YTD")
-    st.dataframe(selected["ytd"])
+st.write("Quarter")
+st.dataframe(selected["products_quarter"])
+
+st.write("YTD")
+st.dataframe(selected["products_uptodate"])
