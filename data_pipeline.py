@@ -1,64 +1,111 @@
-import streamlit as st
-import data_pipeline as dp
+import pandas as pd
+import numpy as np
 
-st.set_page_config(page_title="Sales Dashboard", layout="wide")
-
-st.title("📊 Sales Performance Dashboard")
+current_month = pd.Timestamp.today().month
 
 
 # =========================
-# LOAD DATA 📂
+# LOAD DATA
 # =========================
-data = dp.load_data()
+def load_data():
+    return {
+        "sales": pd.read_excel("Sales.xlsx"),
+        "overdue": pd.read_excel("Overdue.xlsx"),
+        "extra_discounts": pd.read_excel("Extradiscounts.xlsx"),
+        "opening": pd.read_excel("Opening.xlsx"),
+        "opening_detail": pd.read_excel("Opening Detail.xlsx"),
 
+        "target_manager": pd.read_excel("Target Manager.xlsx"),
+        "target_area": pd.read_excel("Target Area.xlsx"),
+        "target_rep": pd.read_excel("Target Rep.xlsx"),
+        "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
+        "target_evak": pd.read_excel("Target Evak.xlsx"),
 
-# =========================
-# BUILD TARGETS 🚀
-# =========================
-rep = dp.build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
-manager = dp.build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"])
-area = dp.build_target_pipeline(data["target_area"], "Area Code", data["mapping"])
-supervisor = dp.build_target_pipeline(data["target_supervisor"], "Supervisor Code", data["mapping"])
-evak = dp.build_target_pipeline(data["target_evak"], "Evak Code", data["mapping"])
-
-
-# =========================
-# VALUE KPI 📊
-# =========================
-st.header("💰 VALUE KPI")
-
-st.subheader("Rep")
-st.dataframe(rep["value_uptodate"])
-
-st.subheader("Manager")
-st.dataframe(manager["value_uptodate"])
-
-st.subheader("Area")
-st.dataframe(area["value_uptodate"])
-
-st.subheader("Supervisor")
-st.dataframe(supervisor["value_uptodate"])
-
-st.subheader("Evak")
-st.dataframe(evak["value_uptodate"])
+        "mapping": pd.read_excel("Mapping.xlsx"),
+        "codes": pd.read_excel("Code.xlsx")
+    }
 
 
 # =========================
-# PRODUCTS KPI 📦🔥
+# TARGET PIPELINE
 # =========================
-st.header("📦 PRODUCTS KPI")
+def build_target_pipeline(df, id_name, mapping):
 
-st.subheader("Rep Products (YTD)")
-st.dataframe(rep["products_uptodate"])
+    df = df.copy()
+    mapping = mapping.copy()
 
-st.subheader("Manager Products (YTD)")
-st.dataframe(manager["products_uptodate"])
+    df.columns = df.columns.str.strip()
 
-st.subheader("Area Products (YTD)")
-st.dataframe(area["products_uptodate"])
+    fixed_cols = [c for c in ["Year", "Product Code", "Old Product Name", "Sales Price"] if c in df.columns]
+    dynamic_cols = [c for c in df.columns if c not in fixed_cols]
 
-st.subheader("Supervisor Products (YTD)")
-st.dataframe(supervisor["products_uptodate"])
+    df = df.melt(
+        id_vars=fixed_cols,
+        value_vars=dynamic_cols,
+        var_name=id_name,
+        value_name="Target (Unit)"
+    )
 
-st.subheader("Evak Products (YTD)")
-st.dataframe(evak["products_uptodate"])
+    # clean ids
+    df[id_name] = (
+        df[id_name].astype(str)
+        .str.replace(r"[^0-9]", "", regex=True)
+    )
+    df[id_name] = pd.to_numeric(df[id_name], errors="coerce")
+
+    df["Product Code"] = pd.to_numeric(df["Product Code"], errors="coerce")
+    mapping["Product Code"] = pd.to_numeric(mapping["Product Code"], errors="coerce")
+
+    mapping = mapping.drop_duplicates("Product Code")
+
+    df = df.merge(mapping, on="Product Code", how="left")
+
+    # numeric clean
+    df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
+    df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
+
+    df["Full Value"] = df["Target (Unit)"] * df["Sales Price"]
+
+    # =========================
+    # KPI CALCULATION
+    # =========================
+    full = df.copy()
+
+    month = df.copy()
+    month["Value"] = full["Full Value"] * (current_month / 12)
+
+    quarter = df.copy()
+    quarter["Value"] = full["Full Value"] * 0.25
+
+    ytd = df.copy()
+    ytd["Value"] = full["Full Value"] * (current_month / 12)
+
+    full["Value"] = full["Full Value"]
+
+    # =========================
+    # VALUE TABLE
+    # =========================
+    def group(d):
+        return d.groupby([id_name], as_index=False)["Value"].sum()
+
+    value_table = group(full).rename(columns={"Value": "Full"})
+    value_table["Month"] = group(month)["Value"]
+    value_table["Quarter"] = group(quarter)["Value"]
+    value_table["YTD"] = group(ytd)["Value"]
+
+    # =========================
+    # PRODUCTS TABLE
+    # =========================
+    def products(d):
+        return d.groupby(
+            [id_name, "Product Code", "Product Name"],
+            as_index=False
+        )["Value"].sum()
+
+    return {
+        "value_table": value_table,
+        "products_full": products(full),
+        "products_month": products(month),
+        "products_quarter": products(quarter),
+        "products_ytd": products(ytd),
+    }
