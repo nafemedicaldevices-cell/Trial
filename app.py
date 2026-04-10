@@ -2,7 +2,8 @@ import streamlit as st
 import data_pipeline as dp
 
 st.set_page_config(layout="wide")
-st.title("📊 Sales & Target Unified Dashboard")
+
+st.title("📊 Sales Performance Dashboard (Unified KPI)")
 
 data = dp.load_data()
 
@@ -10,40 +11,35 @@ kpi = dp.build_kpi(data)
 
 
 # =========================
-# 🎯 REP
+# 👨‍💼 REP
 # =========================
-st.header("👨‍💼 REP KPI")
-
-st.dataframe(kpi["rep"])
+st.header("👨‍💼 Rep KPI")
+st.dataframe(kpi["rep"], use_container_width=True)
 
 
 # =========================
 # 🏢 MANAGER
 # =========================
-st.header("🏢 MANAGER KPI")
-
-st.dataframe(kpi["manager"])
+st.header("🏢 Manager KPI")
+st.dataframe(kpi["manager"], use_container_width=True)
 
 
 # =========================
 # 🌍 AREA
 # =========================
-st.header("🌍 AREA KPI")
-
-st.dataframe(kpi["area"])
+st.header("🌍 Area KPI")
+st.dataframe(kpi["area"], use_container_width=True)
 
 
 # =========================
 # 🧑‍💼 SUPERVISOR
 # =========================
-st.header("🧑‍💼 SUPERVISOR KPI")
-
-st.dataframe(kpi["supervisor"])
+st.header("🧑‍💼 Supervisor KPI")
+st.dataframe(kpi["supervisor"], use_container_width=True)
 
 
 # =========================
 # 🧬 EVAK
 # =========================
-st.header("🧬 EVAK KPI")
-
-st.dataframe(kpi["evak"])
+st.header("🧬 Evak KPI")
+st.dataframe(kpi["evak"], use_container_width=True)
