@@ -3,27 +3,21 @@ import data_pipeline as dp
 
 
 # =========================
-# 🎨 CONFIG
+# 🎨 UI
 # =========================
 st.set_page_config(layout="wide")
 st.title("📊 Sales Performance Dashboard")
 
 
 # =========================
-# 📥 LOAD DATA
+# 📥 LOAD
 # =========================
 data = dp.load_data()
 
 
 # =========================
-# 🚀 PIPELINES
+# 🎯 STEP 1: TARGET FIRST
 # =========================
-sales = dp.build_sales_pipeline(
-    data["sales"],
-    data["mapping"],
-    data["codes"]
-)
-
 rep_target = dp.build_target_pipeline(data["target_rep"], "Rep Code")
 manager_target = dp.build_target_pipeline(data["target_manager"], "Manager Code")
 area_target = dp.build_target_pipeline(data["target_area"], "Area Code")
@@ -31,7 +25,17 @@ supervisor_target = dp.build_target_pipeline(data["target_supervisor"], "Supervi
 
 
 # =========================
-# 🔗 MERGE SALES + TARGET
+# 💰 STEP 2: SALES SECOND
+# =========================
+sales = dp.build_sales_pipeline(
+    data["sales"],
+    data["mapping"],
+    data["codes"]
+)
+
+
+# =========================
+# 🔗 STEP 3: MERGE
 # =========================
 rep = sales["rep_value"].merge(rep_target, on="Rep Code", how="left")
 manager = sales["manager_value"].merge(manager_target, on="Manager Code", how="left")
@@ -67,7 +71,7 @@ supervisor = add_achievement(supervisor, "Target Value")
 
 
 # =========================
-# 📊 DASHBOARD
+# 📊 OUTPUT
 # =========================
 st.header("🔥 SALES vs TARGET")
 
