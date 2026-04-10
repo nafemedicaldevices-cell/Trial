@@ -1,113 +1,119 @@
 import pandas as pd
-import numpy as np
+
+# =========================
+# 📅 TIME SETTINGS
+# =========================
+current_month = pd.Timestamp.today().month
+current_quarter = (current_month - 1) // 3 + 1
+past_quarters = max(current_quarter - 1, 0)
 
 
 # =========================
-# 📥 LOAD DATA
+# 📂 LOAD DATA
 # =========================
 def load_data():
     return {
         "sales": pd.read_excel("Sales.xlsx"),
-        "mapping": pd.read_excel("Mapping.xlsx"),
-        "codes": pd.read_excel("Code.xlsx"),
+        "overdue": pd.read_excel("Overdue.xlsx"),
+        "extra_discounts": pd.read_excel("Extradiscounts.xlsx"),
+        "opening": pd.read_excel("Opening.xlsx"),
+        "opening_detail": pd.read_excel("Opening Detail.xlsx"),
 
-        "target_rep": pd.read_excel("Target Rep.xlsx"),
         "target_manager": pd.read_excel("Target Manager.xlsx"),
         "target_area": pd.read_excel("Target Area.xlsx"),
+        "target_rep": pd.read_excel("Target Rep.xlsx"),
         "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
         "target_evak": pd.read_excel("Target Evak.xlsx"),
+
+        "mapping": pd.read_excel("Mapping.xlsx"),
+        "codes": pd.read_excel("Code.xlsx")
     }
 
 
 # =========================
-# 🧹 CLEAN SALES ONLY
+# 🚀 PIPELINE
 # =========================
-def clean_sales(df):
+def build_target_pipeline(df, id_name, mapping):
 
     df = df.copy()
+    mapping = mapping.copy()
+
     df.columns = df.columns.str.strip()
 
-    # ---------- expected structure fix ----------
-    expected_cols = [
-        'Date','Warehouse Name','Client Code','Client Name','Notes','MF','Mostanad',
-        'Rep Code','Sales Unit Before Edit','Returns Unit Before Edit',
-        'Sales Price','Invoice Discounts','Sales Value'
-    ]
+    fixed_cols = [c for c in ["Year", "Product Code", "Old Product Name", "Sales Price"] if c in df.columns]
+    dynamic_cols = [c for c in df.columns if c not in fixed_cols]
 
-    if len(df.columns) == len(expected_cols):
-        df.columns = expected_cols
+    # 🔄 reshape
+    df = df.melt(
+        id_vars=fixed_cols,
+        value_vars=dynamic_cols,
+        var_name=id_name,
+        value_name="Target (Unit)"
+    )
 
-    # ---------- numeric cleanup ----------
-    num_cols = [
-        'Sales Unit Before Edit',
-        'Returns Unit Before Edit',
-        'Sales Price',
-        'Invoice Discounts'
-    ]
+    # 🧹 clean IDs
+    df[id_name] = pd.to_numeric(
+        df[id_name].astype(str).str.replace(r"[^0-9]", "", regex=True),
+        errors="coerce"
+    )
 
-    for c in num_cols:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+    df["Product Code"] = pd.to_numeric(df["Product Code"], errors="coerce")
+    mapping["Product Code"] = pd.to_numeric(mapping["Product Code"], errors="coerce")
 
-    # ---------- product header fix ----------
-    if 'Date' in df.columns:
+    mapping = mapping.drop_duplicates("Product Code")
 
-        mask = df['Date'].astype(str).str.strip().eq("كود الصنف")
+    # 🔗 merge
+    df = df.merge(mapping, on="Product Code", how="left")
 
-        if 'Old Product Code' not in df.columns:
-            df['Old Product Code'] = np.nan
-        if 'Old Product Name' not in df.columns:
-            df['Old Product Name'] = np.nan
+    # 🔢 numeric
+    df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
+    df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
 
-        df.loc[mask, 'Old Product Code'] = df.loc[mask, 'Warehouse Name']
-        df.loc[mask, 'Old Product Name'] = df.loc[mask, 'Client Code']
+    # 💰 value
+    df["Full Value"] = df["Target (Unit)"] * df["Sales Price"]
 
-        df[['Old Product Code','Old Product Name']] = df[
-            ['Old Product Code','Old Product Name']
-        ].ffill()
+    # =========================
+    # 📊 KPI CALCULATION
+    # =========================
+    full = df.copy()
+    full["Value"] = full["Full Value"]
 
-    # ---------- remove junk rows ----------
-    drop_keywords = 'المندوب|كود الفرع|تاريخ|كود الصنف'
+    month = df.copy()
+    month["Value"] = full["Full Value"] * (current_month / 12)
 
-    if 'Date' in df.columns:
-        df = df[df['Date'].notna()]
-        df = df[~df['Date'].astype(str).str.contains(drop_keywords, na=False)]
+    quarter = df.copy()
+    quarter["Value"] = full["Full Value"] * (past_quarters / 4)
 
-    # ---------- numeric conversion ----------
-    if 'Rep Code' in df.columns:
-        df['Rep Code'] = pd.to_numeric(df['Rep Code'], errors='coerce')
+    ytd = df.copy()
+    ytd["Value"] = full["Full Value"] * (current_month / 12)
 
-    if 'Old Product Code' in df.columns:
-        df['Old Product Code'] = pd.to_numeric(df['Old Product Code'], errors='coerce')
+    # =========================
+    # 📊 VALUE TABLE
+    # =========================
+    def group(d):
+        return d.groupby([id_name], as_index=False)["Value"].sum()
 
-    # ---------- calculations ----------
-    if all(c in df.columns for c in ['Sales Unit Before Edit','Sales Price']):
-        df['Total Sales Value'] = df['Sales Unit Before Edit'] * df['Sales Price']
+    value_table = group(full).rename(columns={"Value": "Full Year 🏆"})
+    value_table["Month 📅"] = group(month)["Value"]
+    value_table["Quarter 📊"] = group(quarter)["Value"]
+    value_table["YTD 📈"] = group(ytd)["Value"]
 
-    if all(c in df.columns for c in ['Returns Unit Before Edit','Sales Price']):
-        df['Returns Value'] = df['Returns Unit Before Edit'] * df['Sales Price']
+    # =========================
+    # 📦 PRODUCTS TABLE
+    # =========================
+    def product_group(d):
+        return d.groupby(
+            [id_name, "Product Code", "Product Name"],
+            as_index=False
+        ).agg(
+            Units=("Target (Unit)", "sum"),
+            Value=("Value", "sum")
+        )
 
-    if 'Total Sales Value' in df.columns and 'Returns Value' in df.columns:
-        df['Sales After Returns'] = df['Total Sales Value'] - df['Returns Value']
-
-    return df
-
-
-# =========================
-# 🧹 CLEAN TARGET ONLY
-# =========================
-def clean_target(df, key_col):
-
-    df = df.copy()
-    df.columns = df.columns.str.strip()
-
-    if key_col in df.columns:
-        df[key_col] = df[key_col].astype(str)
-
-    # numeric only for target columns
-    target_cols = [c for c in df.columns if "Target" in c]
-
-    for c in target_cols:
-        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
-
-    return df
+    return {
+        "value_table": value_table,
+        "products_full": product_group(full),
+        "products_month": product_group(month),
+        "products_quarter": product_group(quarter),
+        "products_ytd": product_group(ytd),
+    }
