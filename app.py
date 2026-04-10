@@ -1,8 +1,14 @@
 import streamlit as st
 import data_pipeline as dp
 
-st.title("Sales Dashboard")
+st.title("Dashboard")
 
-# مثال تشغيل
-data = dp.load_data()   # لو عندك load_data جوه pipeline
-st.write(data["sales"].head())
+data = dp.load_data()
+
+rep_target = dp.build_target_pipeline(
+    data["target_rep"],
+    "Rep Code",
+    data["mapping"]
+)
+
+st.write(rep_target["value_full"].head())
