@@ -1,119 +1,109 @@
-import streamlit as st
-import data_pipeline as dp
+import pandas as pd
+import numpy as np
 
 
 # =========================
-# 🎨 UI
+# 🧼 CLEAN COLUMNS (IMPORTANT)
 # =========================
-st.set_page_config(layout="wide")
-st.title("📊 Sales vs Target Dashboard")
+def clean_columns(df):
+    df = df.copy()
+    df.columns = (
+        df.columns
+        .str.strip()
+        .str.lower()
+        .str.replace(" ", "_")
+    )
+    return df
 
 
 # =========================
 # 📥 LOAD DATA
 # =========================
-data = dp.load_data()
+def load_data():
+    return {
+        "sales": pd.read_excel("Sales.xlsx"),
+
+        "target_rep": pd.read_excel("Target Rep.xlsx"),
+        "target_manager": pd.read_excel("Target Manager.xlsx"),
+        "target_area": pd.read_excel("Target Area.xlsx"),
+        "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
+
+        "mapping": pd.read_excel("Mapping.xlsx"),
+        "codes": pd.read_excel("Code.xlsx")
+    }
 
 
 # =========================
-# 💰 SALES
+# 💰 SALES PIPELINE
 # =========================
-sales = dp.build_sales_pipeline(
-    data["sales"],
-    data["mapping"],
-    data["codes"]
-)
+def build_sales_pipeline(sales, mapping, codes):
+
+    sales = clean_columns(sales)
+    mapping = clean_columns(mapping)
+    codes = clean_columns(codes)
+
+    # =========================
+    # 🔢 NUMERIC CLEAN
+    # =========================
+    num_cols = [
+        "sales_unit_before_edit",
+        "returns_unit_before_edit",
+        "sales_price",
+        "invoice_discounts"
+    ]
+
+    for c in num_cols:
+        if c in sales.columns:
+            sales[c] = pd.to_numeric(sales[c], errors="coerce").fillna(0)
+        else:
+            sales[c] = 0
 
 
-# =========================
-# 🎯 TARGETS
-# =========================
-rep_target = dp.build_target_pipeline(data["target_rep"], "Rep Code")
-manager_target = dp.build_target_pipeline(data["target_manager"], "Manager Code")
-area_target = dp.build_target_pipeline(data["target_area"], "Area Code")
-supervisor_target = dp.build_target_pipeline(data["target_supervisor"], "Supervisor Code")
+    # =========================
+    # 💰 CALCULATIONS
+    # =========================
+    sales["total_sales_value"] = sales["sales_unit_before_edit"] * sales["sales_price"]
+    sales["returns_value"] = sales["returns_unit_before_edit"] * sales["sales_price"]
+    sales["sales_after_returns"] = sales["total_sales_value"] - sales["returns_value"]
 
 
-# =========================
-# 📊 SALES GROUPING
-# =========================
-rep_sales = sales.groupby("Rep Code", as_index=False).agg({
-    "Total Sales Value": "sum",
-    "Returns Value": "sum",
-    "Sales After Returns": "sum"
-})
+    # =========================
+    # 🔑 SAFE CODE
+    # =========================
+    if "rep_code" not in sales.columns:
+        sales["rep_code"] = np.nan
+
+    sales["rep_code"] = sales["rep_code"].astype(str)
+
+    if "rep_code" in codes.columns:
+        codes["rep_code"] = codes["rep_code"].astype(str)
+        sales = sales.merge(codes, on="rep_code", how="left")
 
 
-manager_sales = sales.groupby("Manager Code", as_index=False).agg({
-    "Total Sales Value": "sum",
-    "Returns Value": "sum",
-    "Sales After Returns": "sum"
-})
+    # =========================
+    # 🧠 MAPPING SAFE
+    # =========================
+    if "old_product_code" in sales.columns and "old_product_code" in mapping.columns:
+        sales["old_product_code"] = pd.to_numeric(sales["old_product_code"], errors="coerce")
+        sales = sales.merge(mapping, on="old_product_code", how="left")
 
-
-area_sales = sales.groupby("Area Code", as_index=False).agg({
-    "Total Sales Value": "sum",
-    "Returns Value": "sum",
-    "Sales After Returns": "sum"
-})
-
-
-supervisor_sales = sales.groupby("Supervisor Code", as_index=False).agg({
-    "Total Sales Value": "sum",
-    "Returns Value": "sum",
-    "Sales After Returns": "sum"
-})
-
-
-# =========================
-# 🔗 MERGE TARGET
-# =========================
-rep = rep_sales.merge(rep_target, on="Rep Code", how="left")
-manager = manager_sales.merge(manager_target, on="Manager Code", how="left")
-area = area_sales.merge(area_target, on="Area Code", how="left")
-supervisor = supervisor_sales.merge(supervisor_target, on="Supervisor Code", how="left")
+    return sales
 
 
 # =========================
-# 📊 ACHIEVEMENT %
+# 🎯 TARGET PIPELINE
 # =========================
-def achievement(df):
+def build_target_pipeline(df, key_col):
 
-    if "Target Value" not in df.columns:
-        df["Target Value"] = 0
+    df = clean_columns(df)
 
-    df["Target Value"] = df["Target Value"].fillna(0)
+    key_col = key_col.lower().replace(" ", "_")
 
-    df["Achievement %"] = 0
+    if key_col in df.columns:
+        df[key_col] = df[key_col].astype(str)
 
-    mask = df["Target Value"] > 0
-
-    df.loc[mask, "Achievement %"] = (
-        df.loc[mask, "Total Sales Value"] / df.loc[mask, "Target Value"]
-    ) * 100
+    for c in df.columns:
+        if "target" in c:
+            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
     return df
-
-
-rep = achievement(rep)
-manager = achievement(manager)
-area = achievement(area)
-supervisor = achievement(supervisor)
-
-
-# =========================
-# 📊 OUTPUT
-# =========================
-st.header("🔥 SALES VS TARGET")
-
-st.subheader("👨‍💼 Rep")
-st.dataframe(rep, use_container_width=True)
-
-st.subheader("🏢 Manager")
-st.dataframe(manager, use_container_width=True)
-
-st.subheader("🌍 Area")
-st.dataframe(area, use_container_width=True)
-
-st.subheader("🧑‍💼 Supervisor")
-st.dataframe(supervisor, use_container_width=True)
