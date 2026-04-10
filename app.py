@@ -1,9 +1,6 @@
 import streamlit as st
 import data_pipeline as dp
 
-# =========================
-# LOAD ALL DATA
-# =========================
 data = dp.load_data()
 
 st.title("📊 Sales Dashboard")
@@ -12,24 +9,33 @@ st.title("📊 Sales Dashboard")
 # =========================
 # REP
 # =========================
-rep = dp.build_target_pipeline(
-    data["target_rep"],
-    "Rep Code",
-    data["mapping"]
-)
+rep = dp.build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
 
 st.subheader("👤 Rep KPI")
+
+st.write("### Value Full")
 st.write(rep["value_full"])
+
+st.write("### Value Month")
+st.write(rep["value_month"])
+
+st.write("### Value Quarter")
+st.write(rep["value_quarter"])
+
+st.write("### Value UpToDate")
+st.write(rep["value_uptodate"])
+
+st.write("### Products Full")
+st.write(rep["products_full"])
+
+st.write("### Products UpToDate")
+st.write(rep["products_uptodate"])
 
 
 # =========================
 # MANAGER
 # =========================
-manager = dp.build_target_pipeline(
-    data["target_manager"],
-    "Manager Code",
-    data["mapping"]
-)
+manager = dp.build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"])
 
 st.subheader("👔 Manager KPI")
 st.write(manager["value_full"])
@@ -38,11 +44,7 @@ st.write(manager["value_full"])
 # =========================
 # AREA
 # =========================
-area = dp.build_target_pipeline(
-    data["target_area"],
-    "Area Code",
-    data["mapping"]
-)
+area = dp.build_target_pipeline(data["target_area"], "Area Code", data["mapping"])
 
 st.subheader("🌍 Area KPI")
 st.write(area["value_full"])
@@ -51,11 +53,7 @@ st.write(area["value_full"])
 # =========================
 # SUPERVISOR
 # =========================
-supervisor = dp.build_target_pipeline(
-    data["target_supervisor"],
-    "Supervisor Code",
-    data["mapping"]
-)
+supervisor = dp.build_target_pipeline(data["target_supervisor"], "Supervisor Code", data["mapping"])
 
 st.subheader("🧑‍💼 Supervisor KPI")
 st.write(supervisor["value_full"])
@@ -64,11 +62,7 @@ st.write(supervisor["value_full"])
 # =========================
 # EVAK
 # =========================
-evak = dp.build_target_pipeline(
-    data["target_evak"],
-    "Evak Code",
-    data["mapping"]
-)
+evak = dp.build_target_pipeline(data["target_evak"], "Evak Code", data["mapping"])
 
 st.subheader("📦 Evak KPI")
 st.write(evak["value_full"])
