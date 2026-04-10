@@ -31,21 +31,25 @@ def build_target_pipeline(df, key_col):
     if key_col in df.columns:
         df[key_col] = df[key_col].astype(str)
 
-    for col in df.columns:
-        if "Target" in col:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+    # clean numeric target columns
+    for c in df.columns:
+        if "Target" in c:
+            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
     return df
 
 
 # =========================
-# 💰 SALES PIPELINE
+# 💰 SALES PIPELINE (SAFE)
 # =========================
 def build_sales_pipeline(sales, mapping, codes):
 
     sales = sales.copy()
     sales.columns = sales.columns.str.strip()
 
+    # =========================
+    # 🔢 SAFE NUMERIC
+    # =========================
     num_cols = [
         "Sales Unit Before Edit",
         "Returns Unit Before Edit",
@@ -56,14 +60,21 @@ def build_sales_pipeline(sales, mapping, codes):
     for c in num_cols:
         if c in sales.columns:
             sales[c] = pd.to_numeric(sales[c], errors="coerce").fillna(0)
+        else:
+            sales[c] = 0
 
 
+    # =========================
+    # 💰 CALCULATIONS (SAFE)
+    # =========================
     sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
     sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
     sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
 
 
-    # safe codes
+    # =========================
+    # 🧩 CODES
+    # =========================
     if "Rep Code" in sales.columns:
         sales["Rep Code"] = sales["Rep Code"].astype(str)
 
@@ -82,6 +93,10 @@ def build_groups(sales):
     def g(cols, sums):
         cols = [c for c in cols if c in sales.columns]
         sums = [c for c in sums if c in sales.columns]
+
+        if not cols:
+            return pd.DataFrame()
+
         return sales.groupby(cols, as_index=False)[sums].sum()
 
 
