@@ -5,6 +5,7 @@ data = dp.load_data()
 
 st.title("📊 Sales Dashboard")
 
+
 # =========================
 # REP
 # =========================
@@ -42,3 +43,29 @@ area = dp.build_target_pipeline(
 
 st.subheader("Area KPI")
 st.write(area["value_full"])
+
+
+# =========================
+# SUPERVISOR
+# =========================
+supervisor = dp.build_target_pipeline(
+    data["target_supervisor"],
+    "Supervisor Code",
+    data["mapping"]
+)
+
+st.subheader("Supervisor KPI")
+st.write(supervisor["value_full"])
+
+
+# =========================
+# EVAK
+# =========================
+evak = dp.build_target_pipeline(
+    data["target_evak"],
+    "Evak Code",
+    data["mapping"]
+)
+
+st.subheader("Evak KPI")
+st.write(evak["value_full"])
