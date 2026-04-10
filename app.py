@@ -81,3 +81,40 @@ st.dataframe(evak["products_full"], use_container_width=True)
 st.dataframe(evak["products_month"], use_container_width=True)
 st.dataframe(evak["products_quarter"], use_container_width=True)
 st.dataframe(evak["products_ytd"], use_container_width=True)
+
+#--------------------------------------------------------------------------------------------------------------------------------------------------
+# =========================
+# 📊 SALES PIPELINE RUN
+# =========================
+sales_kpi = dp.build_sales_pipeline(
+    data["sales"],
+    data["mapping"],
+    data["codes"]
+)
+
+
+# =========================
+# 📊 SALES DASHBOARD
+# =========================
+st.header("📊 SALES KPI")
+
+st.subheader("👨‍💼 Rep Sales")
+st.dataframe(sales_kpi["rep_value"], use_container_width=True)
+
+st.subheader("📦 Rep Products")
+st.dataframe(sales_kpi["rep_products"], use_container_width=True)
+
+st.subheader("🏢 Manager Sales")
+st.dataframe(sales_kpi["manager_value"], use_container_width=True)
+
+st.subheader("📦 Manager Products")
+st.dataframe(sales_kpi["manager_products"], use_container_width=True)
+
+st.subheader("🌍 Area Sales")
+st.dataframe(sales_kpi["area_value"], use_container_width=True)
+
+st.subheader("📦 Area Products")
+st.dataframe(sales_kpi["area_products"], use_container_width=True)
+
+st.subheader("🧑‍💼 Supervisor Sales")
+st.dataframe(sales_kpi["supervisor_value"], use_container_width=True)
