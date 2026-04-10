@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 
 current_month = pd.Timestamp.today().month
+current_quarter = (current_month - 1) // 3 + 1
+quarter_months = current_quarter * 3
+
 
 # =========================
 # LOAD DATA 📂
@@ -64,7 +67,7 @@ def build_target_pipeline(df, id_name, mapping):
     df = df.merge(mapping, on="Product Code", how="left")
 
     # -------------------------
-    # Numbers
+    # Numeric
     # -------------------------
     df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
     df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
@@ -72,11 +75,8 @@ def build_target_pipeline(df, id_name, mapping):
     df["Full Target Value"] = df["Target (Unit)"] * df["Sales Price"]
 
     # -------------------------
-    # KPI Logic 🔥
+    # KPI builder 🔥
     # -------------------------
-    current_quarter = (current_month - 1) // 3 + 1
-    quarter_months = current_quarter * 3
-
     def add(df_in, factor):
         tmp = df_in.copy()
         tmp["Target (Value)"] = (tmp["Full Target Value"] / 12) * factor
@@ -88,47 +88,35 @@ def build_target_pipeline(df, id_name, mapping):
     df_ytd = add(df, current_month)
 
     # -------------------------
-    # Group Value
+    # GROUP VALUE
     # -------------------------
     def group(d):
         return d.groupby([id_name], as_index=False)["Target (Value)"].sum()
 
+    # -------------------------
+    # PRODUCTS GROUP 📦
+    # -------------------------
     def group_products(d):
         return d.groupby(
-            [id_name, "Product Code", "Product Name"],
+            [id_name, "Product Code", "Product Name", "Category", "2 Classification"],
             as_index=False
         )["Target (Value)"].sum()
 
-    # -------------------------
-    # Final Tables 💪
-    # -------------------------
-    final_value = group(df_full).rename(columns={"Target (Value)": "Full"})
-    final_value = final_value.merge(
-        group(df_ytd).rename(columns={"Target (Value)": "YTD"}),
-        on=id_name, how="left"
-    )
-    final_value = final_value.merge(
-        group(df_quarter).rename(columns={"Target (Value)": "Quarter"}),
-        on=id_name, how="left"
-    )
-    final_value = final_value.merge(
-        group(df_month).rename(columns={"Target (Value)": "Month"}),
-        on=id_name, how="left"
-    )
-
+    # =========================
+    # FINAL OUTPUT 🔥
+    # =========================
     return {
+
+        # RAW
         "raw": df,
 
-        # KPI TABLE ✅
-        "value_all": final_value,
-
-        # VALUES
+        # VALUE KPI
         "value_full": group(df_full),
         "value_month": group(df_month),
         "value_quarter": group(df_quarter),
         "value_uptodate": group(df_ytd),
 
-        # PRODUCTS 🔥
+        # PRODUCTS KPI 📦🔥 (FULL / MONTH / QUARTER / YTD)
         "products_full": group_products(df_full),
         "products_month": group_products(df_month),
         "products_quarter": group_products(df_quarter),
