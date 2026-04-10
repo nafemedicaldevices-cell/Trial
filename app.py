@@ -16,69 +16,86 @@ data = dp.load_data()
 
 
 # =========================
-# 🎯 TARGETS
-# =========================
-rep_target = dp.build_target(data["target_rep"], "Rep Code")
-manager_target = dp.build_target(data["target_manager"], "Manager Code")
-area_target = dp.build_target(data["target_area"], "Area Code")
-supervisor_target = dp.build_target(data["target_supervisor"], "Supervisor Code")
-
-
-# =========================
 # 💰 SALES
 # =========================
-sales = dp.build_sales(
+sales = dp.build_sales_pipeline(
     data["sales"],
     data["mapping"],
     data["codes"]
 )
 
 
-groups = dp.build_groups(sales)
+# =========================
+# 🎯 TARGETS
+# =========================
+rep_target = dp.build_target_pipeline(data["target_rep"], "Rep Code")
+manager_target = dp.build_target_pipeline(data["target_manager"], "Manager Code")
+area_target = dp.build_target_pipeline(data["target_area"], "Area Code")
+supervisor_target = dp.build_target_pipeline(data["target_supervisor"], "Supervisor Code")
 
 
 # =========================
-# 🔗 MERGE SAFE
+# 📊 GROUP SALES
 # =========================
-def merge_safe(left, right, key):
+rep_sales = sales.groupby("rep_code", as_index=False).agg({
+    "total_sales_value": "sum",
+    "returns_value": "sum",
+    "sales_after_returns": "sum"
+})
 
-    if key in left.columns and key in right.columns:
-        return left.merge(right, on=key, how="left")
+manager_sales = sales.groupby("manager_code", as_index=False).agg({
+    "total_sales_value": "sum",
+    "returns_value": "sum",
+    "sales_after_returns": "sum"
+})
 
-    return left
+area_sales = sales.groupby("area_code", as_index=False).agg({
+    "total_sales_value": "sum",
+    "returns_value": "sum",
+    "sales_after_returns": "sum"
+})
+
+supervisor_sales = sales.groupby("supervisor_code", as_index=False).agg({
+    "total_sales_value": "sum",
+    "returns_value": "sum",
+    "sales_after_returns": "sum"
+})
 
 
-rep = merge_safe(groups["rep"], rep_target, "Rep Code")
-manager = merge_safe(groups["manager"], manager_target, "Manager Code")
-area = merge_safe(groups["area"], area_target, "Area Code")
-supervisor = merge_safe(groups["supervisor"], supervisor_target, "Supervisor Code")
+# =========================
+# 🔗 MERGE
+# =========================
+rep = rep_sales.merge(rep_target, on="rep_code", how="left")
+manager = manager_sales.merge(manager_target, on="manager_code", how="left")
+area = area_sales.merge(area_target, on="area_code", how="left")
+supervisor = supervisor_sales.merge(supervisor_target, on="supervisor_code", how="left")
 
 
 # =========================
 # 📊 ACHIEVEMENT %
 # =========================
-def achievement(df, target_col):
+def achievement(df):
 
-    if target_col not in df.columns:
-        df[target_col] = 0
+    if "target_value" not in df.columns:
+        df["target_value"] = 0
 
-    df[target_col] = df[target_col].fillna(0)
+    df["target_value"] = df["target_value"].fillna(0)
 
-    df["Achievement %"] = 0
+    df["achievement_%"] = 0
 
-    mask = df[target_col] > 0
+    mask = df["target_value"] > 0
 
-    df.loc[mask, "Achievement %"] = (
-        df.loc[mask, "Total Sales Value"] / df.loc[mask, target_col]
+    df.loc[mask, "achievement_%"] = (
+        df.loc[mask, "total_sales_value"] / df.loc[mask, "target_value"]
     ) * 100
 
     return df
 
 
-rep = achievement(rep, "Target Value")
-manager = achievement(manager, "Target Value")
-area = achievement(area, "Target Value")
-supervisor = achievement(supervisor, "Target Value")
+rep = achievement(rep)
+manager = achievement(manager)
+area = achievement(area)
+supervisor = achievement(supervisor)
 
 
 # =========================
