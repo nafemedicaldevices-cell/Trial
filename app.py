@@ -2,36 +2,28 @@ import streamlit as st
 import data_pipeline as dp
 
 st.set_page_config(layout="wide")
-st.title("💰 SALES KPI TEST")
+
+st.title("💰 SALES KPI FIXED")
 
 data = dp.load_data()
 
-sales = dp.build_sales_pipeline(data["sales"])
+sales = dp.build_sales_pipeline(
+    data["sales"],
+    data["mapping"],
+    data["codes"]
+)
 
-
-# =========================
-# 👨‍💼 REP
-# =========================
-st.header("Rep Sales")
+st.header("Rep")
 st.dataframe(sales["rep_value"], use_container_width=True)
 
-
-# =========================
-# 🏢 MANAGER
-# =========================
-st.header("Manager Sales")
+st.header("Manager")
 st.dataframe(sales["manager_value"], use_container_width=True)
 
-
-# =========================
-# 🌍 AREA
-# =========================
-st.header("Area Sales")
+st.header("Area")
 st.dataframe(sales["area_value"], use_container_width=True)
 
-
-# =========================
-# 🧑‍💼 SUPERVISOR
-# =========================
-st.header("Supervisor Sales")
+st.header("Supervisor")
 st.dataframe(sales["supervisor_value"], use_container_width=True)
+
+st.header("Products")
+st.dataframe(sales["rep_products"], use_container_width=True)
