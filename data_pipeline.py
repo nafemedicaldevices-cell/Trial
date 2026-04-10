@@ -1,8 +1,7 @@
 import pandas as pd
+import numpy as np
 
-# =========================
-# 📅 TIME SETTINGS
-# =========================
+# 📅 Time setup
 current_month = pd.Timestamp.today().month
 current_quarter = (current_month - 1) // 3 + 1
 past_quarters = max(current_quarter - 1, 0)
@@ -65,27 +64,28 @@ def build_target_pipeline(df, id_name, mapping):
     # 🔗 merge
     df = df.merge(mapping, on="Product Code", how="left")
 
-    # 🔢 numeric
+    # 🔢 numeric clean
     df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
     df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
 
-    # 💰 value
+    # 💰 total value
     df["Full Value"] = df["Target (Unit)"] * df["Sales Price"]
 
     # =========================
-    # 📊 KPI CALCULATION
+    # 📊 KPI LOGIC
     # =========================
     full = df.copy()
-    full["Value"] = full["Full Value"]
 
     month = df.copy()
     month["Value"] = full["Full Value"] * (current_month / 12)
 
+    ytd = df.copy()
+    ytd["Value"] = full["Full Value"] * (current_month / 12)
+
     quarter = df.copy()
     quarter["Value"] = full["Full Value"] * (past_quarters / 4)
 
-    ytd = df.copy()
-    ytd["Value"] = full["Full Value"] * (current_month / 12)
+    full["Value"] = full["Full Value"]
 
     # =========================
     # 📊 VALUE TABLE
@@ -99,7 +99,7 @@ def build_target_pipeline(df, id_name, mapping):
     value_table["YTD 📈"] = group(ytd)["Value"]
 
     # =========================
-    # 📦 PRODUCTS TABLE
+    # 📦 PRODUCTS TABLE (FIXED)
     # =========================
     def product_group(d):
         return d.groupby(
@@ -112,6 +112,7 @@ def build_target_pipeline(df, id_name, mapping):
 
     return {
         "value_table": value_table,
+
         "products_full": product_group(full),
         "products_month": product_group(month),
         "products_quarter": product_group(quarter),
