@@ -1,119 +1,184 @@
 import pandas as pd
-
-# =========================
-# 📅 TIME SETTINGS
-# =========================
-current_month = pd.Timestamp.today().month
-current_quarter = (current_month - 1) // 3 + 1
-past_quarters = max(current_quarter - 1, 0)
+import numpy as np
 
 
 # =========================
-# 📂 LOAD DATA
+# 📥 LOAD DATA
 # =========================
 def load_data():
     return {
         "sales": pd.read_excel("Sales.xlsx"),
-        "overdue": pd.read_excel("Overdue.xlsx"),
-        "extra_discounts": pd.read_excel("Extradiscounts.xlsx"),
-        "opening": pd.read_excel("Opening.xlsx"),
-        "opening_detail": pd.read_excel("Opening Detail.xlsx"),
-
-        "target_manager": pd.read_excel("Target Manager.xlsx"),
-        "target_area": pd.read_excel("Target Area.xlsx"),
-        "target_rep": pd.read_excel("Target Rep.xlsx"),
-        "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
-        "target_evak": pd.read_excel("Target Evak.xlsx"),
-
         "mapping": pd.read_excel("Mapping.xlsx"),
         "codes": pd.read_excel("Code.xlsx")
     }
 
 
 # =========================
-# 🚀 PIPELINE
+# 📊 SALES PIPELINE
 # =========================
-def build_target_pipeline(df, id_name, mapping):
+def build_sales_pipeline(sales, mapping, codes):
 
-    df = df.copy()
-    mapping = mapping.copy()
+    sales = sales.copy()
+    sales.columns = sales.columns.str.strip()
 
-    df.columns = df.columns.str.strip()
+    expected_cols = [
+        'Date','Warehouse Name','Client Code','Client Name','Notes','MF','Mostanad',
+        'Rep Code','Sales Unit Before Edit','Returns Unit Before Edit',
+        'Sales Price','Invoice Discounts','Sales Value'
+    ]
 
-    fixed_cols = [c for c in ["Year", "Product Code", "Old Product Name", "Sales Price"] if c in df.columns]
-    dynamic_cols = [c for c in df.columns if c not in fixed_cols]
+    if len(sales.columns) == len(expected_cols):
+        sales.columns = expected_cols
 
-    # 🔄 reshape
-    df = df.melt(
-        id_vars=fixed_cols,
-        value_vars=dynamic_cols,
-        var_name=id_name,
-        value_name="Target (Unit)"
+
+    # =========================
+    # 📦 STEP 3 FIXED (IMPORTANT)
+    # =========================
+    if 'Date' in sales.columns:
+
+        mask = sales['Date'].astype(str).str.strip().eq("كود الصنف")
+
+        # 🔥 FORCE OBJECT TYPE
+        if 'Old Product Code' not in sales.columns:
+            sales['Old Product Code'] = np.nan
+        if 'Old Product Name' not in sales.columns:
+            sales['Old Product Name'] = np.nan
+
+        sales['Old Product Code'] = sales['Old Product Code'].astype('object')
+        sales['Old Product Name'] = sales['Old Product Name'].astype('object')
+
+        sales.loc[mask, 'Old Product Code'] = sales.loc[mask, 'Warehouse Name'].astype(str)
+        sales.loc[mask, 'Old Product Name'] = sales.loc[mask, 'Client Code'].astype(str)
+
+        sales[['Old Product Code','Old Product Name']] = sales[
+            ['Old Product Code','Old Product Name']
+        ].ffill()
+
+
+    # =========================
+    # 🧹 FILTER
+    # =========================
+    drop_keywords = 'المندوب|كود الفرع|تاريخ|كود الصنف'
+
+    sales = sales[sales['Date'].notna()].copy()
+    sales = sales[~sales['Date'].astype(str).str.contains(drop_keywords, na=False)].copy()
+
+
+    # =========================
+    # 🔢 NUMERIC
+    # =========================
+    num_cols = [
+        'Sales Unit Before Edit',
+        'Returns Unit Before Edit',
+        'Sales Price',
+        'Invoice Discounts',
+        'Sales Value'
+    ]
+
+    for col in num_cols:
+        if col in sales.columns:
+            sales[col] = pd.to_numeric(sales[col], errors='coerce').fillna(0)
+
+
+    # =========================
+    # 🆔 IDS
+    # =========================
+    if 'Old Product Code' in sales.columns:
+        sales['Old Product Code'] = pd.to_numeric(sales['Old Product Code'], errors='coerce').astype('Int64')
+
+    if 'Rep Code' in sales.columns:
+        sales['Rep Code'] = pd.to_numeric(sales['Rep Code'], errors='coerce').astype('Int64')
+
+
+    # =========================
+    # 🧩 MAPPING
+    # =========================
+    if 'Old Product Code' in sales.columns:
+
+        mapping_cols = [
+            'Old Product Code','4 Classification','Product Name',
+            'Product Code','Category','Next Factor','2 Classification'
+        ]
+
+        mapping_cols = [c for c in mapping_cols if c in mapping.columns]
+
+        sales = sales.merge(mapping[mapping_cols], on='Old Product Code', how='left')
+
+
+    # =========================
+    # 🧩 CODES
+    # =========================
+    if 'Next Factor' not in sales.columns:
+        sales['Next Factor'] = 1
+
+    sales['Next Factor'] = sales['Next Factor'].fillna(1)
+
+    codes['Rep Code'] = pd.to_numeric(codes['Rep Code'], errors='coerce').astype('Int64')
+
+    sales = sales.merge(codes, on='Rep Code', how='left')
+
+
+    # =========================
+    # 💰 CALCULATIONS
+    # =========================
+    sales['Total Sales Value'] = sales['Sales Unit Before Edit'] * sales['Sales Price']
+    sales['Returns Value'] = sales['Returns Unit Before Edit'] * sales['Sales Price']
+    sales['Sales After Returns'] = sales['Total Sales Value'] - sales['Returns Value']
+
+    sales['Net Sales Unit'] = (
+        (sales['Sales Unit Before Edit'] - sales['Returns Unit Before Edit'])
+        * sales['Next Factor']
     )
 
-    # 🧹 clean IDs
-    df[id_name] = pd.to_numeric(
-        df[id_name].astype(str).str.replace(r"[^0-9]", "", regex=True),
-        errors="coerce"
-    )
-
-    df["Product Code"] = pd.to_numeric(df["Product Code"], errors="coerce")
-    mapping["Product Code"] = pd.to_numeric(mapping["Product Code"], errors="coerce")
-
-    mapping = mapping.drop_duplicates("Product Code")
-
-    # 🔗 merge
-    df = df.merge(mapping, on="Product Code", how="left")
-
-    # 🔢 numeric
-    df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
-    df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
-
-    # 💰 value
-    df["Full Value"] = df["Target (Unit)"] * df["Sales Price"]
 
     # =========================
-    # 📊 KPI CALCULATION
+    # 📊 GROUP ENGINE
     # =========================
-    full = df.copy()
-    full["Value"] = full["Full Value"]
+    def safe_group(df, group_cols, sum_cols):
 
-    month = df.copy()
-    month["Value"] = full["Full Value"] * (current_month / 12)
+        group_cols = [c for c in group_cols if c in df.columns]
+        sum_cols = [c for c in sum_cols if c in df.columns]
 
-    quarter = df.copy()
-    quarter["Value"] = full["Full Value"] * (past_quarters / 4)
+        if not group_cols:
+            return pd.DataFrame(columns=sum_cols)
 
-    ytd = df.copy()
-    ytd["Value"] = full["Full Value"] * (current_month / 12)
+        return df.groupby(group_cols, as_index=False)[sum_cols].sum()
 
-    # =========================
-    # 📊 VALUE TABLE
-    # =========================
-    def group(d):
-        return d.groupby([id_name], as_index=False)["Value"].sum()
 
-    value_table = group(full).rename(columns={"Value": "Full Year 🏆"})
-    value_table["Month 📅"] = group(month)["Value"]
-    value_table["Quarter 📊"] = group(quarter)["Value"]
-    value_table["YTD 📈"] = group(ytd)["Value"]
-
-    # =========================
-    # 📦 PRODUCTS TABLE
-    # =========================
-    def product_group(d):
-        return d.groupby(
-            [id_name, "Product Code", "Product Name"],
-            as_index=False
-        ).agg(
-            Units=("Target (Unit)", "sum"),
-            Value=("Value", "sum")
-        )
-
-    return {
-        "value_table": value_table,
-        "products_full": product_group(full),
-        "products_month": product_group(month),
-        "products_quarter": product_group(quarter),
-        "products_ytd": product_group(ytd),
+    GROUP_DEFS = {
+        "rep_value": {
+            "group": ['Rep Code'],
+            "sum": ['Total Sales Value','Returns Value','Sales After Returns','Invoice Discounts']
+        },
+        "manager_value": {
+            "group": ['Manager Code'],
+            "sum": ['Total Sales Value','Returns Value','Sales After Returns','Invoice Discounts']
+        },
+        "area_value": {
+            "group": ['Area Code'],
+            "sum": ['Total Sales Value','Returns Value','Sales After Returns','Invoice Discounts']
+        },
+        "supervisor_value": {
+            "group": ['Supervisor Code'],
+            "sum": ['Total Sales Value','Returns Value','Sales After Returns','Invoice Discounts']
+        },
+        "rep_products": {
+            "group": ['Rep Code','Product Code','Product Name'],
+            "sum": ['Sales Value','Net Sales Unit']
+        },
+        "manager_products": {
+            "group": ['Manager Code','Product Code','Product Name'],
+            "sum": ['Sales Value','Net Sales Unit']
+        },
+        "area_products": {
+            "group": ['Area Code','Product Code','Product Name'],
+            "sum": ['Sales Value','Net Sales Unit']
+        }
     }
+
+
+    results = {}
+    for name, cfg in GROUP_DEFS.items():
+        results[name] = safe_group(sales, cfg["group"], cfg["sum"])
+
+    return results
