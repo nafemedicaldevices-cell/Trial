@@ -1,3 +1,36 @@
+import pandas as pd
+import numpy as np
+
+current_month = pd.Timestamp.today().month
+current_quarter = (current_month - 1) // 3 + 1
+past_quarters = max(current_quarter - 1, 0)
+
+
+# =========================
+# LOAD DATA
+# =========================
+def load_data():
+    return {
+        "sales": pd.read_excel("Sales.xlsx"),
+        "overdue": pd.read_excel("Overdue.xlsx"),
+        "extra_discounts": pd.read_excel("Extradiscounts.xlsx"),
+        "opening": pd.read_excel("Opening.xlsx"),
+        "opening_detail": pd.read_excel("Opening Detail.xlsx"),
+
+        "target_manager": pd.read_excel("Target Manager.xlsx"),
+        "target_area": pd.read_excel("Target Area.xlsx"),
+        "target_rep": pd.read_excel("Target Rep.xlsx"),
+        "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
+        "target_evak": pd.read_excel("Target Evak.xlsx"),
+
+        "mapping": pd.read_excel("Mapping.xlsx"),
+        "codes": pd.read_excel("Code.xlsx")
+    }
+
+
+# =========================
+# PIPELINE
+# =========================
 def build_target_pipeline(df, id_name, mapping):
 
     df = df.copy()
@@ -15,14 +48,16 @@ def build_target_pipeline(df, id_name, mapping):
         value_name="Target (Unit)"
     )
 
-    # clean
+    # clean IDs
     df[id_name] = pd.to_numeric(df[id_name].astype(str).str.replace(r"[^0-9]", "", regex=True), errors="coerce")
     df["Product Code"] = pd.to_numeric(df["Product Code"], errors="coerce")
     mapping["Product Code"] = pd.to_numeric(mapping["Product Code"], errors="coerce")
 
     mapping = mapping.drop_duplicates("Product Code")
+
     df = df.merge(mapping, on="Product Code", how="left")
 
+    # numeric clean
     df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
     df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
 
@@ -56,7 +91,7 @@ def build_target_pipeline(df, id_name, mapping):
     value_table["YTD"] = group(ytd)["Value"]
 
     # =========================
-    # PRODUCTS TABLE (FIXED 🚀)
+    # PRODUCTS TABLE
     # =========================
     def product_group(d):
         return d.groupby(
@@ -64,17 +99,11 @@ def build_target_pipeline(df, id_name, mapping):
             as_index=False
         )["Value"].sum()
 
-    products_full = product_group(full)
-    products_month = product_group(month)
-    products_quarter = product_group(quarter)
-    products_ytd = product_group(ytd)
-
     return {
         "value_table": value_table,
 
-        # PRODUCTS FULL KPI SET 🔥
-        "products_full": products_full,
-        "products_month": products_month,
-        "products_quarter": products_quarter,
-        "products_ytd": products_ytd,
+        "products_full": product_group(full),
+        "products_month": product_group(month),
+        "products_quarter": product_group(quarter),
+        "products_ytd": product_group(ytd),
     }
