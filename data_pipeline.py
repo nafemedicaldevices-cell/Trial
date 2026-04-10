@@ -1,8 +1,6 @@
 import pandas as pd
 import numpy as np
 
-current_month = pd.Timestamp.today().month
-
 
 # =========================
 # 📂 LOAD DATA
@@ -21,7 +19,89 @@ def load_data():
 
 
 # =========================
-# 🎯 TARGET PIPELINE
+# 🔍 SMART COLUMN FINDER
+# =========================
+def find_col(df, keywords):
+    for c in df.columns:
+        if any(k.lower() in c.lower() for k in keywords):
+            return c
+    return None
+
+
+# =========================
+# 💰 SALES PIPELINE (FIXED)
+# =========================
+def build_sales(df):
+
+    df = df.copy()
+
+    # clean columns
+    df.columns = df.columns.str.strip()
+
+    # detect columns dynamically
+    qty_col = find_col(df, ["sales unit", "unit", "qty"])
+    return_col = find_col(df, ["return"])
+    price_col = find_col(df, ["price"])
+
+    if qty_col is None or price_col is None:
+        raise ValueError(f"Missing required columns. Found: {df.columns}")
+
+    # numeric conversion
+    df[qty_col] = pd.to_numeric(df[qty_col], errors="coerce").fillna(0)
+    df[price_col] = pd.to_numeric(df[price_col], errors="coerce").fillna(0)
+
+    if return_col:
+        df[return_col] = pd.to_numeric(df[return_col], errors="coerce").fillna(0)
+    else:
+        df["Returns Unit Before Edit"] = 0
+        return_col = "Returns Unit Before Edit"
+
+    # KPI
+    df["Total Sales Value"] = df[qty_col] * df[price_col]
+    df["Returns Value"] = df[return_col] * df[price_col]
+    df["Sales After Returns"] = df["Total Sales Value"] - df["Returns Value"]
+
+    return df
+
+
+# =========================
+# 📊 SALES GROUPING
+# =========================
+def build_sales_pipeline(df):
+
+    df = build_sales(df)
+
+    # Rep
+    rep = df.groupby("Rep Code", as_index=False)[
+        ["Total Sales Value", "Returns Value", "Sales After Returns"]
+    ].sum()
+
+    # Manager (if exists)
+    manager = df.groupby("Manager Code", as_index=False)[
+        ["Total Sales Value", "Returns Value", "Sales After Returns"]
+    ].sum() if "Manager Code" in df.columns else pd.DataFrame()
+
+    # Area
+    area = df.groupby("Area Code", as_index=False)[
+        ["Total Sales Value", "Returns Value", "Sales After Returns"]
+    ].sum() if "Area Code" in df.columns else pd.DataFrame()
+
+    # Supervisor
+    supervisor = df.groupby("Supervisor Code", as_index=False)[
+        ["Total Sales Value", "Returns Value", "Sales After Returns"]
+    ].sum() if "Supervisor Code" in df.columns else pd.DataFrame()
+
+    return {
+        "rep_value": rep,
+        "manager_value": manager,
+        "area_value": area,
+        "supervisor_value": supervisor,
+        "raw": df
+    }
+
+
+# =========================
+# 🎯 TARGET PIPELINE (SIMPLE)
 # =========================
 def build_target(df, id_name, mapping):
 
@@ -54,57 +134,3 @@ def build_target(df, id_name, mapping):
     df["Target Value"] = df["Target Units"] * df["Sales Price"]
 
     return df.groupby([id_name], as_index=False)["Target Value"].sum()
-
-
-# =========================
-# 💰 SALES PIPELINE
-# =========================
-def build_sales(df):
-
-    df = df.copy()
-    df.columns = df.columns.str.strip()
-
-    for c in [
-        "Sales Unit Before Edit",
-        "Returns Unit Before Edit",
-        "Sales Price",
-        "Invoice Discounts"
-    ]:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
-
-    df["Total Sales Value"] = df["Sales Unit Before Edit"] * df["Sales Price"]
-    df["Returns Value"] = df["Returns Unit Before Edit"] * df["Sales Price"]
-    df["Sales After Returns"] = df["Total Sales Value"] - df["Returns Value"]
-
-    return df
-
-
-# =========================
-# 🚀 FINAL KPI (MERGED)
-# =========================
-def build_kpi(data):
-
-    sales = build_sales(data["sales"])
-
-    def sales_group(key):
-        return sales.groupby(key, as_index=False).agg({
-            "Total Sales Value": "sum",
-            "Returns Value": "sum",
-            "Sales After Returns": "sum",
-            "Invoice Discounts": "sum"
-        })
-
-    def build_level(target_df, key):
-        target = build_target(target_df, key, data["mapping"])
-        sales_val = sales_group(key)
-
-        return target.merge(sales_val, on=key, how="left").fillna(0)
-
-    return {
-        "rep": build_level(data["target_rep"], "Rep Code"),
-        "manager": build_level(data["target_manager"], "Manager Code"),
-        "area": build_level(data["target_area"], "Area Code"),
-        "supervisor": build_level(data["target_supervisor"], "Supervisor Code"),
-        "evak": build_level(data["target_evak"], "Evak Code"),
-    }
