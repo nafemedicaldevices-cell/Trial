@@ -10,13 +10,13 @@ st.title("📊 Sales vs Target Dashboard")
 
 
 # =========================
-# 📥 DATA
+# 📥 LOAD
 # =========================
 data = dp.load_data()
 
 
 # =========================
-# 🚀 TARGETS FIRST
+# 🎯 TARGETS
 # =========================
 rep_target = dp.build_target_pipeline(data["target_rep"], "Rep Code")
 manager_target = dp.build_target_pipeline(data["target_manager"], "Manager Code")
@@ -25,7 +25,7 @@ supervisor_target = dp.build_target_pipeline(data["target_supervisor"], "Supervi
 
 
 # =========================
-# 💰 SALES SECOND
+# 💰 SALES
 # =========================
 sales = dp.build_sales_pipeline(
     data["sales"],
@@ -33,21 +33,28 @@ sales = dp.build_sales_pipeline(
     data["codes"]
 )
 
-
 groups = dp.build_groups(sales)
 
 
 # =========================
-# 🔗 MERGE
+# 🔗 MERGE SAFE
 # =========================
-rep = groups["rep"].merge(rep_target, on="Rep Code", how="left")
-manager = groups["manager"].merge(manager_target, on="Manager Code", how="left")
-area = groups["area"].merge(area_target, on="Area Code", how="left")
-supervisor = groups["supervisor"].merge(supervisor_target, on="Supervisor Code", how="left")
+def safe_merge(left, right, key):
+
+    if key in left.columns and key in right.columns:
+        return left.merge(right, on=key, how="left")
+
+    return left
+
+
+rep = safe_merge(groups["rep"], rep_target, "Rep Code")
+manager = safe_merge(groups["manager"], manager_target, "Manager Code")
+area = safe_merge(groups["area"], area_target, "Area Code")
+supervisor = safe_merge(groups["supervisor"], supervisor_target, "Supervisor Code")
 
 
 # =========================
-# 📊 ACHIEVEMENT
+# 📊 ACHIEVEMENT %
 # =========================
 def achievement(df, target_col):
 
@@ -76,7 +83,7 @@ supervisor = achievement(supervisor, "Target Value")
 # =========================
 # 📊 OUTPUT
 # =========================
-st.header("🔥 SALES vs TARGET")
+st.header("🔥 SALES VS TARGET")
 
 st.subheader("👨‍💼 Rep")
 st.dataframe(rep, use_container_width=True)
