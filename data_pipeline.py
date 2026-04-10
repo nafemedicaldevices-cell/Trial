@@ -30,7 +30,7 @@ def load_data():
 
 
 # =========================
-# 🚀 PIPELINE
+# 🚀 PIPELINE FUNCTION
 # =========================
 def build_target_pipeline(df, id_name, mapping):
 
@@ -42,7 +42,7 @@ def build_target_pipeline(df, id_name, mapping):
     fixed_cols = [c for c in ["Year", "Product Code", "Old Product Name", "Sales Price"] if c in df.columns]
     dynamic_cols = [c for c in df.columns if c not in fixed_cols]
 
-    # 🔄 reshape
+    # 🔄 melt
     df = df.melt(
         id_vars=fixed_cols,
         value_vars=dynamic_cols,
@@ -64,50 +64,49 @@ def build_target_pipeline(df, id_name, mapping):
     # 🔗 merge
     df = df.merge(mapping, on="Product Code", how="left")
 
-    # 🔢 numeric clean
+    # 🔢 numeric cleanup
     df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
     df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
 
-    # 💰 total value
+    # 💰 value
     df["Full Value"] = df["Target (Unit)"] * df["Sales Price"]
 
     # =========================
-    # 📊 KPI LOGIC
+    # 📊 KPI CALCULATION
     # =========================
     full = df.copy()
+    full["Value"] = full["Full Value"]
 
     month = df.copy()
     month["Value"] = full["Full Value"] * (current_month / 12)
 
-    ytd = df.copy()
-    ytd["Value"] = full["Full Value"] * (current_month / 12)
-
     quarter = df.copy()
     quarter["Value"] = full["Full Value"] * (past_quarters / 4)
 
-    full["Value"] = full["Full Value"]
+    ytd = df.copy()
+    ytd["Value"] = full["Full Value"] * (current_month / 12)
 
     # =========================
     # 📊 VALUE TABLE
     # =========================
-    def group(d):
+    def group_value(d):
         return d.groupby([id_name], as_index=False)["Value"].sum()
 
-    value_table = group(full).rename(columns={"Value": "Full Year 🏆"})
-    value_table["Month 📅"] = group(month)["Value"]
-    value_table["Quarter 📊"] = group(quarter)["Value"]
-    value_table["YTD 📈"] = group(ytd)["Value"]
+    value_table = group_value(full).rename(columns={"Value": "🏆 Full Year"})
+    value_table["📅 Month"] = group_value(month)["Value"]
+    value_table["📊 Quarter"] = group_value(quarter)["Value"]
+    value_table["📈 YTD"] = group_value(ytd)["Value"]
 
     # =========================
-    # 📦 PRODUCTS TABLE (FIXED)
+    # 📦 PRODUCTS TABLE (Units + Value)
     # =========================
     def product_group(d):
         return d.groupby(
             [id_name, "Product Code", "Product Name"],
             as_index=False
         ).agg(
-            Units=("Target (Unit)", "sum"),
-            Value=("Value", "sum")
+            📦_Units=("Target (Unit)", "sum"),
+            💰_Value=("Value", "sum")
         )
 
     return {
