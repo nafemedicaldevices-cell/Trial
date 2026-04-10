@@ -5,7 +5,7 @@ current_month = pd.Timestamp.today().month
 
 
 # =========================
-# 1) LOAD DATA
+# LOAD DATA
 # =========================
 def load_data():
     return {
@@ -18,6 +18,8 @@ def load_data():
         "target_manager": pd.read_excel("Target Manager.xlsx"),
         "target_area": pd.read_excel("Target Area.xlsx"),
         "target_rep": pd.read_excel("Target Rep.xlsx"),
+        "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
+        "target_evak": pd.read_excel("Target Evak.xlsx"),
 
         "mapping": pd.read_excel("Mapping.xlsx"),
         "codes": pd.read_excel("Code.xlsx")
@@ -25,7 +27,7 @@ def load_data():
 
 
 # =========================
-# 2) TARGET PIPELINE (FOR ALL LEVELS)
+# TARGET PIPELINE (ALL LEVELS)
 # =========================
 def build_target_pipeline(df, id_name, mapping):
 
@@ -57,13 +59,13 @@ def build_target_pipeline(df, id_name, mapping):
 
     df = df.merge(mapping, on="Product Code", how="left")
 
-    # numeric
+    # numeric cleanup
     df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
     df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
 
     df["Full Target Value"] = df["Target (Unit)"] * df["Sales Price"]
 
-    # KPI
+    # KPI helper
     def add(df_in, factor):
         tmp = df_in.copy()
         tmp["Target (Value)"] = (tmp["Full Target Value"] / 12) * factor
@@ -79,10 +81,11 @@ def build_target_pipeline(df, id_name, mapping):
         return d.groupby([id_name], as_index=False)["Target (Value)"].sum()
 
     def group_products(d):
-        return d.groupby(
-            [id_name, "Product Code", "Product Name"],
-            as_index=False
-        )["Target (Value)"].sum()
+        cols = [id_name, "Product Code"]
+        if "Product Name" in d.columns:
+            cols.append("Product Name")
+
+        return d.groupby(cols, as_index=False)["Target (Value)"].sum()
 
     return {
         "raw": df,
