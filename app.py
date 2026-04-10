@@ -1,37 +1,83 @@
 import streamlit as st
 import data_pipeline as dp
 
+# =========================
+# 🎨 PAGE CONFIG
+# =========================
 st.set_page_config(layout="wide")
-st.title("📊 CLEAN DATA CHECK DASHBOARD")
+
+st.title("📊 Sales Performance Dashboard")
+st.markdown("### 🚀 KPI System (Rep / Manager / Area / Supervisor / Evak)")
 
 
 # =========================
-# LOAD
+# 📂 LOAD DATA
 # =========================
 data = dp.load_data()
 
-sales = dp.clean_sales(data["sales"])
 
-rep_target = dp.clean_target(data["target_rep"], "Rep Code")
-manager_target = dp.clean_target(data["target_manager"], "Manager Code")
-area_target = dp.clean_target(data["target_area"], "Area Code")
-supervisor_target = dp.clean_target(data["target_supervisor"], "Supervisor Code")
+# =========================
+# ⚙️ PIPELINES
+# =========================
+rep = dp.build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
+manager = dp.build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"])
+area = dp.build_target_pipeline(data["target_area"], "Area Code", data["mapping"])
+supervisor = dp.build_target_pipeline(data["target_supervisor"], "Supervisor Code", data["mapping"])
+evak = dp.build_target_pipeline(data["target_evak"], "Evak Code", data["mapping"])
 
 
 # =========================
-# SHOW ONLY (NO MERGE)
+# 📊 VALUE KPI
 # =========================
-st.header("📦 SALES CLEAN DATA")
-st.dataframe(sales, use_container_width=True)
+st.header("📊 VALUE KPI")
 
-st.header("🎯 REP TARGET CLEAN")
-st.dataframe(rep_target, use_container_width=True)
+st.subheader("👨‍💼 Rep")
+st.dataframe(rep["value_table"], use_container_width=True)
 
-st.header("🎯 MANAGER TARGET CLEAN")
-st.dataframe(manager_target, use_container_width=True)
+st.subheader("🏢 Manager")
+st.dataframe(manager["value_table"], use_container_width=True)
 
-st.header("🎯 AREA TARGET CLEAN")
-st.dataframe(area_target, use_container_width=True)
+st.subheader("🌍 Area")
+st.dataframe(area["value_table"], use_container_width=True)
 
-st.header("🎯 SUPERVISOR TARGET CLEAN")
-st.dataframe(supervisor_target, use_container_width=True)
+st.subheader("🧑‍💼 Supervisor")
+st.dataframe(supervisor["value_table"], use_container_width=True)
+
+st.subheader("🧬 Evak")
+st.dataframe(evak["value_table"], use_container_width=True)
+
+
+# =========================
+# 📦 PRODUCTS KPI
+# =========================
+st.header("📦 PRODUCTS KPI")
+
+st.subheader("👨‍💼 Rep Products 🏆📅📊📈")
+st.dataframe(rep["products_full"], use_container_width=True)
+st.dataframe(rep["products_month"], use_container_width=True)
+st.dataframe(rep["products_quarter"], use_container_width=True)
+st.dataframe(rep["products_ytd"], use_container_width=True)
+
+st.subheader("🏢 Manager Products 🏆📅📊📈")
+st.dataframe(manager["products_full"], use_container_width=True)
+st.dataframe(manager["products_month"], use_container_width=True)
+st.dataframe(manager["products_quarter"], use_container_width=True)
+st.dataframe(manager["products_ytd"], use_container_width=True)
+
+st.subheader("🌍 Area Products 🏆📅📊📈")
+st.dataframe(area["products_full"], use_container_width=True)
+st.dataframe(area["products_month"], use_container_width=True)
+st.dataframe(area["products_quarter"], use_container_width=True)
+st.dataframe(area["products_ytd"], use_container_width=True)
+
+st.subheader("🧑‍💼 Supervisor Products 🏆📅📊📈")
+st.dataframe(supervisor["products_full"], use_container_width=True)
+st.dataframe(supervisor["products_month"], use_container_width=True)
+st.dataframe(supervisor["products_quarter"], use_container_width=True)
+st.dataframe(supervisor["products_ytd"], use_container_width=True)
+
+st.subheader("🧬 Evak Products 🏆📅📊📈")
+st.dataframe(evak["products_full"], use_container_width=True)
+st.dataframe(evak["products_month"], use_container_width=True)
+st.dataframe(evak["products_quarter"], use_container_width=True)
+st.dataframe(evak["products_ytd"], use_container_width=True)
