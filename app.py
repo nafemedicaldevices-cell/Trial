@@ -1,6 +1,9 @@
 import streamlit as st
 import data_pipeline as dp
 
+# =========================
+# LOAD ALL DATA
+# =========================
 data = dp.load_data()
 
 st.title("📊 Sales Dashboard")
@@ -15,7 +18,7 @@ rep = dp.build_target_pipeline(
     data["mapping"]
 )
 
-st.subheader("Rep KPI")
+st.subheader("👤 Rep KPI")
 st.write(rep["value_full"])
 
 
@@ -28,7 +31,7 @@ manager = dp.build_target_pipeline(
     data["mapping"]
 )
 
-st.subheader("Manager KPI")
+st.subheader("👔 Manager KPI")
 st.write(manager["value_full"])
 
 
@@ -41,7 +44,7 @@ area = dp.build_target_pipeline(
     data["mapping"]
 )
 
-st.subheader("Area KPI")
+st.subheader("🌍 Area KPI")
 st.write(area["value_full"])
 
 
@@ -54,7 +57,7 @@ supervisor = dp.build_target_pipeline(
     data["mapping"]
 )
 
-st.subheader("Supervisor KPI")
+st.subheader("🧑‍💼 Supervisor KPI")
 st.write(supervisor["value_full"])
 
 
@@ -67,5 +70,5 @@ evak = dp.build_target_pipeline(
     data["mapping"]
 )
 
-st.subheader("Evak KPI")
+st.subheader("📦 Evak KPI")
 st.write(evak["value_full"])
