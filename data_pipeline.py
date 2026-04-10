@@ -3,7 +3,7 @@ import numpy as np
 
 
 # =========================
-# 📥 LOAD DATA
+# 📥 LOAD ALL SHEETS
 # =========================
 def load_data():
     return {
@@ -13,7 +13,6 @@ def load_data():
         "target_manager": pd.read_excel("Target Manager.xlsx"),
         "target_area": pd.read_excel("Target Area.xlsx"),
         "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
-        "target_evak": pd.read_excel("Target Evak.xlsx"),
 
         "mapping": pd.read_excel("Mapping.xlsx"),
         "codes": pd.read_excel("Code.xlsx")
@@ -21,17 +20,24 @@ def load_data():
 
 
 # =========================
-# 🎯 TARGET PIPELINE
+# 🧼 CLEAN COLUMNS
 # =========================
-def build_target_pipeline(df, key_col):
-
+def clean_cols(df):
     df = df.copy()
     df.columns = df.columns.str.strip()
+    return df
+
+
+# =========================
+# 🎯 TARGET PIPELINE
+# =========================
+def build_target(df, key_col):
+
+    df = clean_cols(df)
 
     if key_col in df.columns:
         df[key_col] = df[key_col].astype(str)
 
-    # clean numeric target columns
     for c in df.columns:
         if "Target" in c:
             df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
@@ -40,15 +46,14 @@ def build_target_pipeline(df, key_col):
 
 
 # =========================
-# 💰 SALES PIPELINE (SAFE)
+# 💰 SALES PIPELINE
 # =========================
-def build_sales_pipeline(sales, mapping, codes):
+def build_sales(df, mapping, codes):
 
-    sales = sales.copy()
-    sales.columns = sales.columns.str.strip()
+    df = clean_cols(df)
 
     # =========================
-    # 🔢 SAFE NUMERIC
+    # SAFE NUMERIC
     # =========================
     num_cols = [
         "Sales Unit Before Edit",
@@ -58,31 +63,55 @@ def build_sales_pipeline(sales, mapping, codes):
     ]
 
     for c in num_cols:
-        if c in sales.columns:
-            sales[c] = pd.to_numeric(sales[c], errors="coerce").fillna(0)
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
         else:
-            sales[c] = 0
+            df[c] = 0
 
 
     # =========================
-    # 💰 CALCULATIONS (SAFE)
+    # CALCULATIONS
     # =========================
-    sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
-    sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
-    sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
+    df["Total Sales Value"] = df["Sales Unit Before Edit"] * df["Sales Price"]
+    df["Returns Value"] = df["Returns Unit Before Edit"] * df["Sales Price"]
+    df["Sales After Returns"] = df["Total Sales Value"] - df["Returns Value"]
 
 
     # =========================
-    # 🧩 CODES
+    # SAFE KEYS
     # =========================
-    if "Rep Code" in sales.columns:
-        sales["Rep Code"] = sales["Rep Code"].astype(str)
+    if "Rep Code" not in df.columns:
+        df["Rep Code"] = np.nan
 
-    codes["Rep Code"] = codes["Rep Code"].astype(str)
+    df["Rep Code"] = df["Rep Code"].astype(str)
 
-    sales = sales.merge(codes, on="Rep Code", how="left")
 
-    return sales
+    # =========================
+    # MERGE CODES SAFE
+    # =========================
+    codes = clean_cols(codes)
+
+    if "Rep Code" in codes.columns:
+        codes["Rep Code"] = codes["Rep Code"].astype(str)
+        df = df.merge(codes, on="Rep Code", how="left")
+
+
+    # =========================
+    # MERGE MAPPING SAFE
+    # =========================
+    mapping = clean_cols(mapping)
+
+    if "Old Product Code" in df.columns and "Old Product Code" in mapping.columns:
+
+        df["Old Product Code"] = pd.to_numeric(df["Old Product Code"], errors="coerce")
+
+        df = df.merge(
+            mapping,
+            on="Old Product Code",
+            how="left"
+        )
+
+    return df
 
 
 # =========================
