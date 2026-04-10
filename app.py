@@ -1,12 +1,26 @@
 import streamlit as st
-import pandas as pd
+from data_pipeline import run_pipeline
 
-st.title("📊 Sales Dashboard")
+data = run_pipeline()
 
-sales = pd.read_excel("Sales.xlsx")
-overdue = pd.read_excel("Overdue.xlsx")
-opening = pd.read_excel("Opening.xlsx")
+st.set_page_config(page_title="Sales Dashboard", layout="wide")
 
-st.success("Data loaded successfully ✅")
+st.title("📊 Sales Performance Dashboard")
 
-st.write(sales.head())
+# =========================
+# SALES
+# =========================
+st.subheader("Sales Data")
+st.dataframe(data["sales"].head())
+
+# =========================
+# OVERDUE
+# =========================
+st.subheader("Overdue Data")
+st.dataframe(data["overdue"].head())
+
+# =========================
+# OPENING DETAIL
+# =========================
+st.subheader("Opening Detail")
+st.dataframe(data["opening_detail"].head())
