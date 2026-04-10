@@ -1,12 +1,15 @@
 import streamlit as st
+import pandas as pd
 import data_pipeline as dp
+
+from overdue_pipeline import build_overdue_pipeline
 
 
 # =========================
 # 🎨 CONFIG
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 Sales Performance Dashboard")
+st.title("📊 Sales Dashboard")
 
 
 # =========================
@@ -18,29 +21,36 @@ data = dp.load_data()
 # =========================
 # 🚀 RUN PIPELINE
 # =========================
-sales = dp.build_sales_pipeline(
-    data["sales"],
-    data["mapping"],
+overdue = build_overdue_pipeline(
+    data["overdue"],
     data["codes"]
 )
 
 
 # =========================
-# 📊 VALUE KPI
+# 📊 DISPLAY KPI
 # =========================
-st.header("💰 VALUE KPI")
+st.header("💰 Overdue KPI")
 
-st.dataframe(sales["rep_value"], use_container_width=True)
-st.dataframe(sales["manager_value"], use_container_width=True)
-st.dataframe(sales["area_value"], use_container_width=True)
-st.dataframe(sales["supervisor_value"], use_container_width=True)
+st.subheader("Rep")
+st.dataframe(overdue["rep_value"], use_container_width=True)
+
+st.subheader("Manager")
+st.dataframe(overdue["manager_value"], use_container_width=True)
+
+st.subheader("Area")
+st.dataframe(overdue["area_value"], use_container_width=True)
+
+st.subheader("Supervisor")
+st.dataframe(overdue["supervisor_value"], use_container_width=True)
 
 
 # =========================
-# 📦 PRODUCTS KPI
+# 📦 CLIENT LEVEL
 # =========================
-st.header("📦 PRODUCTS KPI")
+st.header("📦 Client Breakdown")
 
-st.dataframe(sales["rep_products"], use_container_width=True)
-st.dataframe(sales["manager_products"], use_container_width=True)
-st.dataframe(sales["area_products"], use_container_width=True)
+st.dataframe(overdue["rep_client"], use_container_width=True)
+st.dataframe(overdue["manager_client"], use_container_width=True)
+st.dataframe(overdue["area_client"], use_container_width=True)
+st.dataframe(overdue["supervisor_client"], use_container_width=True)
