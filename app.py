@@ -1,31 +1,73 @@
-import pandas as pd
-import numpy as np
+import streamlit as st
+import data_pipeline as dp
 
-current_month = pd.Timestamp.today().month
-
+st.title("Sales Target Dashboard")
 
 # =========================
 # LOAD DATA
 # =========================
-def load_data():
-    return {
-        "target_rep": pd.read_excel("Target Rep.xlsx"),
-        "target_manager": pd.read_excel("Target Manager.xlsx"),
-        "target_area": pd.read_excel("Target Area.xlsx"),
-        "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
-        "target_evak": pd.read_excel("Target Evak.xlsx"),
-
-        "mapping": pd.read_excel("Mapping.xlsx"),
-    }
-
+data = dp.load_data()
 
 # =========================
-# TARGET PIPELINE
+# BUILD ALL LEVELS
 # =========================
-def build_target_pipeline(df, id_name, mapping):
+rep = dp.build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
+manager = dp.build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"])
+area = dp.build_target_pipeline(data["target_area"], "Area Code", data["mapping"])
+supervisor = dp.build_target_pipeline(data["target_supervisor"], "Supervisor Code", data["mapping"])
+evak = dp.build_target_pipeline(data["target_evak"], "Evak Code", data["mapping"])
 
-    df = df.copy()
-    mapping = mapping.copy()
+# =========================
+# SELECT LEVEL
+# =========================
+level = st.selectbox(
+    "Choose Level",
+    ["Rep", "Manager", "Area", "Supervisor", "Evak"]
+)
+
+data_map = {
+    "Rep": rep,
+    "Manager": manager,
+    "Area": area,
+    "Supervisor": supervisor,
+    "Evak": evak
+}
+
+selected = data_map[level]
+
+# =========================
+# KPI TABLES
+# =========================
+st.subheader(f"{level} Target Values")
+
+st.write("Full Year")
+st.dataframe(selected["value_full"])
+
+st.write("Month")
+st.dataframe(selected["value_month"])
+
+st.write("Quarter (Dynamic)")
+st.dataframe(selected["value_quarter"])
+
+st.write("Up To Date (YTD)")
+st.dataframe(selected["value_uptodate"])
+
+# =========================
+# PRODUCTS
+# =========================
+st.subheader(f"{level} Products")
+
+st.write("Full")
+st.dataframe(selected["products_full"])
+
+st.write("Month")
+st.dataframe(selected["products_month"])
+
+st.write("Quarter")
+st.dataframe(selected["products_quarter"])
+
+st.write("Up To Date")
+st.dataframe(selected["products_uptodate"])
 
     # CLEAN
     df.columns = df.columns.str.strip()
