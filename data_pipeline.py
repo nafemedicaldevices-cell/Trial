@@ -1,35 +1,4 @@
 import pandas as pd
-
-# =========================
-# 📅 TIME SETTINGS
-# =========================
-current_month = pd.Timestamp.today().month
-current_quarter = (current_month - 1) // 3 + 1
-past_quarters = max(current_quarter - 1, 0)
-
-
-# =========================
-# 📂 LOAD DATA
-# =========================
-def load_data():
-    return {
-        "sales": pd.read_excel("Sales.xlsx"),
-        "overdue": pd.read_excel("Overdue.xlsx"),
-        "extra_discounts": pd.read_excel("Extradiscounts.xlsx"),
-        "opening": pd.read_excel("Opening.xlsx"),
-        "opening_detail": pd.read_excel("Opening Detail.xlsx"),
-
-        "target_manager": pd.read_excel("Target Manager.xlsx"),
-        "target_area": pd.read_excel("Target Area.xlsx"),
-        "target_rep": pd.read_excel("Target Rep.xlsx"),
-        "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
-        "target_evak": pd.read_excel("Target Evak.xlsx"),
-
-        "mapping": pd.read_excel("Mapping.xlsx"),
-        "codes": pd.read_excel("Code.xlsx")
-    }
-
-import pandas as pd
 import numpy as np
 
 
@@ -39,7 +8,7 @@ def build_overdue_pipeline(overdue, codes):
     overdue.columns = overdue.columns.str.strip()
 
     # =========================
-    # 📌 CLEANING
+    # 📌 BASIC CLEANING
     # =========================
     overdue = overdue.iloc[:, :9]
     overdue.columns = [
@@ -48,7 +17,7 @@ def build_overdue_pipeline(overdue, codes):
     ]
 
     # =========================
-    # 🧩 INIT REP FIELDS
+    # 🧩 INIT FIELDS
     # =========================
     overdue["Rep Code"] = np.nan
     overdue["Old Rep Name"] = np.nan
@@ -57,7 +26,7 @@ def build_overdue_pipeline(overdue, codes):
     overdue["Old Rep Name"] = overdue["Old Rep Name"].astype("object")
 
     # =========================
-    # 🔎 EXTRACT REP HEADER
+    # 🔎 EXTRACT REP HEADER ROWS
     # =========================
     mask = overdue["Client Name"].astype(str).str.strip().eq("كود المندوب")
 
@@ -108,7 +77,7 @@ def build_overdue_pipeline(overdue, codes):
     overdue = overdue.merge(codes, on="Rep Code", how="left")
 
     # =========================
-    # 📊 GROUP ENGINE
+    # 📊 SAFE GROUP
     # =========================
     def safe_group(df, group_cols, sum_cols):
         group_cols = [c for c in group_cols if c in df.columns]
@@ -119,6 +88,9 @@ def build_overdue_pipeline(overdue, codes):
 
         return df.groupby(group_cols, as_index=False)[sum_cols].sum()
 
+    # =========================
+    # 📦 GROUP CONFIG
+    # =========================
     GROUPS = {
         "rep_value": (["Rep Code"], ["Overdue"]),
         "manager_value": (["Manager Code"], ["Overdue"]),
