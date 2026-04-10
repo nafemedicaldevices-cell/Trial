@@ -3,27 +3,51 @@ import data_pipeline as dp
 
 st.set_page_config(layout="wide")
 
-st.title("💰 SALES KPI FIXED")
+st.title("📊 Sales Performance Dashboard")
 
+
+# =========================
+# 📂 LOAD DATA
+# =========================
 data = dp.load_data()
 
-sales = dp.build_sales_pipeline(
-    data["sales"],
-    data["mapping"],
-    data["codes"]
-)
 
-st.header("Rep")
-st.dataframe(sales["rep_value"], use_container_width=True)
+# =========================
+# 🚀 BUILD KPI
+# =========================
+kpi = dp.build_kpi(data)
 
-st.header("Manager")
-st.dataframe(sales["manager_value"], use_container_width=True)
 
-st.header("Area")
-st.dataframe(sales["area_value"], use_container_width=True)
+# =========================
+# 👨‍💼 REP
+# =========================
+st.header("👨‍💼 Rep KPI")
+st.dataframe(kpi["rep"], use_container_width=True)
 
-st.header("Supervisor")
-st.dataframe(sales["supervisor_value"], use_container_width=True)
 
-st.header("Products")
-st.dataframe(sales["rep_products"], use_container_width=True)
+# =========================
+# 🏢 MANAGER
+# =========================
+st.header("🏢 Manager KPI")
+st.dataframe(kpi["manager"], use_container_width=True)
+
+
+# =========================
+# 🌍 AREA
+# =========================
+st.header("🌍 Area KPI")
+st.dataframe(kpi["area"], use_container_width=True)
+
+
+# =========================
+# 🧑‍💼 SUPERVISOR
+# =========================
+st.header("🧑‍💼 Supervisor KPI")
+st.dataframe(kpi["supervisor"], use_container_width=True)
+
+
+# =========================
+# 🧬 EVAK
+# =========================
+st.header("🧬 Evak KPI")
+st.dataframe(kpi["evak"], use_container_width=True)
