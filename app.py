@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-st.title("Overdue Step 5")
+st.title("Overdue Step 6")
 
 overdue = pd.read_excel("Overdue.xlsx")
 
@@ -29,25 +29,24 @@ overdue["Rep Code"] = pd.NA
 overdue["Old Rep Name"] = pd.NA
 
 # =========================
-# 🧠 EXTRACT REP HEADER ROWS
+# 🧠 FILTER VALID ROWS
 # =========================
-mask = overdue["Client Name"].astype(str).str.strip().eq("كود المندوب")
-
-overdue.loc[mask, "Rep Code"] = overdue.loc[mask, "Client Code"].astype("object")
-overdue.loc[mask, "Old Rep Name"] = overdue.loc[mask, "30 Days"].astype("object")
-
-# =========================
-# 🔁 FORWARD FILL
-# =========================
-overdue[["Rep Code", "Old Rep Name"]] = overdue[["Rep Code", "Old Rep Name"]].ffill()
+overdue = overdue[
+    overdue["Client Name"].notna() &
+    (overdue["Client Name"].astype(str).str.strip() != "") &
+    (~overdue["Client Name"].astype(str).str.contains(
+        "اجمالــــــي التقرير|اجمالى الفرع/المندوب|كود الفرع|كود المندوب|اسم العميل",
+        na=False
+    ))
+].copy()
 
 # =========================
 # SHOW RESULT
 # =========================
-st.subheader("📄 After Rep Extraction")
+st.subheader("📄 After Filtering Valid Rows")
 st.dataframe(overdue)
 
 # =========================
-# DEBUG (optional)
+# DEBUG INFO
 # =========================
 st.write("Shape:", overdue.shape)
