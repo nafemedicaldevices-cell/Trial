@@ -1,92 +1,111 @@
 import pandas as pd
 import numpy as np
 
-# =========================
-# 🧹 CLEAN SALES
-# =========================
-def clean_sales(sales):
-
-    sales = sales.copy()
-    sales.columns = sales.columns.str.strip()
-
-    # remove empty rows
-    sales = sales.dropna(how="all")
-
-    # remove internal header rows
-    if "Date" in sales.columns:
-        drop_keywords = 'المندوب|كود الصنف|تاريخ|كود الفرع'
-        sales = sales[~sales["Date"].astype(str).str.contains(drop_keywords, na=False)]
-
-    return sales
+current_month = pd.Timestamp.today().month
 
 
 # =========================
-# 🔢 FIX TYPES
+# 📂 LOAD DATA
 # =========================
-def fix_sales_types(sales):
+def load_data():
+    return {
+        "sales": pd.read_excel("Sales.xlsx"),
+        "target_rep": pd.read_excel("Target Rep.xlsx"),
+        "target_manager": pd.read_excel("Target Manager.xlsx"),
+        "target_area": pd.read_excel("Target Area.xlsx"),
+        "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
+        "target_evak": pd.read_excel("Target Evak.xlsx"),
+        "mapping": pd.read_excel("Mapping.xlsx"),
+        "codes": pd.read_excel("Code.xlsx")
+    }
 
-    cols = [
+
+# =========================
+# 🎯 TARGET PIPELINE
+# =========================
+def build_target(df, id_name, mapping):
+
+    df = df.copy()
+    mapping = mapping.copy()
+
+    df.columns = df.columns.str.strip()
+
+    fixed_cols = [c for c in ["Year", "Product Code", "Sales Price"] if c in df.columns]
+    dynamic_cols = [c for c in df.columns if c not in fixed_cols]
+
+    df = df.melt(
+        id_vars=fixed_cols,
+        value_vars=dynamic_cols,
+        var_name=id_name,
+        value_name="Target Units"
+    )
+
+    df[id_name] = pd.to_numeric(df[id_name].astype(str).str.replace(r"[^0-9]", "", regex=True), errors="coerce")
+    df["Product Code"] = pd.to_numeric(df["Product Code"], errors="coerce")
+
+    mapping["Product Code"] = pd.to_numeric(mapping["Product Code"], errors="coerce")
+    mapping = mapping.drop_duplicates("Product Code")
+
+    df = df.merge(mapping, on="Product Code", how="left")
+
+    df["Target Units"] = pd.to_numeric(df["Target Units"], errors="coerce").fillna(0)
+    df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
+
+    df["Target Value"] = df["Target Units"] * df["Sales Price"]
+
+    return df.groupby([id_name], as_index=False)["Target Value"].sum()
+
+
+# =========================
+# 💰 SALES PIPELINE
+# =========================
+def build_sales(df):
+
+    df = df.copy()
+    df.columns = df.columns.str.strip()
+
+    for c in [
         "Sales Unit Before Edit",
         "Returns Unit Before Edit",
         "Sales Price",
         "Invoice Discounts"
-    ]
+    ]:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
-    for c in cols:
-        if c in sales.columns:
-            sales[c] = pd.to_numeric(sales[c], errors="coerce").fillna(0)
+    df["Total Sales Value"] = df["Sales Unit Before Edit"] * df["Sales Price"]
+    df["Returns Value"] = df["Returns Unit Before Edit"] * df["Sales Price"]
+    df["Sales After Returns"] = df["Total Sales Value"] - df["Returns Value"]
 
-    return sales
-
-
-# =========================
-# 💰 CALCULATE KPI
-# =========================
-def calc_sales(sales):
-
-    sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
-    sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
-
-    sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
-
-    return sales
+    return df
 
 
 # =========================
-# 🚀 MAIN PIPELINE
+# 🚀 FINAL KPI (MERGED TABLE)
 # =========================
-def build_sales_pipeline(sales):
+def build_kpi(data):
 
-    sales = clean_sales(sales)
-    sales = fix_sales_types(sales)
-    sales = calc_sales(sales)
+    sales = build_sales(data["sales"])
 
-    # fix rep code
-    if "Rep Code" in sales.columns:
-        sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
-        sales = sales.dropna(subset=["Rep Code"])
+    def sales_group(key):
+        return sales.groupby(key, as_index=False).agg({
+            "Total Sales Value": "sum",
+            "Returns Value": "sum",
+            "Sales After Returns": "sum",
+            "Invoice Discounts": "sum"
+        })
 
-    # GROUP
-    rep_value = sales.groupby("Rep Code", as_index=False)[
-        ["Total Sales Value", "Returns Value", "Sales After Returns"]
-    ].sum()
+    def build_level(target_df, key):
 
-    manager_value = sales.groupby("Manager Code", as_index=False)[
-        ["Total Sales Value", "Returns Value", "Sales After Returns"]
-    ].sum()
+        target = build_target(target_df, key, data["mapping"])
+        sales_val = sales_group(key)
 
-    area_value = sales.groupby("Area Code", as_index=False)[
-        ["Total Sales Value", "Returns Value", "Sales After Returns"]
-    ].sum()
-
-    supervisor_value = sales.groupby("Supervisor Code", as_index=False)[
-        ["Total Sales Value", "Returns Value", "Sales After Returns"]
-    ].sum()
+        return target.merge(sales_val, on=key, how="left").fillna(0)
 
     return {
-        "rep_value": rep_value,
-        "manager_value": manager_value,
-        "area_value": area_value,
-        "supervisor_value": supervisor_value,
-        "raw": sales
+        "rep": build_level(data["target_rep"], "Rep Code"),
+        "manager": build_level(data["target_manager"], "Manager Code"),
+        "area": build_level(data["target_area"], "Area Code"),
+        "supervisor": build_level(data["target_supervisor"], "Supervisor Code"),
+        "evak": build_level(data["target_evak"], "Evak Code"),
     }
