@@ -9,12 +9,17 @@ def load_data():
     return {
         "sales": pd.read_excel("Sales.xlsx"),
         "mapping": pd.read_excel("Mapping.xlsx"),
-        "codes": pd.read_excel("Code.xlsx")
+        "codes": pd.read_excel("Code.xlsx"),
+
+        "target_rep": pd.read_excel("Target Rep.xlsx"),
+        "target_manager": pd.read_excel("Target Manager.xlsx"),
+        "target_area": pd.read_excel("Target Area.xlsx"),
+        "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
     }
 
 
 # =========================
-# 📊 SALES PIPELINE
+# 💰 SALES PIPELINE
 # =========================
 def build_sales_pipeline(sales, mapping, codes):
 
@@ -32,13 +37,12 @@ def build_sales_pipeline(sales, mapping, codes):
 
 
     # =========================
-    # 📦 STEP 3 FIXED (IMPORTANT)
+    # 📦 PRODUCT HEADER FIX
     # =========================
     if 'Date' in sales.columns:
 
         mask = sales['Date'].astype(str).str.strip().eq("كود الصنف")
 
-        # 🔥 FORCE OBJECT TYPE
         if 'Old Product Code' not in sales.columns:
             sales['Old Product Code'] = np.nan
         if 'Old Product Name' not in sales.columns:
@@ -80,9 +84,6 @@ def build_sales_pipeline(sales, mapping, codes):
             sales[col] = pd.to_numeric(sales[col], errors='coerce').fillna(0)
 
 
-    # =========================
-    # 🆔 IDS
-    # =========================
     if 'Old Product Code' in sales.columns:
         sales['Old Product Code'] = pd.to_numeric(sales['Old Product Code'], errors='coerce').astype('Int64')
 
@@ -182,3 +183,21 @@ def build_sales_pipeline(sales, mapping, codes):
         results[name] = safe_group(sales, cfg["group"], cfg["sum"])
 
     return results
+
+
+# =========================
+# 🎯 TARGET PIPELINE
+# =========================
+def build_target_pipeline(target_df, key_col):
+
+    df = target_df.copy()
+    df.columns = df.columns.str.strip()
+
+    if key_col in df.columns:
+        df[key_col] = pd.to_numeric(df[key_col], errors='coerce').astype('Int64')
+
+    num_cols = [c for c in df.columns if "Target" in c]
+
+    df[num_cols] = df[num_cols].apply(pd.to_numeric, errors='coerce').fillna(0)
+
+    return df
