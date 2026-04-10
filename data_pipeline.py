@@ -1,5 +1,8 @@
 import pandas as pd
 
+# =========================
+# 1) LOAD DATA LAYER
+# =========================
 def load_data():
 
     sales = pd.read_excel("Sales.xlsx")
@@ -26,6 +29,22 @@ def load_data():
         "target_rep": target_rep,
         "mapping": mapping,
         "codes": codes
+    }
+
+# =========================
+# 2) MAIN PIPELINE ENTRY
+# =========================
+def run_pipeline():
+
+    data = load_data()
+
+    return {
+        "sales": data["sales"],
+        "overdue": data["overdue"],
+        "opening": data["opening"],
+        "opening_detail": data["opening_detail"],
+        "mapping": data["mapping"],
+        "codes": data["codes"]
     }
 
 import pandas as pd
