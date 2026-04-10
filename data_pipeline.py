@@ -3,20 +3,6 @@ import numpy as np
 
 
 # =========================
-# 🧼 CLEAN COLUMNS (IMPORTANT)
-# =========================
-def clean_columns(df):
-    df = df.copy()
-    df.columns = (
-        df.columns
-        .str.strip()
-        .str.lower()
-        .str.replace(" ", "_")
-    )
-    return df
-
-
-# =========================
 # 📥 LOAD DATA
 # =========================
 def load_data():
@@ -34,76 +20,54 @@ def load_data():
 
 
 # =========================
-# 💰 SALES PIPELINE
+# 💰 SALES CLEAN ONLY (NO MERGE, NO RENAMING)
 # =========================
-def build_sales_pipeline(sales, mapping, codes):
+def build_sales_pipeline(sales):
 
-    sales = clean_columns(sales)
-    mapping = clean_columns(mapping)
-    codes = clean_columns(codes)
+    df = sales.copy()
+    df.columns = df.columns.str.strip()
 
     # =========================
-    # 🔢 NUMERIC CLEAN
+    # 🔢 NUMERIC CLEAN ONLY
     # =========================
     num_cols = [
-        "sales_unit_before_edit",
-        "returns_unit_before_edit",
-        "sales_price",
-        "invoice_discounts"
+        "Sales Unit Before Edit",
+        "Returns Unit Before Edit",
+        "Sales Price",
+        "Invoice Discounts",
+        "Sales Value"
     ]
 
-    for c in num_cols:
-        if c in sales.columns:
-            sales[c] = pd.to_numeric(sales[c], errors="coerce").fillna(0)
-        else:
-            sales[c] = 0
-
+    for col in num_cols:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
     # =========================
-    # 💰 CALCULATIONS
+    # 💰 CALCULATIONS ONLY
     # =========================
-    sales["total_sales_value"] = sales["sales_unit_before_edit"] * sales["sales_price"]
-    sales["returns_value"] = sales["returns_unit_before_edit"] * sales["sales_price"]
-    sales["sales_after_returns"] = sales["total_sales_value"] - sales["returns_value"]
+    if "Sales Unit Before Edit" in df.columns and "Sales Price" in df.columns:
+        df["Total Sales Value"] = df["Sales Unit Before Edit"] * df["Sales Price"]
 
+    if "Returns Unit Before Edit" in df.columns and "Sales Price" in df.columns:
+        df["Returns Value"] = df["Returns Unit Before Edit"] * df["Sales Price"]
 
-    # =========================
-    # 🔑 SAFE CODE
-    # =========================
-    if "rep_code" not in sales.columns:
-        sales["rep_code"] = np.nan
+    if "Total Sales Value" in df.columns and "Returns Value" in df.columns:
+        df["Sales After Returns"] = df["Total Sales Value"] - df["Returns Value"]
 
-    sales["rep_code"] = sales["rep_code"].astype(str)
-
-    if "rep_code" in codes.columns:
-        codes["rep_code"] = codes["rep_code"].astype(str)
-        sales = sales.merge(codes, on="rep_code", how="left")
-
-
-    # =========================
-    # 🧠 MAPPING SAFE
-    # =========================
-    if "old_product_code" in sales.columns and "old_product_code" in mapping.columns:
-        sales["old_product_code"] = pd.to_numeric(sales["old_product_code"], errors="coerce")
-        sales = sales.merge(mapping, on="old_product_code", how="left")
-
-    return sales
+    return df
 
 
 # =========================
-# 🎯 TARGET PIPELINE
+# 🎯 TARGET CLEAN ONLY
 # =========================
-def build_target_pipeline(df, key_col):
+def build_target_pipeline(df):
 
-    df = clean_columns(df)
+    df = df.copy()
+    df.columns = df.columns.str.strip()
 
-    key_col = key_col.lower().replace(" ", "_")
-
-    if key_col in df.columns:
-        df[key_col] = df[key_col].astype(str)
-
-    for c in df.columns:
-        if "target" in c:
-            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+    # numeric only
+    for col in df.columns:
+        if "Target" in col:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
     return df
