@@ -44,12 +44,13 @@ for col in num_cols:
 overdue["Overdue"] = overdue["120 Days"] + overdue["More Than 120 Days"]
 
 # =========================
-# REP EXTRACTION (optional)
+# REP EXTRACTION
 # =========================
 overdue["Rep Code"] = pd.NA
 
 mask = overdue["Client Name"].astype(str).str.strip().eq("كود المندوب")
 overdue.loc[mask, "Rep Code"] = overdue.loc[mask, "Client Code"]
+
 overdue["Rep Code"] = overdue["Rep Code"].ffill()
 
 # =========================
@@ -61,31 +62,57 @@ overdue["Rep Code"] = pd.to_numeric(overdue["Rep Code"], errors="coerce").astype
 overdue = overdue.merge(codes, on="Rep Code", how="left")
 
 # =========================
-# 🔥 FUNCTION: STANDARD LEVEL BUILDER
+# FUNCTION
 # =========================
 def build_level(df, level_code):
-    return df[[level_code, "Client Code", "Overdue"]].copy()
+    # DETAILS
+    details = df[[level_code, "Client Code", "Overdue"]].copy()
+    
+    # SUMMARY
+    summary = (
+        df.groupby(level_code)["Overdue"]
+        .sum()
+        .reset_index()
+    )
+    
+    return summary, details
 
 # =========================
-# 🔥 LEVELS
+# LEVELS
+# =========================
+rep_summary, rep_details = build_level(overdue, "Rep Code")
+manager_summary, manager_details = build_level(overdue, "Manager Code")
+area_summary, area_details = build_level(overdue, "Area Code")
+supervisor_summary, supervisor_details = build_level(overdue, "Supervisor Code")
+
+# =========================
+# UI
 # =========================
 
-rep_kpi = build_level(overdue, "Rep Code")
-manager_kpi = build_level(overdue, "Manager Code")
-area_kpi = build_level(overdue, "Area Code")
-supervisor_kpi = build_level(overdue, "Supervisor Code")
+# REP
+st.subheader("📌 Rep Summary")
+st.dataframe(rep_summary)
 
-# =========================
-# OUTPUT
-# =========================
-st.subheader("📌 Rep Level")
-st.dataframe(rep_kpi)
+st.subheader("📌 Rep Details")
+st.dataframe(rep_details)
 
-st.subheader("📌 Manager Level")
-st.dataframe(manager_kpi)
+# MANAGER
+st.subheader("📌 Manager Summary")
+st.dataframe(manager_summary)
 
-st.subheader("📌 Area Level")
-st.dataframe(area_kpi)
+st.subheader("📌 Manager Details")
+st.dataframe(manager_details)
 
-st.subheader("📌 Supervisor Level")
-st.dataframe(supervisor_kpi)
+# AREA
+st.subheader("📌 Area Summary")
+st.dataframe(area_summary)
+
+st.subheader("📌 Area Details")
+st.dataframe(area_details)
+
+# SUPERVISOR
+st.subheader("📌 Supervisor Summary")
+st.dataframe(supervisor_summary)
+
+st.subheader("📌 Supervisor Details")
+st.dataframe(supervisor_details)
