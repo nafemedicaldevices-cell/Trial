@@ -3,66 +3,44 @@ import data_pipeline as dp
 
 data = dp.load_data()
 
-st.title("📊 Sales Dashboard")
+rep = dp.build_target_pipeline(
+    data["target_rep"],
+    "Rep Code",
+    data["mapping"]
+)
+
+st.title("📊 Sales Dashboard - Rep Summary")
 
 
 # =========================
-# REP
+# MERGE ALL KPIs IN ONE TABLE
 # =========================
-rep = dp.build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
+rep_summary = rep["value_full"].rename(
+    columns={"Target (Value)": "Full Year"}
+)
 
-st.subheader("👤 Rep KPI")
+rep_summary = rep_summary.merge(
+    rep["value_uptodate"].rename(columns={"Target (Value)": "Up To Date"}),
+    on="Rep Code",
+    how="left"
+)
 
-st.write("### Value Full")
-st.write(rep["value_full"])
+rep_summary = rep_summary.merge(
+    rep["value_quarter"].rename(columns={"Target (Value)": "Quarter"}),
+    on="Rep Code",
+    how="left"
+)
 
-st.write("### Value Month")
-st.write(rep["value_month"])
-
-st.write("### Value Quarter")
-st.write(rep["value_quarter"])
-
-st.write("### Value UpToDate")
-st.write(rep["value_uptodate"])
-
-st.write("### Products Full")
-st.write(rep["products_full"])
-
-st.write("### Products UpToDate")
-st.write(rep["products_uptodate"])
-
-
-# =========================
-# MANAGER
-# =========================
-manager = dp.build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"])
-
-st.subheader("👔 Manager KPI")
-st.write(manager["value_full"])
+rep_summary = rep_summary.merge(
+    rep["value_month"].rename(columns={"Target (Value)": "Month"}),
+    on="Rep Code",
+    how="left"
+)
 
 
 # =========================
-# AREA
+# FINAL OUTPUT
 # =========================
-area = dp.build_target_pipeline(data["target_area"], "Area Code", data["mapping"])
+st.subheader("👤 Rep KPI Summary Table")
 
-st.subheader("🌍 Area KPI")
-st.write(area["value_full"])
-
-
-# =========================
-# SUPERVISOR
-# =========================
-supervisor = dp.build_target_pipeline(data["target_supervisor"], "Supervisor Code", data["mapping"])
-
-st.subheader("🧑‍💼 Supervisor KPI")
-st.write(supervisor["value_full"])
-
-
-# =========================
-# EVAK
-# =========================
-evak = dp.build_target_pipeline(data["target_evak"], "Evak Code", data["mapping"])
-
-st.subheader("📦 Evak KPI")
-st.write(evak["value_full"])
+st.dataframe(rep_summary)
