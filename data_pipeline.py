@@ -8,18 +8,39 @@ import numpy as np
 def load_data():
     return {
         "sales": pd.read_excel("Sales.xlsx"),
-        "mapping": pd.read_excel("Mapping.xlsx"),
-        "codes": pd.read_excel("Code.xlsx"),
 
         "target_rep": pd.read_excel("Target Rep.xlsx"),
         "target_manager": pd.read_excel("Target Manager.xlsx"),
         "target_area": pd.read_excel("Target Area.xlsx"),
         "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
+
+        "mapping": pd.read_excel("Mapping.xlsx"),
+        "codes": pd.read_excel("Code.xlsx")
     }
 
 
 # =========================
-# 💰 SALES PIPELINE
+# 🎯 TARGET PIPELINE (FIRST)
+# =========================
+def build_target_pipeline(df, key_col):
+
+    df = df.copy()
+    df.columns = df.columns.str.strip()
+
+    # unify key
+    if key_col in df.columns:
+        df[key_col] = df[key_col].astype(str)
+
+    # clean targets
+    for col in df.columns:
+        if "Target" in col:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+    return df
+
+
+# =========================
+# 💰 SALES PIPELINE (SECOND)
 # =========================
 def build_sales_pipeline(sales, mapping, codes):
 
@@ -37,7 +58,7 @@ def build_sales_pipeline(sales, mapping, codes):
 
 
     # =========================
-    # 📦 PRODUCT HEADER FIX
+    # 📦 PRODUCT FIX
     # =========================
     if 'Date' in sales.columns:
 
@@ -60,7 +81,7 @@ def build_sales_pipeline(sales, mapping, codes):
 
 
     # =========================
-    # 🧹 FILTER
+    # 🧹 CLEAN FILTER
     # =========================
     drop_keywords = 'المندوب|كود الفرع|تاريخ|كود الصنف'
 
@@ -84,26 +105,23 @@ def build_sales_pipeline(sales, mapping, codes):
             sales[col] = pd.to_numeric(sales[col], errors='coerce').fillna(0)
 
 
-    if 'Old Product Code' in sales.columns:
-        sales['Old Product Code'] = pd.to_numeric(sales['Old Product Code'], errors='coerce').astype('Int64')
-
+    # =========================
+    # 🧩 IDS
+    # =========================
     if 'Rep Code' in sales.columns:
-        sales['Rep Code'] = pd.to_numeric(sales['Rep Code'], errors='coerce').astype('Int64')
-
+        sales['Rep Code'] = sales['Rep Code'].astype(str)
 
     # =========================
     # 🧩 MAPPING
     # =========================
-    if 'Old Product Code' in sales.columns:
+    mapping_cols = [
+        'Old Product Code','4 Classification','Product Name',
+        'Product Code','Category','Next Factor','2 Classification'
+    ]
 
-        mapping_cols = [
-            'Old Product Code','4 Classification','Product Name',
-            'Product Code','Category','Next Factor','2 Classification'
-        ]
+    mapping_cols = [c for c in mapping_cols if c in mapping.columns]
 
-        mapping_cols = [c for c in mapping_cols if c in mapping.columns]
-
-        sales = sales.merge(mapping[mapping_cols], on='Old Product Code', how='left')
+    sales = sales.merge(mapping[mapping_cols], on='Old Product Code', how='left')
 
 
     # =========================
@@ -114,7 +132,7 @@ def build_sales_pipeline(sales, mapping, codes):
 
     sales['Next Factor'] = sales['Next Factor'].fillna(1)
 
-    codes['Rep Code'] = pd.to_numeric(codes['Rep Code'], errors='coerce').astype('Int64')
+    codes['Rep Code'] = codes['Rep Code'].astype(str)
 
     sales = sales.merge(codes, on='Rep Code', how='left')
 
@@ -133,7 +151,7 @@ def build_sales_pipeline(sales, mapping, codes):
 
 
     # =========================
-    # 📊 GROUP ENGINE
+    # 📊 GROUPS (SALES OUTPUT)
     # =========================
     def safe_group(df, group_cols, sum_cols):
 
@@ -162,42 +180,12 @@ def build_sales_pipeline(sales, mapping, codes):
         "supervisor_value": {
             "group": ['Supervisor Code'],
             "sum": ['Total Sales Value','Returns Value','Sales After Returns','Invoice Discounts']
-        },
-        "rep_products": {
-            "group": ['Rep Code','Product Code','Product Name'],
-            "sum": ['Sales Value','Net Sales Unit']
-        },
-        "manager_products": {
-            "group": ['Manager Code','Product Code','Product Name'],
-            "sum": ['Sales Value','Net Sales Unit']
-        },
-        "area_products": {
-            "group": ['Area Code','Product Code','Product Name'],
-            "sum": ['Sales Value','Net Sales Unit']
         }
     }
 
 
     results = {}
-    for name, cfg in GROUP_DEFS.items():
-        results[name] = safe_group(sales, cfg["group"], cfg["sum"])
+    for k, v in GROUP_DEFS.items():
+        results[k] = safe_group(sales, v["group"], v["sum"])
 
     return results
-
-
-# =========================
-# 🎯 TARGET PIPELINE
-# =========================
-def build_target_pipeline(target_df, key_col):
-
-    df = target_df.copy()
-    df.columns = df.columns.str.strip()
-
-    if key_col in df.columns:
-        df[key_col] = pd.to_numeric(df[key_col], errors='coerce').astype('Int64')
-
-    num_cols = [c for c in df.columns if "Target" in c]
-
-    df[num_cols] = df[num_cols].apply(pd.to_numeric, errors='coerce').fillna(0)
-
-    return df
