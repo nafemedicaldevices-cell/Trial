@@ -3,8 +3,8 @@ import data_pipeline as dp
 
 data = dp.run_pipeline()
 
-st.title("Dashboard")
+st.title("📊 KPI Dashboard")
 
-st.subheader("🎯 Target Rep Value")
+st.subheader("🎯 Sales vs Target")
 
-st.dataframe(data["target"])
+st.dataframe(data["kpi"])
