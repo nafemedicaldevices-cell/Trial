@@ -19,13 +19,16 @@ def load_data():
         "target_area": pd.read_excel("Target Area.xlsx"),
         "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
         "target_evak": pd.read_excel("Target Evak.xlsx"),
-        "sales": pd.read_excel("Sales.xlsx", header=None),  # مهم
+
+        # 🔥 أهم تعديل
+        "sales": pd.read_excel("Sales.xlsx", header=None),
+
         "mapping": pd.read_excel("Mapping.xlsx"),
         "codes": pd.read_excel("Code.xlsx"),
     }
 
 # =========================
-# 🧠 SALES COLUMN FIX
+# 🧠 FIX SALES COLUMNS
 # =========================
 def fix_sales_columns(sales):
 
@@ -35,12 +38,7 @@ def fix_sales_columns(sales):
         'Sales Price','Invoice Discounts','Sales Value'
     ]
 
-    # تحقق
-    if sales.shape[1] < len(expected_cols):
-        st.error(f"❌ عدد الأعمدة أقل من المتوقع: {sales.shape[1]}")
-        st.stop()
-
-    # ناخد أول الأعمدة فقط
+    # ناخد أول الأعمدة بس
     sales = sales.iloc[:, :len(expected_cols)].copy()
     sales.columns = expected_cols
 
@@ -119,7 +117,7 @@ def build_sales_pipeline(sales, codes):
     sales.columns = sales.columns.str.strip()
     codes.columns = codes.columns.str.strip()
 
-    # تحويل أرقام
+    # 🔢 تحويل أرقام
     num_cols = [
         "Sales Unit Before Edit",
         "Returns Unit Before Edit",
@@ -145,7 +143,7 @@ def build_sales_pipeline(sales, codes):
             "supervisor": pd.DataFrame(),
         }
 
-    # حسابات
+    # 💰 حسابات
     sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
     sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
     sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
@@ -174,7 +172,6 @@ data = load_data()
 
 # 🎯 TARGET
 st.header("🎯 TARGET")
-
 st.dataframe(build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"]))
 st.dataframe(build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"]))
 st.dataframe(build_target_pipeline(data["target_area"], "Area Code", data["mapping"]))
