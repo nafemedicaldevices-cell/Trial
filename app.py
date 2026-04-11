@@ -79,7 +79,7 @@ codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce").astype("In
 opening = opening.merge(codes, on="Rep Code", how="left")
 
 # =========================
-# BUILD LEVEL (زي Overdue)
+# BUILD LEVEL (زي Overdue 🔥)
 # =========================
 def build_level(df, level_code):
     return (
@@ -91,7 +91,7 @@ def build_level(df, level_code):
     )
 
 # =========================
-# REP LEVEL ONLY 🔥
+# REP LEVEL ONLY
 # =========================
 opening_rep = build_level(opening, "Rep Code")
 
