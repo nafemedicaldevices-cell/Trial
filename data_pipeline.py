@@ -10,7 +10,7 @@ past_quarters = max(current_quarter - 1, 0)
 
 
 # =========================
-# 📂 LOAD DATA (TEST)
+# 📂 LOAD DATA
 # =========================
 def load_data():
     return {
@@ -21,9 +21,9 @@ def load_data():
     }
 
 
-# =========================================================
+# =========================
 # 🚀 TARGET PIPELINE
-# =========================================================
+# =========================
 def build_target_pipeline(df, id_name, mapping):
 
     df = df.copy()
@@ -96,9 +96,9 @@ def build_target_pipeline(df, id_name, mapping):
     }
 
 
-# =========================================================
+# =========================
 # 🚀 SALES PIPELINE
-# =========================================================
+# =========================
 def build_sales_pipeline(sales, mapping, codes):
 
     sales = sales.copy()
@@ -113,26 +113,7 @@ def build_sales_pipeline(sales, mapping, codes):
     if len(sales.columns) == len(expected_cols):
         sales.columns = expected_cols
 
-    if 'Date' in sales.columns:
-
-        mask = sales['Date'].astype(str).str.strip().eq("كود الصنف")
-
-        if 'Old Product Code' not in sales.columns:
-            sales['Old Product Code'] = np.nan
-        if 'Old Product Name' not in sales.columns:
-            sales['Old Product Name'] = np.nan
-
-        sales.loc[mask, 'Old Product Code'] = sales.loc[mask, 'Warehouse Name'].astype(str)
-        sales.loc[mask, 'Old Product Name'] = sales.loc[mask, 'Client Code'].astype(str)
-
-        sales[['Old Product Code','Old Product Name']] = sales[
-            ['Old Product Code','Old Product Name']
-        ].ffill()
-
-    drop_keywords = 'المندوب|كود الفرع|تاريخ|كود الصنف'
-
     sales = sales[sales['Date'].notna()].copy()
-    sales = sales[~sales['Date'].astype(str).str.contains(drop_keywords, na=False)].copy()
 
     num_cols = [
         'Sales Unit Before Edit',
@@ -166,11 +147,9 @@ def build_sales_pipeline(sales, mapping, codes):
         sum_cols = [c for c in sum_cols if c in df.columns]
         return df.groupby(group_cols, as_index=False)[sum_cols].sum()
 
-    results = {
+    return {
         "rep_value": safe_group(sales, ["Rep Code"], ["Total Sales Value","Returns Value","Sales After Returns"]),
         "manager_value": safe_group(sales, ["Manager Code"], ["Total Sales Value","Returns Value","Sales After Returns"]),
         "area_value": safe_group(sales, ["Area Code"], ["Total Sales Value","Returns Value","Sales After Returns"]),
         "rep_products": safe_group(sales, ["Rep Code","Product Code","Product Name"], ["Sales Value","Net Sales Unit"]),
     }
-
-    return results
