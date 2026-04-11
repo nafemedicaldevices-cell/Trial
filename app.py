@@ -19,8 +19,6 @@ st.title("📊 Sales Performance Dashboard")
 @st.cache_data
 def get_data():
     data   = dp.load_data()
-    # fix Rep file name
-    data["target_rep"] = pd.read_excel("Rep.xlsx")
     master = dp.build_all(data)
     return master
 
