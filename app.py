@@ -22,9 +22,6 @@ opening.columns = [
     "Extra Discounts",'Daienah','End Balance'
 ]
 
-st.subheader("After Column Cleaning")
-st.dataframe(opening.head())
-
 # =========================
 # REP EXTRACTION
 # =========================
@@ -38,5 +35,8 @@ opening.loc[mask, "Old Rep Name"] = opening.loc[mask, "Total Sales After Invoice
 
 opening[["Rep Code", "Old Rep Name"]] = opening[["Rep Code", "Old Rep Name"]].ffill()
 
-st.subheader("After Rep Extraction")
-st.dataframe(opening[["Branch", "Rep Code", "Old Rep Name"]].head(15))
+# =========================
+# FINAL DISPLAY ✅
+# =========================
+st.subheader("Final Data")
+st.dataframe(opening.head(20))
