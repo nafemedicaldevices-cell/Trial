@@ -1,3 +1,11 @@
+import pandas as pd
+
+# =========================
+# LOAD DATA 🔥
+# =========================
+opening = pd.read_excel("Opening.xlsx")
+codes = pd.read_excel("Code.xlsx")
+
 # =========================
 # COLUMN STANDARDIZATION
 # =========================
@@ -18,7 +26,7 @@ opening['Rep Code'] = pd.Series(dtype='object')
 opening['Old Rep Name'] = pd.Series(dtype='object')
 
 # =========================
-# 🔥 EXTRACT REP INFO (قبل الفلترة)
+# 🔥 EXTRACT REP INFO
 # =========================
 mask = opening['Branch'].astype(str).str.strip().eq("كود المندوب")
 
@@ -28,7 +36,7 @@ opening.loc[mask, 'Old Rep Name'] = opening.loc[mask, 'Total Sales After Invoice
 opening[['Rep Code','Old Rep Name']] = opening[['Rep Code','Old Rep Name']].ffill()
 
 # =========================
-# 🔥 FILTER VALID ROWS (بعد الاستخراج)
+# 🔥 FILTER VALID ROWS
 # =========================
 opening = opening[
     opening['Branch'].notna() &
@@ -63,7 +71,7 @@ opening['Sales After Returns'] = (
 )
 
 # =========================
-# CLEAN REP CODE (🔥 مهم)
+# CLEAN REP CODE
 # =========================
 opening['Rep Code'] = pd.to_numeric(opening['Rep Code'], errors='coerce').astype('Int64')
 
@@ -75,7 +83,7 @@ codes['Rep Code'] = pd.to_numeric(codes['Rep Code'], errors='coerce').astype('In
 opening = opening.merge(codes, on='Rep Code', how='left')
 
 # =========================
-# 🔥 SAFE CLEAN قبل الجروب
+# 🔥 FINAL CLEAN BEFORE GROUP
 # =========================
 opening_clean = opening[
     opening['Rep Code'].notna()
@@ -88,10 +96,7 @@ def safe_group(df, group_cols, sum_cols):
     group_cols = [c for c in group_cols if c in df.columns]
     sum_cols = [c for c in sum_cols if c in df.columns]
 
-    return (
-        df.groupby(group_cols, as_index=False)[sum_cols]
-        .sum()
-    )
+    return df.groupby(group_cols, as_index=False)[sum_cols].sum()
 
 # =========================
 # GROUP CONFIG
