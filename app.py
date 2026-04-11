@@ -27,6 +27,16 @@ def build_target_pipeline(rep):
 
     df = df.groupby("Rep Code", as_index=False).sum()
 
+st.write("rep shape:", rep["value_table"].shape)
+st.write("sales shape:", sales.shape)
+st.write("opening shape:", opening.shape)
+st.write("overdue shape:", overdue.shape)
+
+final = build_all(rep, sales, opening, overdue)
+
+st.write("final shape:", final.shape)
+st.dataframe(final)
+
     return df
 
 
