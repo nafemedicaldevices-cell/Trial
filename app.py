@@ -1,15 +1,38 @@
 import streamlit as st
-import pipelines_test as p
+import data_pipeline as p   # ✅ مهم جدًا التصحيح هنا
 
+# =========================
+# 📂 LOAD DATA
+# =========================
 data = p.load_data()
 
-target = p.build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
-sales = p.build_sales_pipeline(data["sales"], data["mapping"], data["codes"])
+target = p.build_target_pipeline(
+    data["target_rep"],
+    "Rep Code",
+    data["mapping"]
+)
 
-st.title("Test Dashboard")
+sales = p.build_sales_pipeline(
+    data["sales"],
+    data["mapping"],
+    data["codes"]
+)
 
-st.subheader("Target")
+# =========================
+# 🎨 UI
+# =========================
+st.set_page_config(layout="wide")
+
+st.title("📊 Test Dashboard")
+
+# =========================
+# TARGET
+# =========================
+st.subheader("🎯 Target KPI")
 st.dataframe(target["value_table"])
 
-st.subheader("Sales")
+# =========================
+# SALES
+# =========================
+st.subheader("💰 Sales KPI (Rep Level)")
 st.dataframe(sales["rep_value"])
