@@ -4,45 +4,47 @@ import pandas as pd
 # =========================
 # LOAD DATA
 # =========================
-opening = pd.read_excel("Opening.xlsx")
+opening_detail = pd.read_excel("Opening Detail.xlsx")
 codes = pd.read_excel("Code.xlsx")
 
-st.title("📊 Opening Dashboard")
+st.title("📊 Opening Detail Dashboard")
 
 # =========================
-# COLUMN STANDARDIZATION
+# COLUMN CLEANING
 # =========================
-opening = opening.copy()
+opening_detail = opening_detail.iloc[:, :11].copy()
 
-opening.columns = [
-    'Branch',"Evak",'Opening Balance','Total Sales After Invoice Discounts',
-    'Returns','Sales Value Before Extra Discounts',
-    'Cash Collection','Collection Checks',
-    'Returned Chick','Collection Returned Chick',
-    "Extra Discounts",'Daienah','End Balance'
+opening_detail.columns = [
+    'Client Code',"Client Name",'Opening Balance',
+    'Total Sales After Invoice Discounts','Returns',
+    'Extra Discounts','Total Collection',"Madfoaat",
+    'Tasweyat Daiinah',"End Balance",
+    'Motalbet El Fatrah'
 ]
 
 # =========================
 # REP EXTRACTION
 # =========================
-opening["Rep Code"] = pd.NA
-opening["Old Rep Name"] = pd.NA
+opening_detail["Rep Code"] = pd.NA
+opening_detail["Old Rep Name"] = pd.NA
 
-mask = opening["Branch"].astype(str).str.strip().eq("كود المندوب")
+mask = opening_detail['Client Code'].astype(str).str.strip().eq("كود الفرع")
 
-opening.loc[mask, "Rep Code"] = opening.loc[mask, "Opening Balance"]
-opening.loc[mask, "Old Rep Name"] = opening.loc[mask, "Total Sales After Invoice Discounts"]
+opening_detail.loc[mask, 'Rep Code'] = opening_detail.loc[mask, 'Returns']
+opening_detail.loc[mask, 'Old Rep Name'] = opening_detail.loc[mask, 'Extra Discounts']
 
-opening[["Rep Code", "Old Rep Name"]] = opening[["Rep Code", "Old Rep Name"]].ffill()
+opening_detail[["Rep Code","Old Rep Name"]] = opening_detail[["Rep Code","Old Rep Name"]].ffill()
+
+opening_detail["Rep Code"] = pd.to_numeric(opening_detail["Rep Code"], errors="coerce").astype("Int64")
 
 # =========================
 # FILTER VALID ROWS
 # =========================
-opening = opening[
-    opening['Branch'].notna() &
-    (opening['Branch'].astype(str).str.strip() != '') &
-    (~opening['Branch'].astype(str).str.contains(
-        'نسبة المندوب|كود المندوب|اجماليات|كود الفرع',
+opening_detail = opening_detail[
+    opening_detail['Client Code'].notna() &
+    (opening_detail['Client Code'].astype(str).str.strip() != '') &
+    (~opening_detail['Client Code'].astype(str).str.contains(
+        "كود الفرع|كود العميل",
         na=False
     ))
 ].copy()
@@ -52,63 +54,49 @@ opening = opening[
 # =========================
 num_cols = [
     'Opening Balance','Total Sales After Invoice Discounts','Returns',
-    'Sales Value Before Extra Discounts',
-    'Cash Collection','Collection Checks',
-    'Returned Chick','Collection Returned Chick',
-    'Extra Discounts','Daienah','End Balance'
+    'Extra Discounts','Total Collection','End Balance'
 ]
 
 for col in num_cols:
-    opening[col] = pd.to_numeric(opening[col], errors='coerce').fillna(0)
-
-# =========================
-# KPI CALCULATIONS
-# =========================
-opening['Total Collection'] = opening['Cash Collection'] + opening['Collection Checks']
-
-opening['Sales After Returns'] = (
-    opening['Total Sales After Invoice Discounts'] - opening['Returns']
-)
+    opening_detail[col] = pd.to_numeric(opening_detail[col], errors='coerce').fillna(0)
 
 # =========================
 # MERGE CODES
 # =========================
-opening["Rep Code"] = pd.to_numeric(opening["Rep Code"], errors="coerce").astype("Int64")
 codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce").astype("Int64")
-
-opening = opening.merge(codes, on="Rep Code", how="left")
+opening_detail = opening_detail.merge(codes, on="Rep Code", how="left")
 
 # =========================
-# BUILD LEVEL (زي Overdue 🔥)
+# BUILD LEVEL (DETAIL 🔥)
 # =========================
 def build_level(df, level_code):
     return (
-        df.groupby(level_code)[
-            ["Opening Balance","Cash Collection","Collection Checks","Extra Discounts","End Balance"]
+        df.groupby([level_code, "Client Code"])[
+            ["Opening Balance","End Balance","Total Collection","Extra Discounts"]
         ]
         .sum()
         .reset_index()
     )
 
 # =========================
-# ALL LEVELS
+# LEVELS
 # =========================
-opening_rep = build_level(opening, "Rep Code")
-opening_manager = build_level(opening, "Manager Code")
-opening_area = build_level(opening, "Area Code")
-opening_supervisor = build_level(opening, "Supervisor Code")
+opening_detail_rep = build_level(opening_detail, "Rep Code")
+opening_detail_manager = build_level(opening_detail, "Manager Code")
+opening_detail_area = build_level(opening_detail, "Area Code")
+opening_detail_supervisor = build_level(opening_detail, "Supervisor Code")
 
 # =========================
 # FINAL OUTPUT
 # =========================
-st.subheader("📌 Rep Level")
-st.dataframe(opening_rep)
+st.subheader("📌 Rep - Client Level")
+st.dataframe(opening_detail_rep)
 
-st.subheader("📌 Manager Level")
-st.dataframe(opening_manager)
+st.subheader("📌 Manager - Client Level")
+st.dataframe(opening_detail_manager)
 
-st.subheader("📌 Area Level")
-st.dataframe(opening_area)
+st.subheader("📌 Area - Client Level")
+st.dataframe(opening_detail_area)
 
-st.subheader("📌 Supervisor Level")
-st.dataframe(opening_supervisor)
+st.subheader("📌 Supervisor - Client Level")
+st.dataframe(opening_detail_supervisor)
