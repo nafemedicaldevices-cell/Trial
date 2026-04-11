@@ -2,12 +2,12 @@ import streamlit as st
 import pandas as pd
 
 st.set_page_config(layout="wide")
-st.title("🎯 STEP 1 - TARGET FILES ONLY")
+st.title("🎯 TARGET FILES - CLEAN VIEW")
 
 # =========================
-# 📥 TARGET FILES ONLY
+# 📥 TARGET FILES
 # =========================
-target_files = {
+files = {
     "target_rep": "Target Rep.xlsx",
     "target_manager": "Target Manager.xlsx",
     "target_area": "Target Area.xlsx",
@@ -18,22 +18,32 @@ target_files = {
 data = {}
 
 # =========================
-# 📊 READ ONLY TARGETS
+# 📊 READ + CLEAN VIEW
 # =========================
-for name, file in target_files.items():
+for name, file in files.items():
 
     st.subheader(f"🎯 {name}")
 
     try:
         df = pd.read_excel(file)
-
         data[name] = df
 
-        st.write("Shape:", df.shape)
-        st.write("Columns:")
-        st.write(list(df.columns))
+        # =========================
+        # 🧠 SHOW BASIC INFO ONLY
+        # =========================
+        st.write("📌 Shape:", df.shape)
 
-        st.write("Preview:")
+        # نفصل الأعمدة المهمة
+        fixed_cols = ["Year", "Product Code", "Old Product Name", "Sales Price"]
+        target_cols = [c for c in df.columns if c not in fixed_cols]
+
+        st.write("📦 Fixed Columns:")
+        st.write(fixed_cols)
+
+        st.write("🎯 Target Columns (Codes):")
+        st.write(target_cols)
+
+        st.write("👀 Sample Data:")
         st.dataframe(df.head())
 
         st.markdown("---")
@@ -43,8 +53,4 @@ for name, file in target_files.items():
         st.exception(e)
 
 
-# =========================
-# 🧠 SUMMARY
-# =========================
-st.success("✅ Target files loaded check completed")
-st.write("Loaded targets:", list(data.keys()))
+st.success("✅ Targets loaded and structured view ready")
