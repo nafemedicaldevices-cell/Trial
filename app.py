@@ -1,48 +1,15 @@
 import streamlit as st
-import data_pipeline as dp
+import pipelines_test as p
 
-st.set_page_config(layout="wide")
-st.title("📊 Final KPI Dashboard 🔥")
+data = p.load_data()
 
-data = dp.load_data()
+target = p.build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
+sales = p.build_sales_pipeline(data["sales"], data["mapping"], data["codes"])
 
-# =========================
-# 🚀 RUN ALL PIPELINES
-# =========================
-target = dp.build_target_pipeline(
-    data["target_rep"],
-    "Rep Code",
-    data["mapping"],
-    data["codes"]
-)
+st.title("Test Dashboard")
 
-sales = dp.build_sales_pipeline(
-    data["sales"],
-    data["mapping"],
-    data["codes"]
-)
+st.subheader("Target")
+st.dataframe(target["value_table"])
 
-overdue = dp.build_overdue_pipeline(
-    data["overdue"],
-    data["codes"]
-)
-
-opening = dp.build_opening_pipeline(
-    data["opening"],
-    data["codes"]
-)
-
-# =========================
-# 📊 DISPLAY
-# =========================
-st.header("🎯 TARGET")
-st.dataframe(target["Rep Code"])
-
-st.header("💰 SALES")
-st.dataframe(sales["rep"])
-
-st.header("⏳ OVERDUE")
-st.dataframe(overdue["rep"])
-
-st.header("🏦 OPENING")
-st.dataframe(opening["rep"])
+st.subheader("Sales")
+st.dataframe(sales["rep_value"])
