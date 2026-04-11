@@ -6,7 +6,7 @@ import numpy as np
 # 🎨 PAGE SETUP
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 Unified KPI Dashboard")
+st.title("📊 Unified KPI Dashboard (Clean & Safe)")
 
 
 # =========================
@@ -33,7 +33,7 @@ data = load_data()
 
 
 # =========================
-# 🧠 HELPERS (FIXED)
+# 🧠 HELPERS (SAFE CORE)
 # =========================
 def to_numeric(df, cols):
     for c in cols:
@@ -43,9 +43,6 @@ def to_numeric(df, cols):
 
 
 def merge_codes(df, codes, key):
-    """
-    SAFE merge (prevents KeyError)
-    """
     df = df.copy()
     codes = codes.copy()
 
@@ -59,33 +56,56 @@ def merge_codes(df, codes, key):
 
 
 # =========================
-# 🚀 SALES PIPELINE
+# 🔍 AUTO COLUMN FINDER
+# =========================
+def find_col(df, options):
+    for c in options:
+        if c in df.columns:
+            return c
+    return None
+
+
+# =========================
+# 🚀 SALES PIPELINE (FIXED)
 # =========================
 def sales_pipeline(sales, mapping, codes):
 
     sales = sales.copy()
     sales.columns = sales.columns.str.strip()
 
-    sales = to_numeric(sales, [
-        'Sales Unit Before Edit',
-        'Returns Unit Before Edit',
-        'Sales Price',
-        'Invoice Discounts',
-        'Sales Value'
-    ])
+    unit_col = find_col(sales, ["Sales Unit Before Edit", "Sales Unit", "Units", "Qty"])
+    return_col = find_col(sales, ["Returns Unit Before Edit", "Returns Unit", "Returns"])
+    price_col = find_col(sales, ["Sales Price", "Price", "Unit Price"])
+
+    if unit_col is None or price_col is None:
+        st.error("❌ Missing Sales required columns")
+        st.write(sales.columns)
+        return {}
+
+    for c in [unit_col, return_col, price_col]:
+        if c:
+            sales[c] = pd.to_numeric(sales[c], errors="coerce").fillna(0)
 
     sales = merge_codes(sales, codes, "Rep Code")
 
-    sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
-    sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
+    sales["Total Sales Value"] = sales[unit_col] * sales[price_col]
+    sales["Returns Value"] = sales[return_col] * sales[price_col] if return_col else 0
     sales["Net Sales"] = sales["Total Sales Value"] - sales["Returns Value"]
 
-    return {
-        "rep": sales.groupby("Rep Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index(),
-        "manager": sales.groupby("Manager Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index() if "Manager Code" in sales.columns else pd.DataFrame(),
-        "area": sales.groupby("Area Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index() if "Area Code" in sales.columns else pd.DataFrame(),
-        "supervisor": sales.groupby("Supervisor Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index() if "Supervisor Code" in sales.columns else pd.DataFrame(),
+    result = {
+        "rep": sales.groupby("Rep Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index()
     }
+
+    if "Manager Code" in sales.columns:
+        result["manager"] = sales.groupby("Manager Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index()
+
+    if "Area Code" in sales.columns:
+        result["area"] = sales.groupby("Area Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index()
+
+    if "Supervisor Code" in sales.columns:
+        result["supervisor"] = sales.groupby("Supervisor Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index()
+
+    return result
 
 
 # =========================
@@ -100,7 +120,8 @@ def overdue_pipeline(df, codes):
         "Client Name","Client Code","15","30","60","90","120","120+","Balance"
     ]
 
-    df = to_numeric(df, ["120","120+","Balance"])
+    to_numeric(df, ["120","120+","Balance"])
+
     df["Overdue"] = df["120"] + df["120+"]
 
     df = merge_codes(df, codes, "Rep Code")
@@ -127,7 +148,7 @@ def opening_pipeline(df, codes):
         "Extra Discounts",'Daienah','End Balance'
     ]
 
-    df = to_numeric(df, [
+    to_numeric(df, [
         'Opening Balance','Sales After Invoice Discounts','Returns',
         'Cash Collection','Collection Checks','End Balance'
     ])
@@ -174,7 +195,7 @@ def target_pipeline(df, id_col, mapping):
 
 
 # =========================
-# 🚀 RUN PIPELINES
+# 🚀 RUN ALL PIPELINES
 # =========================
 sales = sales_pipeline(data["sales"], data["mapping"], data["codes"])
 overdue = overdue_pipeline(data["overdue"], data["codes"])
@@ -193,47 +214,35 @@ targets = {
 tab1, tab2, tab3, tab4 = st.tabs(["💰 Sales", "⚠️ Overdue", "🏦 Opening", "🎯 Targets"])
 
 
-# =========================
-# 💰 SALES
-# =========================
 with tab1:
     st.subheader("Rep")
-    st.dataframe(sales["rep"], use_container_width=True)
+    st.dataframe(sales.get("rep", pd.DataFrame()), use_container_width=True)
 
     st.subheader("Manager")
-    st.dataframe(sales["manager"], use_container_width=True)
+    st.dataframe(sales.get("manager", pd.DataFrame()), use_container_width=True)
 
     st.subheader("Area")
-    st.dataframe(sales["area"], use_container_width=True)
+    st.dataframe(sales.get("area", pd.DataFrame()), use_container_width=True)
 
     st.subheader("Supervisor")
-    st.dataframe(sales["supervisor"], use_container_width=True)
+    st.dataframe(sales.get("supervisor", pd.DataFrame()), use_container_width=True)
 
 
-# =========================
-# ⚠️ OVERDUE
-# =========================
 with tab2:
-    st.dataframe(overdue["rep"], use_container_width=True)
-    st.dataframe(overdue["manager"], use_container_width=True)
-    st.dataframe(overdue["area"], use_container_width=True)
-    st.dataframe(overdue["supervisor"], use_container_width=True)
+    st.dataframe(overdue.get("rep", pd.DataFrame()))
+    st.dataframe(overdue.get("manager", pd.DataFrame()))
+    st.dataframe(overdue.get("area", pd.DataFrame()))
+    st.dataframe(overdue.get("supervisor", pd.DataFrame()))
 
 
-# =========================
-# 🏦 OPENING
-# =========================
 with tab3:
-    st.dataframe(opening["rep"], use_container_width=True)
-    st.dataframe(opening["manager"], use_container_width=True)
-    st.dataframe(opening["area"], use_container_width=True)
-    st.dataframe(opening["supervisor"], use_container_width=True)
+    st.dataframe(opening.get("rep", pd.DataFrame()))
+    st.dataframe(opening.get("manager", pd.DataFrame()))
+    st.dataframe(opening.get("area", pd.DataFrame()))
+    st.dataframe(opening.get("supervisor", pd.DataFrame()))
 
 
-# =========================
-# 🎯 TARGETS
-# =========================
 with tab4:
-    st.dataframe(targets["rep"], use_container_width=True)
-    st.dataframe(targets["manager"], use_container_width=True)
-    st.dataframe(targets["area"], use_container_width=True)
+    st.dataframe(targets["rep"])
+    st.dataframe(targets["manager"])
+    st.dataframe(targets["area"])
