@@ -1,3 +1,4 @@
+```python
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -24,7 +25,7 @@ def load_data():
     }
 
 # =========================
-# 🚀 TARGET PIPELINE (SAFE)
+# 🚀 TARGET PIPELINE
 # =========================
 def build_target_pipeline(df, id_name, mapping):
 
@@ -33,7 +34,6 @@ def build_target_pipeline(df, id_name, mapping):
 
     df.columns = df.columns.str.strip()
 
-    # SAFE KEYS
     if "Product Code" not in df.columns:
         df["Product Code"] = np.nan
 
@@ -81,7 +81,6 @@ def build_target_pipeline(df, id_name, mapping):
         return d.groupby([id_name], as_index=False)["Value"].sum()
 
     base = group(full).rename(columns={"Value": "Full Year 🏆"})
-
     base = base.merge(group(month).rename(columns={"Value": "Month 📅"}), on=id_name, how="left")
     base = base.merge(group(quarter).rename(columns={"Value": "Quarter 📊"}), on=id_name, how="left")
     base = base.merge(group(ytd).rename(columns={"Value": "YTD 📈"}), on=id_name, how="left")
@@ -90,27 +89,22 @@ def build_target_pipeline(df, id_name, mapping):
 
 
 # =========================
-# 🚀 SALES PIPELINE (FULL SAFE FIX)
+# 🚀 SALES PIPELINE (FIXED)
 # =========================
 def build_sales_pipeline(sales, mapping, codes):
 
     sales = sales.copy()
+    codes = codes.copy()
+
     sales.columns = sales.columns.str.strip()
+    codes.columns = codes.columns.str.strip()
 
     # =========================
-    # 🛡️ SAFE COLUMN CREATION
+    # 🛡️ SAFE COLUMNS
     # =========================
-    if "Rep Code" not in sales.columns:
-        sales["Rep Code"] = np.nan
-
-    if "Manager Code" not in sales.columns:
-        sales["Manager Code"] = np.nan
-
-    if "Area Code" not in sales.columns:
-        sales["Area Code"] = np.nan
-
-    if "Supervisor Code" not in sales.columns:
-        sales["Supervisor Code"] = np.nan
+    for col in ["Rep Code", "Manager Code", "Area Code", "Supervisor Code"]:
+        if col not in sales.columns:
+            sales[col] = np.nan
 
     # =========================
     # 🔢 NUMERIC CLEAN
@@ -128,12 +122,34 @@ def build_sales_pipeline(sales, mapping, codes):
         sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
 
     # =========================
-    # 🆔 IDS CLEAN
+    # 🆔 CLEAN IDS
     # =========================
     sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
     codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
 
-    sales = sales.merge(codes, on="Rep Code", how="left")
+    # 🔥 DEBUG قبل الميرج
+    st.subheader("🔍 DEBUG SALES")
+    st.write("Sales shape:", sales.shape)
+    st.write("Codes shape:", codes.shape)
+    st.write("Sales Rep unique:", sales["Rep Code"].nunique())
+    st.write("Codes Rep unique:", codes["Rep Code"].nunique())
+
+    # =========================
+    # 🔗 MERGE (CRITICAL FIX)
+    # =========================
+    sales = sales.merge(codes, on="Rep Code", how="inner")
+
+    st.write("After merge shape:", sales.shape)
+
+    # لو فاضي → وقف
+    if sales.empty:
+        st.error("❌ المشكلة: مفيش تطابق بين Sales و Code")
+        return {
+            "rep_value": pd.DataFrame(),
+            "manager_value": pd.DataFrame(),
+            "area_value": pd.DataFrame(),
+            "supervisor_value": pd.DataFrame(),
+        }
 
     # =========================
     # 💰 CALCULATIONS
@@ -143,23 +159,24 @@ def build_sales_pipeline(sales, mapping, codes):
     sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
 
     # =========================
-    # 📊 SAFE GROUP ENGINE
+    # 📊 GROUP
     # =========================
-    def safe_group(df, group_cols, sum_cols):
+    def safe_group(df, group_cols):
 
         group_cols = [c for c in group_cols if c in df.columns]
-        sum_cols = [c for c in sum_cols if c in df.columns]
 
         if not group_cols:
             return pd.DataFrame()
 
-        return df.groupby(group_cols, as_index=False)[sum_cols].sum()
+        return df.groupby(group_cols, as_index=False)[
+            ["Total Sales Value", "Returns Value", "Sales After Returns"]
+        ].sum()
 
     return {
-        "rep_value": safe_group(sales, ["Rep Code"], ["Total Sales Value","Returns Value","Sales After Returns"]),
-        "manager_value": safe_group(sales, ["Manager Code"], ["Total Sales Value","Returns Value","Sales After Returns"]),
-        "area_value": safe_group(sales, ["Area Code"], ["Total Sales Value","Returns Value","Sales After Returns"]),
-        "supervisor_value": safe_group(sales, ["Supervisor Code"], ["Total Sales Value","Returns Value","Sales After Returns"]),
+        "rep_value": safe_group(sales, ["Rep Code"]),
+        "manager_value": safe_group(sales, ["Manager Code"]),
+        "area_value": safe_group(sales, ["Area Code"]),
+        "supervisor_value": safe_group(sales, ["Supervisor Code"]),
     }
 
 
@@ -167,7 +184,7 @@ def build_sales_pipeline(sales, mapping, codes):
 # 🎨 STREAMLIT UI
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 Unified KPI System (ERROR-FREE VERSION)")
+st.title("📊 Unified KPI System (FINAL FIX)")
 
 data = load_data()
 
@@ -193,3 +210,4 @@ st.dataframe(sales["rep_value"], use_container_width=True)
 st.dataframe(sales["manager_value"], use_container_width=True)
 st.dataframe(sales["area_value"], use_container_width=True)
 st.dataframe(sales["supervisor_value"], use_container_width=True)
+```
