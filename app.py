@@ -36,7 +36,19 @@ opening.loc[mask, "Old Rep Name"] = opening.loc[mask, "Total Sales After Invoice
 opening[["Rep Code", "Old Rep Name"]] = opening[["Rep Code", "Old Rep Name"]].ffill()
 
 # =========================
+# FILTER VALID ROWS 🔥
+# =========================
+opening = opening[
+    opening['Branch'].notna() &
+    (opening['Branch'].astype(str).str.strip() != '') &
+    (~opening['Branch'].astype(str).str.contains(
+        'نسبة المندوب|كود المندوب|اجماليات|كود الفرع',
+        na=False
+    ))
+].copy()
+
+# =========================
 # FINAL DISPLAY
 # =========================
-st.subheader("Opening Data After Rep Extraction")
+st.subheader("Cleaned Opening Data")
 st.dataframe(opening.head(20))
