@@ -14,19 +14,12 @@ past_quarters = max(current_quarter - 1, 0)
 # =========================
 def load_data():
     return {
-        # TARGET
         "target_rep": pd.read_excel("Target Rep.xlsx"),
         "target_manager": pd.read_excel("Target Manager.xlsx"),
         "target_area": pd.read_excel("Target Area.xlsx"),
         "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
         "target_evak": pd.read_excel("Target Evak.xlsx"),
-
-        # SALES
-        "sales": pd.read_excel("Sales.xlsx"),
-
-        # COMMON
         "mapping": pd.read_excel("Mapping.xlsx"),
-        "codes": pd.read_excel("Code.xlsx"),
     }
 
 # =========================
@@ -42,6 +35,7 @@ def build_target_pipeline(df, id_name, mapping):
     fixed_cols = [c for c in ["Year", "Product Code", "Old Product Name", "Sales Price"] if c in df.columns]
     dynamic_cols = [c for c in df.columns if c not in fixed_cols]
 
+    # 🔄 MELT
     df = df.melt(
         id_vars=fixed_cols,
         value_vars=dynamic_cols,
@@ -49,6 +43,7 @@ def build_target_pipeline(df, id_name, mapping):
         value_name="Target (Unit)"
     )
 
+    # 🧹 CLEAN IDS
     df[id_name] = pd.to_numeric(
         df[id_name].astype(str).str.replace(r"[^0-9]", "", regex=True),
         errors="coerce"
@@ -58,18 +53,31 @@ def build_target_pipeline(df, id_name, mapping):
     mapping["Product Code"] = pd.to_numeric(mapping["Product Code"], errors="coerce")
 
     mapping = mapping.drop_duplicates("Product Code")
+
     df = df.merge(mapping, on="Product Code", how="left")
 
+    # 🔢 NUMERIC
     df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
     df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
 
-    df["Value"] = df["Target (Unit)"] * df["Sales Price"]
+    # 💰 VALUE
+    df["Full Value"] = df["Target (Unit)"] * df["Sales Price"]
 
     full = df.copy()
-    month = df.copy()
-    quarter = df.copy()
-    ytd = df.copy()
+    full["Value"] = full["Full Value"]
 
+    month = df.copy()
+    month["Value"] = full["Full Value"] * (current_month / 12)
+
+    quarter = df.copy()
+    quarter["Value"] = full["Full Value"] * (past_quarters / 4)
+
+    ytd = df.copy()
+    ytd["Value"] = full["Full Value"] * (current_month / 12)
+
+    # =========================
+    # 📊 GROUP FUNCTION
+    # =========================
     def group(d):
         return d.groupby([id_name], as_index=False)["Value"].sum()
 
@@ -78,10 +86,10 @@ def build_target_pipeline(df, id_name, mapping):
     value_table["Quarter 📊"] = group(quarter)["Value"]
     value_table["YTD 📈"] = group(ytd)["Value"]
 
+    # =========================
+    # 📦 PRODUCTS GROUP
+    # =========================
     def product_group(d):
-        if "Product Name" not in d.columns:
-            d["Product Name"] = "UNKNOWN"
-
         return d.groupby(
             [id_name, "Product Code", "Product Name"],
             as_index=False
@@ -99,95 +107,15 @@ def build_target_pipeline(df, id_name, mapping):
     }
 
 # =========================
-# 🚀 SALES PIPELINE (100% SAFE FIX)
-# =========================
-def build_sales_pipeline(sales, mapping, codes):
-
-    sales = sales.copy()
-    sales.columns = sales.columns.str.strip()
-
-    # =========================
-    # 🔎 AUTO COLUMN DETECTION
-    # =========================
-    def get_col(df, options):
-        for c in options:
-            if c in df.columns:
-                return c
-        return None
-
-    sales_unit = get_col(sales, ["Sales Unit Before Edit", "Sales Unit", "Qty", "Quantity"])
-    returns_unit = get_col(sales, ["Returns Unit Before Edit", "Returns Unit"])
-    price = get_col(sales, ["Sales Price", "Price"])
-
-    if not sales_unit or not price:
-        st.error("Missing Sales Unit or Price columns in Sales file")
-        st.stop()
-
-    # =========================
-    # 🔢 NUMERIC CLEAN
-    # =========================
-    for col in [sales_unit, returns_unit, price]:
-        if col and col in sales.columns:
-            sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
-
-    # =========================
-    # 🆔 IDS SAFE
-    # =========================
-    if "Rep Code" not in sales.columns:
-        sales["Rep Code"] = np.nan
-
-    sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
-    codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
-
-    # =========================
-    # 🧩 MERGE CODES
-    # =========================
-    sales = sales.merge(codes, on="Rep Code", how="left")
-
-    # =========================
-    # 🧠 ENSURE HIERARCHY
-    # =========================
-    for c in ["Manager Code", "Area Code", "Supervisor Code"]:
-        if c not in sales.columns:
-            sales[c] = np.nan
-
-    # =========================
-    # 💰 CALCULATION
-    # =========================
-    sales["Total Sales Value"] = sales[sales_unit] * sales[price]
-
-    if returns_unit:
-        sales["Returns Value"] = sales[returns_unit] * sales[price]
-    else:
-        sales["Returns Value"] = 0
-
-    sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
-
-    # =========================
-    # 📊 GROUP FUNCTION
-    # =========================
-    def safe_group(df, group_cols):
-        return df.groupby(group_cols, as_index=False)[
-            ["Total Sales Value", "Returns Value", "Sales After Returns"]
-        ].sum()
-
-    return {
-        "rep_value": safe_group(sales, ["Rep Code"]),
-        "manager_value": safe_group(sales, ["Manager Code"]),
-        "area_value": safe_group(sales, ["Area Code"]),
-        "supervisor_value": safe_group(sales, ["Supervisor Code"]),
-    }
-
-# =========================
 # 🎨 STREAMLIT UI
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 Unified KPI System (TARGET + SALES)")
+st.title("📊 TARGET DASHBOARD")
 
 data = load_data()
 
 # =========================
-# 🚀 RUN TARGET
+# 🚀 RUN PIPELINES
 # =========================
 rep = build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
 manager = build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"])
@@ -196,31 +124,41 @@ supervisor = build_target_pipeline(data["target_supervisor"], "Supervisor Code",
 evak = build_target_pipeline(data["target_evak"], "Evak Code", data["mapping"])
 
 # =========================
-# 🚀 RUN SALES
+# 📊 VALUE TABLES
 # =========================
-sales = build_sales_pipeline(
-    data["sales"],
-    data["mapping"],
-    data["codes"]
-)
+st.header("📊 VALUE KPI")
 
-# =========================
-# 📊 TARGET VIEW
-# =========================
-st.header("🎯 TARGET KPI")
-
+st.subheader("Rep")
 st.dataframe(rep["value_table"], use_container_width=True)
+
+st.subheader("Manager")
 st.dataframe(manager["value_table"], use_container_width=True)
+
+st.subheader("Area")
 st.dataframe(area["value_table"], use_container_width=True)
+
+st.subheader("Supervisor")
 st.dataframe(supervisor["value_table"], use_container_width=True)
+
+st.subheader("Evak")
 st.dataframe(evak["value_table"], use_container_width=True)
 
 # =========================
-# 💰 SALES VIEW
+# 📦 PRODUCTS TABLES
 # =========================
-st.header("💰 SALES KPI")
+st.header("📦 PRODUCTS KPI")
 
-st.dataframe(sales["rep_value"], use_container_width=True)
-st.dataframe(sales["manager_value"], use_container_width=True)
-st.dataframe(sales["area_value"], use_container_width=True)
-st.dataframe(sales["supervisor_value"], use_container_width=True)
+st.subheader("Rep Products")
+st.dataframe(rep["products_full"], use_container_width=True)
+
+st.subheader("Manager Products")
+st.dataframe(manager["products_full"], use_container_width=True)
+
+st.subheader("Area Products")
+st.dataframe(area["products_full"], use_container_width=True)
+
+st.subheader("Supervisor Products")
+st.dataframe(supervisor["products_full"], use_container_width=True)
+
+st.subheader("Evak Products")
+st.dataframe(evak["products_full"], use_container_width=True)
