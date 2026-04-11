@@ -8,7 +8,7 @@ import streamlit as st
 # =========================
 current_month = pd.Timestamp.today().month
 current_quarter = (current_month - 1) // 3 + 1
-past_quarters = max(current_quarter - 1, 0)
+
 # =========================
 # 📂 LOAD DATA
 # =========================
@@ -19,14 +19,32 @@ def load_data():
         "target_area": pd.read_excel("Target Area.xlsx"),
         "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
         "target_evak": pd.read_excel("Target Evak.xlsx"),
-        "sales": pd.read_excel("Sales.xlsx"),
+        "sales": pd.read_excel("Sales.xlsx", header=None),  # مهم
         "mapping": pd.read_excel("Mapping.xlsx"),
         "codes": pd.read_excel("Code.xlsx"),
-        "overdue": pd.read_excel("Overdue.xlsx"),
-        "extra_discounts": pd.read_excel("Extradiscounts.xlsx"),
-        "opening": pd.read_excel("Opening.xlsx"),
-        "opening_detail": pd.read_excel("Opening Detail.xlsx"),
     }
+
+# =========================
+# 🧠 SALES COLUMN FIX
+# =========================
+def fix_sales_columns(sales):
+
+    expected_cols = [
+        'Date','Warehouse Name','Client Code','Client Name','Notes','MF','Mostanad',
+        'Rep Code','Sales Unit Before Edit','Returns Unit Before Edit',
+        'Sales Price','Invoice Discounts','Sales Value'
+    ]
+
+    # تحقق
+    if sales.shape[1] < len(expected_cols):
+        st.error(f"❌ عدد الأعمدة أقل من المتوقع: {sales.shape[1]}")
+        st.stop()
+
+    # ناخد أول الأعمدة فقط
+    sales = sales.iloc[:, :len(expected_cols)].copy()
+    sales.columns = expected_cols
+
+    return sales
 
 # =========================
 # 🚀 TARGET PIPELINE
@@ -91,28 +109,17 @@ def build_target_pipeline(df, id_name, mapping):
 
     return base
 
-
 # =========================
-# 🚀 SALES PIPELINE (FIXED)
+# 🚀 SALES PIPELINE
 # =========================
-def build_sales_pipeline(sales, mapping, codes):
+def build_sales_pipeline(sales, codes):
 
-    sales = sales.copy()
-    codes = codes.copy()
+    sales = fix_sales_columns(sales)
 
     sales.columns = sales.columns.str.strip()
     codes.columns = codes.columns.str.strip()
 
-    # =========================
-    # 🛡️ SAFE COLUMNS
-    # =========================
-    for col in ["Rep Code", "Manager Code", "Area Code", "Supervisor Code"]:
-        if col not in sales.columns:
-            sales[col] = np.nan
-
-    # =========================
-    # 🔢 NUMERIC CLEAN
-    # =========================
+    # تحويل أرقام
     num_cols = [
         "Sales Unit Before Edit",
         "Returns Unit Before Edit",
@@ -121,81 +128,52 @@ def build_sales_pipeline(sales, mapping, codes):
     ]
 
     for col in num_cols:
-        if col not in sales.columns:
-            sales[col] = 0
         sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
 
-    # =========================
-    # 🆔 CLEAN IDS
-    # =========================
     sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
     codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
 
-    # 🔥 DEBUG قبل الميرج
-    st.subheader("🔍 DEBUG SALES")
-    st.write("Sales shape:", sales.shape)
-    st.write("Codes shape:", codes.shape)
-    st.write("Sales Rep unique:", sales["Rep Code"].nunique())
-    st.write("Codes Rep unique:", codes["Rep Code"].nunique())
-
-    # =========================
-    # 🔗 MERGE (CRITICAL FIX)
-    # =========================
+    # 🔥 merge مهم
     sales = sales.merge(codes, on="Rep Code", how="inner")
 
-    st.write("After merge shape:", sales.shape)
-
-    # لو فاضي → وقف
     if sales.empty:
-        st.error("❌ المشكلة: مفيش تطابق بين Sales و Code")
+        st.error("❌ مفيش تطابق بين Sales و Code")
         return {
-            "rep_value": pd.DataFrame(),
-            "manager_value": pd.DataFrame(),
-            "area_value": pd.DataFrame(),
-            "supervisor_value": pd.DataFrame(),
+            "rep": pd.DataFrame(),
+            "manager": pd.DataFrame(),
+            "area": pd.DataFrame(),
+            "supervisor": pd.DataFrame(),
         }
 
-    # =========================
-    # 💰 CALCULATIONS
-    # =========================
+    # حسابات
     sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
     sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
     sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
 
-    # =========================
-    # 📊 GROUP
-    # =========================
-    def safe_group(df, group_cols):
-
-        group_cols = [c for c in group_cols if c in df.columns]
-
-        if not group_cols:
+    def group(df, col):
+        if col not in df.columns:
             return pd.DataFrame()
-
-        return df.groupby(group_cols, as_index=False)[
+        return df.groupby(col, as_index=False)[
             ["Total Sales Value", "Returns Value", "Sales After Returns"]
         ].sum()
 
     return {
-        "rep_value": safe_group(sales, ["Rep Code"]),
-        "manager_value": safe_group(sales, ["Manager Code"]),
-        "area_value": safe_group(sales, ["Area Code"]),
-        "supervisor_value": safe_group(sales, ["Supervisor Code"]),
+        "rep": group(sales, "Rep Code"),
+        "manager": group(sales, "Manager Code"),
+        "area": group(sales, "Area Code"),
+        "supervisor": group(sales, "Supervisor Code"),
     }
 
-
 # =========================
-# 🎨 STREAMLIT UI
+# 🎨 UI
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 Unified KPI System (FINAL FIX)")
+st.title("📊 Unified KPI System")
 
 data = load_data()
 
-# =========================
 # 🎯 TARGET
-# =========================
-st.header("🎯 TARGET KPI")
+st.header("🎯 TARGET")
 
 st.dataframe(build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"]))
 st.dataframe(build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"]))
@@ -203,15 +181,13 @@ st.dataframe(build_target_pipeline(data["target_area"], "Area Code", data["mappi
 st.dataframe(build_target_pipeline(data["target_supervisor"], "Supervisor Code", data["mapping"]))
 st.dataframe(build_target_pipeline(data["target_evak"], "Evak Code", data["mapping"]))
 
-# =========================
 # 💰 SALES
-# =========================
-st.header("💰 SALES KPI")
+st.header("💰 SALES")
 
-sales = build_sales_pipeline(data["sales"], data["mapping"], data["codes"])
+sales = build_sales_pipeline(data["sales"], data["codes"])
 
-st.dataframe(sales["rep_value"], use_container_width=True)
-st.dataframe(sales["manager_value"], use_container_width=True)
-st.dataframe(sales["area_value"], use_container_width=True)
-st.dataframe(sales["supervisor_value"], use_container_width=True)
+st.dataframe(sales["rep"], use_container_width=True)
+st.dataframe(sales["manager"], use_container_width=True)
+st.dataframe(sales["area"], use_container_width=True)
+st.dataframe(sales["supervisor"], use_container_width=True)
 ```
