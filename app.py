@@ -16,10 +16,16 @@ def load_data():
     return {
         "sales": pd.read_excel("Sales.xlsx"),
         "overdue": pd.read_excel("Overdue.xlsx"),
+        "extra_discounts": pd.read_excel("Extradiscounts.xlsx"),
         "opening": pd.read_excel("Opening.xlsx"),
-        "mapping": pd.read_excel("Mapping.xlsx"),
-        "codes": pd.read_excel("Code.xlsx"),
+        "opening_detail": pd.read_excel("Opening Detail.xlsx"),
+        "target_manager": pd.read_excel("Target Manager.xlsx"),
+        "target_area": pd.read_excel("Target Area.xlsx"),
         "target_rep": pd.read_excel("Target Rep.xlsx"),
+        "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
+        "target_evak": pd.read_excel("Target Evak.xlsx"),
+        "mapping": pd.read_excel("Mapping.xlsx"),
+        "codes": pd.read_excel("Code.xlsx")
     }
 
 # =========================
@@ -50,6 +56,8 @@ def build_target_pipeline(df, id_name, mapping):
     df["Product Code"] = pd.to_numeric(df["Product Code"], errors="coerce")
     mapping["Product Code"] = pd.to_numeric(mapping["Product Code"], errors="coerce")
 
+    mapping = mapping.drop_duplicates("Product Code")
+
     df = df.merge(mapping, on="Product Code", how="left")
 
     df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
@@ -72,17 +80,32 @@ def build_target_pipeline(df, id_name, mapping):
     def group(d):
         return d.groupby([id_name], as_index=False)["Value"].sum()
 
-    value_table = group(full).rename(columns={"Value": "Full Year"})
-    value_table["Month"] = group(month)["Value"]
-    value_table["Quarter"] = group(quarter)["Value"]
-    value_table["YTD"] = group(ytd)["Value"]
+    value_table = group(full).rename(columns={"Value": "Full Year 🏆"})
+    value_table["Month 📅"] = group(month)["Value"]
+    value_table["Quarter 📊"] = group(quarter)["Value"]
+    value_table["YTD 📈"] = group(ytd)["Value"]
 
-    return value_table
+    def product_group(d):
+        return d.groupby(
+            [id_name, "Product Code", "Product Name"],
+            as_index=False
+        ).agg(
+            Units=("Target (Unit)", "sum"),
+            Value=("Value", "sum")
+        )
+
+    return {
+        "value_table": value_table,
+        "products_full": product_group(full),
+        "products_month": product_group(month),
+        "products_quarter": product_group(quarter),
+        "products_ytd": product_group(ytd),
+    }
 
 # =========================
-# 💰 SALES PIPELINE
+# 💰 SALES PIPELINE (زي ما هو)
 # =========================
-def build_sales_pipeline(sales):
+def build_sales_pipeline(sales, mapping, codes):
 
     sales = sales.copy()
     sales.columns = sales.columns.str.strip()
@@ -96,34 +119,7 @@ def build_sales_pipeline(sales):
     ].sum()
 
 # =========================
-# ⏰ OVERDUE
-# =========================
-def build_overdue(overdue):
-
-    overdue.columns = [
-        "Client Name","Client Code","15","30","60","90","120","120+","Balance"
-    ]
-
-    overdue["Overdue"] = overdue["120"] + overdue["120+"]
-
-    return overdue.groupby("Client Code", as_index=False)["Overdue"].sum()
-
-# =========================
-# 🏦 OPENING
-# =========================
-def build_opening(opening):
-
-    opening.columns = [
-        'Branch',"Evak",'Opening Balance','Sales','Returns','Before Discount',
-        'Cash','Checks','Returned','Returned2',"Extra",'Daienah','End'
-    ]
-
-    return opening.groupby("Branch", as_index=False)[
-        ["Opening Balance","Cash","Checks","Extra","End"]
-    ].sum()
-
-# =========================
-# 🚀 STREAMLIT APP
+# 🚀 APP
 # =========================
 st.set_page_config(layout="wide")
 st.title("📊 Full Dashboard")
@@ -131,21 +127,21 @@ st.title("📊 Full Dashboard")
 data = load_data()
 
 # TARGET
-st.header("🎯 Target")
-target = build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
-st.dataframe(target, use_container_width=True)
+st.header("🎯 TARGET")
+rep = build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
+st.dataframe(rep["value_table"])
 
 # SALES
-st.header("💰 Sales")
-sales = build_sales_pipeline(data["sales"])
-st.dataframe(sales, use_container_width=True)
+st.header("💰 SALES")
+sales = build_sales_pipeline(data["sales"], data["mapping"], data["codes"])
+st.dataframe(sales)
 
 # OVERDUE
-st.header("⏰ Overdue")
-overdue = build_overdue(data["overdue"])
-st.dataframe(overdue, use_container_width=True)
+st.header("⏰ OVERDUE")
+overdue = data["overdue"]
+st.dataframe(overdue)
 
 # OPENING
-st.header("🏦 Opening")
-opening = build_opening(data["opening"])
-st.dataframe(opening, use_container_width=True)
+st.header("🏦 OPENING")
+opening = data["opening"]
+st.dataframe(opening)
