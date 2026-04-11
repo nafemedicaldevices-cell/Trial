@@ -9,9 +9,6 @@ codes = pd.read_excel("Code.xlsx")
 
 st.title("📊 Opening Dashboard")
 
-st.subheader("Raw Data")
-st.dataframe(opening.head())
-
 # =========================
 # COLUMN STANDARDIZATION
 # =========================
