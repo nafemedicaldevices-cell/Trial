@@ -32,7 +32,7 @@ def load_data(base_path: str = ".") -> dict:
         # targets (one file per hierarchy level)
         "target_manager":    pd.read_excel(p("Target Manager.xlsx")),
         "target_area":       pd.read_excel(p("Target Area.xlsx")),
-        "target_rep":        pd.read_excel(p("Target Rep.xlsx")),
+        "target_rep":        pd.read_excel(p("Rep.xlsx")),
         "target_supervisor": pd.read_excel(p("Target Supervisor.xlsx")),
         "target_evak":       pd.read_excel(p("Target Evak.xlsx")),
 
@@ -187,8 +187,19 @@ def build_target_pipeline(df: pd.DataFrame,
                  var_name=id_name, value_name="Target (Unit)")
 
     # ── 2b. clean IDs ─────────────────────────
-    df[id_name]       = _clean_id(df[id_name])
-    df["Product Code"]= _to_num(df["Product Code"], "Int64")
+    df[id_name] = _clean_id(df[id_name])
+
+    # Product Code قد يكون اسمه مختلف — نحاول نوحّده
+    if "Product Code" not in df.columns:
+        # ابحث عن أي كولوم فيه "code" و"product" بغض النظر عن الحالة
+        candidates = [c for c in df.columns if "code" in c.lower() and "product" in c.lower()]
+        if candidates:
+            df = df.rename(columns={candidates[0]: "Product Code"})
+        else:
+            # مفيش product code خالص — نضيف كولوم فاضي عشان الكود ميقعش
+            df["Product Code"] = pd.NA
+
+    df["Product Code"] = _to_num(df["Product Code"], "Int64")
 
     mapping["Product Code"] = _to_num(mapping["Product Code"], "Int64")
     mapping_clean = mapping.drop_duplicates("Product Code")
