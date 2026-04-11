@@ -91,12 +91,24 @@ def build_level(df, level_code):
     )
 
 # =========================
-# REP LEVEL ONLY
+# ALL LEVELS
 # =========================
 opening_rep = build_level(opening, "Rep Code")
+opening_manager = build_level(opening, "Manager Code")
+opening_area = build_level(opening, "Area Code")
+opening_supervisor = build_level(opening, "Supervisor Code")
 
 # =========================
 # FINAL OUTPUT
 # =========================
-st.subheader("📌 Opening - Rep Level")
+st.subheader("📌 Rep Level")
 st.dataframe(opening_rep)
+
+st.subheader("📌 Manager Level")
+st.dataframe(opening_manager)
+
+st.subheader("📌 Area Level")
+st.dataframe(opening_area)
+
+st.subheader("📌 Supervisor Level")
+st.dataframe(opening_supervisor)
