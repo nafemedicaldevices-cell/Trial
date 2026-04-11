@@ -262,14 +262,14 @@ opening = build_opening_pipeline(data["opening"], data["codes"])
 # 📊 UI
 # =========================
 st.header("📊 TARGET KPI")
-st.dataframe(rep["value_table"])
+st.dataframe(rep["value_table"], use_container_width=True)
 
 st.header("💰 SALES KPI")
-st.dataframe(sales["rep_value"])
+st.dataframe(sales["rep_value"], use_container_width=True)
 
 st.header("⏰ OVERDUE KPI")
-st.dataframe(overdue["rep"])
+st.dataframe(overdue["rep"], use_container_width=True)
 
 st.header("🏦 OPENING KPI")
-st.dataframe(opening["rep"])
+st.dataframe(opening["rep"], use_container_width=True)
 ```
