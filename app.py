@@ -1,167 +1,136 @@
-import streamlit as st
-import pandas as pd
-
-st.set_page_config(layout="wide")
-st.title("📊 Overdue KPI - Clean Levels")
-
 # =========================
-# LOAD DATA
+# COLUMN STANDARDIZATION
 # =========================
-overdue = pd.read_excel("Overdue.xlsx")
-codes = pd.read_excel("Code.xlsx")
+opening = opening.copy()
 
-# =========================
-# BASIC CLEANING
-# =========================
-overdue = overdue.iloc[:, :9].copy()
-
-overdue.columns = [
-    "Client Name",
-    "Client Code",
-    "15 Days",
-    "30 Days",
-    "60 Days",
-    "90 Days",
-    "120 Days",
-    "More Than 120 Days",
-    "Balance"
+opening.columns = [
+    'Branch',"Evak",'Opening Balance','Total Sales After Invoice Discounts',
+    'Returns','Sales Value Before Extra Discounts',
+    'Cash Collection','Collection Checks',
+    'Returned Chick','Collection Returned Chick',
+    "Extra Discounts",'Daienah','End Balance'
 ]
 
 # =========================
-# NUMERIC
+# FIX DTYPE
 # =========================
-num_cols = [
-    "15 Days","30 Days","60 Days","90 Days",
-    "120 Days","More Than 120 Days","Balance"
-]
-
-for col in num_cols:
-    overdue[col] = pd.to_numeric(overdue[col], errors="coerce").fillna(0)
+opening['Rep Code'] = pd.Series(dtype='object')
+opening['Old Rep Name'] = pd.Series(dtype='object')
 
 # =========================
-# KPI
+# 🔥 EXTRACT REP INFO (قبل الفلترة)
 # =========================
-overdue["Overdue"] = overdue["120 Days"] + overdue["More Than 120 Days"]
+mask = opening['Branch'].astype(str).str.strip().eq("كود المندوب")
+
+opening.loc[mask, 'Rep Code'] = opening.loc[mask, 'Opening Balance'].astype('object')
+opening.loc[mask, 'Old Rep Name'] = opening.loc[mask, 'Total Sales After Invoice Discounts'].astype('object')
+
+opening[['Rep Code','Old Rep Name']] = opening[['Rep Code','Old Rep Name']].ffill()
 
 # =========================
-# 🔥 REP EXTRACTION (قبل الحذف)
+# 🔥 FILTER VALID ROWS (بعد الاستخراج)
 # =========================
-overdue["Rep Code"] = pd.NA
-
-mask = overdue["Client Name"].astype(str).str.strip().eq("كود المندوب")
-overdue.loc[mask, "Rep Code"] = overdue.loc[mask, "Client Code"]
-
-overdue["Rep Code"] = overdue["Rep Code"].ffill()
-
-# =========================
-# 🔥 FILTER VALID ROWS (بعد استخراج الريپ)
-# =========================
-overdue = overdue[
-    overdue['Client Name'].notna() &
-    (overdue['Client Name'].astype(str).str.strip() != '') &
-    (~overdue['Client Name'].astype(str).str.contains(
-        'اجمالــــــي التقرير|اجمالى الفرع/المندوب|كود الفرع|كود المندوب|اسم العميل',
+opening = opening[
+    opening['Branch'].notna() &
+    (opening['Branch'].astype(str).str.strip() != '') &
+    (~opening['Branch'].astype(str).str.contains(
+        'نسبة المندوب|كود المندوب|اجماليات|كود الفرع',
         na=False
     ))
 ].copy()
 
 # =========================
-# CLEAN CODES
+# NUMERIC CONVERSION
 # =========================
-codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce").astype("Int64")
-overdue["Rep Code"] = pd.to_numeric(overdue["Rep Code"], errors="coerce").astype("Int64")
+num_cols = [
+    'Opening Balance','Total Sales After Invoice Discounts','Returns',
+    'Sales Value Before Extra Discounts',
+    'Cash Collection','Collection Checks',
+    'Returned Chick','Collection Returned Chick',
+    'Extra Discounts','Daienah','End Balance'
+]
 
-overdue = overdue.merge(codes, on="Rep Code", how="left")
-
-# =========================
-# 🔎 FILTERS (UI)
-# =========================
-st.sidebar.header("🔎 Filters")
-
-rep_list = sorted(overdue["Rep Code"].dropna().unique())
-manager_list = sorted(overdue["Manager Code"].dropna().unique())
-area_list = sorted(overdue["Area Code"].dropna().unique())
-supervisor_list = sorted(overdue["Supervisor Code"].dropna().unique())
-
-selected_rep = st.sidebar.selectbox("Rep", ["All"] + list(rep_list))
-selected_manager = st.sidebar.selectbox("Manager", ["All"] + list(manager_list))
-selected_area = st.sidebar.selectbox("Area", ["All"] + list(area_list))
-selected_supervisor = st.sidebar.selectbox("Supervisor", ["All"] + list(supervisor_list))
+for col in num_cols:
+    opening[col] = pd.to_numeric(opening[col], errors='coerce').fillna(0)
 
 # =========================
-# APPLY FILTERS
+# KPI CALCULATIONS
 # =========================
-filtered_df = overdue.copy()
+opening['Total Collection'] = opening['Cash Collection'] + opening['Collection Checks']
 
-if selected_rep != "All":
-    filtered_df = filtered_df[filtered_df["Rep Code"] == selected_rep]
-
-if selected_manager != "All":
-    filtered_df = filtered_df[filtered_df["Manager Code"] == selected_manager]
-
-if selected_area != "All":
-    filtered_df = filtered_df[filtered_df["Area Code"] == selected_area]
-
-if selected_supervisor != "All":
-    filtered_df = filtered_df[filtered_df["Supervisor Code"] == selected_supervisor]
+opening['Sales After Returns'] = (
+    opening['Total Sales After Invoice Discounts'] - opening['Returns']
+)
 
 # =========================
-# FUNCTION (🔥 Clean Details)
+# CLEAN REP CODE (🔥 مهم)
 # =========================
-def build_level(df, level_code):
-    clean_df = df[
-        df["Client Code"].notna() &
-        (df["Client Code"] != 0)
-    ].copy()
+opening['Rep Code'] = pd.to_numeric(opening['Rep Code'], errors='coerce').astype('Int64')
 
-    # DETAILS
-    details = clean_df[[level_code, "Client Code", "Overdue"]]
+# =========================
+# MERGE CODES
+# =========================
+codes['Rep Code'] = pd.to_numeric(codes['Rep Code'], errors='coerce').astype('Int64')
 
-    # SUMMARY
-    summary = (
-        clean_df.groupby(level_code)["Overdue"]
+opening = opening.merge(codes, on='Rep Code', how='left')
+
+# =========================
+# 🔥 SAFE CLEAN قبل الجروب
+# =========================
+opening_clean = opening[
+    opening['Rep Code'].notna()
+].copy()
+
+# =========================
+# SAFE GROUP ENGINE
+# =========================
+def safe_group(df, group_cols, sum_cols):
+    group_cols = [c for c in group_cols if c in df.columns]
+    sum_cols = [c for c in sum_cols if c in df.columns]
+
+    return (
+        df.groupby(group_cols, as_index=False)[sum_cols]
         .sum()
-        .reset_index()
     )
 
-    return summary, details
+# =========================
+# GROUP CONFIG
+# =========================
+OPENING_GROUPS = {
+    "rep_value": {
+        "group": ["Rep Code"],
+        "sum": ["Opening Balance","Cash Collection","Collection Checks","Extra Discounts","End Balance"]
+    },
+    "manager_value": {
+        "group": ["Manager Code"],
+        "sum": ["Opening Balance","Cash Collection","Collection Checks","Extra Discounts","End Balance"]
+    },
+    "area_value": {
+        "group": ["Area Code"],
+        "sum": ["Opening Balance","Cash Collection","Collection Checks","Extra Discounts","End Balance"]
+    },
+    "supervisor_value": {
+        "group": ["Supervisor Code"],
+        "sum": ["Opening Balance","Cash Collection","Collection Checks","Extra Discounts","End Balance"]
+    }
+}
 
 # =========================
-# LEVELS
+# RUN ALL GROUPS
 # =========================
-rep_summary, rep_details = build_level(filtered_df, "Rep Code")
-manager_summary, manager_details = build_level(filtered_df, "Manager Code")
-area_summary, area_details = build_level(filtered_df, "Area Code")
-supervisor_summary, supervisor_details = build_level(filtered_df, "Supervisor Code")
+opening_results = {}
+
+for name, cfg in OPENING_GROUPS.items():
+    opening_results[name] = safe_group(
+        opening_clean,
+        cfg["group"],
+        cfg["sum"]
+    )
 
 # =========================
-# UI
+# OUTPUTS
 # =========================
-
-# REP
-st.subheader("📌 Rep Summary")
-st.dataframe(rep_summary)
-
-st.subheader("📌 Rep Details")
-st.dataframe(rep_details)
-
-# MANAGER
-st.subheader("📌 Manager Summary")
-st.dataframe(manager_summary)
-
-st.subheader("📌 Manager Details")
-st.dataframe(manager_details)
-
-# AREA
-st.subheader("📌 Area Summary")
-st.dataframe(area_summary)
-
-st.subheader("📌 Area Details")
-st.dataframe(area_details)
-
-# SUPERVISOR
-st.subheader("📌 Supervisor Summary")
-st.dataframe(supervisor_summary)
-
-st.subheader("📌 Supervisor Details")
-st.dataframe(supervisor_details)
+opening_rep_value = opening_results["rep_value"]
+opening_manager_value = opening_results["manager_value"]
+opening_area_value = opening_results["area_value"]
+opening_supervisor_value = opening_results["supervisor_value"]
