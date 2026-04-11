@@ -3,10 +3,10 @@ import pandas as pd
 import numpy as np
 
 # =========================
-# 🎨 APP SETUP
+# 🎨 SETUP
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 Unified KPI Dashboard (FINAL FIXED VERSION)")
+st.title("📊 Smart Unified KPI Dashboard (AUTO FIX VERSION)")
 
 
 # =========================
@@ -25,15 +25,13 @@ def load_data():
         "target_manager": pd.read_excel("Target Manager.xlsx"),
         "target_area": pd.read_excel("Target Area.xlsx"),
         "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
-        "target_evak": pd.read_excel("Target Evak.xlsx"),
     }
-
 
 data = load_data()
 
 
 # =========================
-# 🧠 HELPERS
+# 🧠 HELPERS (SMART CORE)
 # =========================
 def to_numeric(df, cols):
     for c in cols:
@@ -63,20 +61,29 @@ def find_col(df, options):
 
 
 # =========================
-# 🚀 SALES PIPELINE
+# 🚀 SALES PIPELINE (AUTO FIX)
 # =========================
 def sales_pipeline(sales, mapping, codes):
 
     sales = sales.copy()
     sales.columns = sales.columns.str.strip()
 
-    unit_col = find_col(sales, ["Sales Unit Before Edit", "Sales Unit", "Units", "Qty"])
-    return_col = find_col(sales, ["Returns Unit Before Edit", "Returns Unit", "Returns"])
-    price_col = find_col(sales, ["Sales Price", "Price", "Unit Price"])
+    unit_col = find_col(sales, [
+        "Sales Unit Before Edit","Sales Unit","Units","Qty",
+        "Sales Qty","Quantity"
+    ])
+
+    return_col = find_col(sales, [
+        "Returns Unit Before Edit","Returns Unit","Returns","Return Qty"
+    ])
+
+    price_col = find_col(sales, [
+        "Sales Price","Price","Unit Price","Price Value"
+    ])
 
     if unit_col is None or price_col is None:
-        st.error("❌ Missing Sales columns")
-        st.write(sales.columns)
+        st.error("❌ Sales columns not found")
+        st.write("Available columns:", sales.columns.tolist())
         return {}
 
     for c in [unit_col, return_col, price_col]:
@@ -89,24 +96,19 @@ def sales_pipeline(sales, mapping, codes):
     sales["Returns Value"] = sales[return_col] * sales[price_col] if return_col else 0
     sales["Net Sales"] = sales["Total Sales Value"] - sales["Returns Value"]
 
-    result = {
-        "rep": sales.groupby("Rep Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index()
+    return {
+        "rep": sales.groupby("Rep Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index(),
+        "manager": sales.groupby("Manager Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index()
+        if "Manager Code" in sales.columns else pd.DataFrame(),
+        "area": sales.groupby("Area Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index()
+        if "Area Code" in sales.columns else pd.DataFrame(),
+        "supervisor": sales.groupby("Supervisor Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index()
+        if "Supervisor Code" in sales.columns else pd.DataFrame(),
     }
-
-    if "Manager Code" in sales.columns:
-        result["manager"] = sales.groupby("Manager Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index()
-
-    if "Area Code" in sales.columns:
-        result["area"] = sales.groupby("Area Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index()
-
-    if "Supervisor Code" in sales.columns:
-        result["supervisor"] = sales.groupby("Supervisor Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index()
-
-    return result
 
 
 # =========================
-# ⚠️ OVERDUE PIPELINE (FIXED)
+# ⚠️ OVERDUE PIPELINE (SAFE)
 # =========================
 def overdue_pipeline(df, codes):
 
@@ -148,7 +150,7 @@ def overdue_pipeline(df, codes):
 
 
 # =========================
-# 🏦 OPENING PIPELINE (FIXED GROUPBY)
+# 🏦 OPENING PIPELINE (FULL SAFE FIX)
 # =========================
 def opening_pipeline(df, codes):
 
@@ -219,7 +221,7 @@ def target_pipeline(df, id_col, mapping):
 
 
 # =========================
-# 🚀 RUN PIPELINES
+# 🚀 RUN ALL
 # =========================
 sales = sales_pipeline(data["sales"], data["mapping"], data["codes"])
 overdue = overdue_pipeline(data["overdue"], data["codes"])
