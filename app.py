@@ -3,10 +3,10 @@ import pandas as pd
 import numpy as np
 
 # =========================
-# 🎨 PAGE SETUP
+# 🎨 SETUP
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 Unified KPI Dashboard (Clean & Safe)")
+st.title("📊 Unified KPI Dashboard (Stable Version)")
 
 
 # =========================
@@ -33,7 +33,7 @@ data = load_data()
 
 
 # =========================
-# 🧠 HELPERS (SAFE CORE)
+# 🧠 HELPERS
 # =========================
 def to_numeric(df, cols):
     for c in cols:
@@ -55,9 +55,6 @@ def merge_codes(df, codes, key):
     return df.merge(codes, on=key, how="left")
 
 
-# =========================
-# 🔍 AUTO COLUMN FINDER
-# =========================
 def find_col(df, options):
     for c in options:
         if c in df.columns:
@@ -66,7 +63,7 @@ def find_col(df, options):
 
 
 # =========================
-# 🚀 SALES PIPELINE (FIXED)
+# 🚀 SALES PIPELINE
 # =========================
 def sales_pipeline(sales, mapping, codes):
 
@@ -78,7 +75,7 @@ def sales_pipeline(sales, mapping, codes):
     price_col = find_col(sales, ["Sales Price", "Price", "Unit Price"])
 
     if unit_col is None or price_col is None:
-        st.error("❌ Missing Sales required columns")
+        st.error("❌ Missing Sales columns")
         st.write(sales.columns)
         return {}
 
@@ -109,7 +106,7 @@ def sales_pipeline(sales, mapping, codes):
 
 
 # =========================
-# ⚠️ OVERDUE PIPELINE
+# ⚠️ OVERDUE PIPELINE (FIXED COMPLETELY)
 # =========================
 def overdue_pipeline(df, codes):
 
@@ -120,17 +117,38 @@ def overdue_pipeline(df, codes):
         "Client Name","Client Code","15","30","60","90","120","120+","Balance"
     ]
 
-    to_numeric(df, ["120","120+","Balance"])
+    # numeric
+    for c in ["120","120+","Balance"]:
+        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
     df["Overdue"] = df["120"] + df["120+"]
 
+    # SAFE REP EXTRACTION
+    df["Rep Code"] = pd.NA
+
+    mask = df["Client Name"].astype(str).str.strip().eq("كود المندوب")
+
+    if mask.any():
+        df.loc[mask, "Rep Code"] = df.loc[mask, "Client Code"]
+        df["Rep Code"] = df["Rep Code"].ffill()
+
     df = merge_codes(df, codes, "Rep Code")
+
+    # SAFETY FALLBACK
+    if "Rep Code" not in df.columns:
+        df["Rep Code"] = "Unknown"
 
     return {
         "rep": df.groupby("Rep Code")["Overdue"].sum().reset_index(),
-        "manager": df.groupby("Manager Code")["Overdue"].sum().reset_index() if "Manager Code" in df.columns else pd.DataFrame(),
-        "area": df.groupby("Area Code")["Overdue"].sum().reset_index() if "Area Code" in df.columns else pd.DataFrame(),
-        "supervisor": df.groupby("Supervisor Code")["Overdue"].sum().reset_index() if "Supervisor Code" in df.columns else pd.DataFrame(),
+
+        "manager": df.groupby("Manager Code")["Overdue"].sum().reset_index()
+        if "Manager Code" in df.columns else pd.DataFrame(),
+
+        "area": df.groupby("Area Code")["Overdue"].sum().reset_index()
+        if "Area Code" in df.columns else pd.DataFrame(),
+
+        "supervisor": df.groupby("Supervisor Code")["Overdue"].sum().reset_index()
+        if "Supervisor Code" in df.columns else pd.DataFrame(),
     }
 
 
@@ -148,7 +166,7 @@ def opening_pipeline(df, codes):
         "Extra Discounts",'Daienah','End Balance'
     ]
 
-    to_numeric(df, [
+    df = to_numeric(df, [
         'Opening Balance','Sales After Invoice Discounts','Returns',
         'Cash Collection','Collection Checks','End Balance'
     ])
@@ -159,9 +177,12 @@ def opening_pipeline(df, codes):
 
     return {
         "rep": df.groupby("Rep Code")[["Opening Balance","Total Collection","End Balance"]].sum().reset_index(),
-        "manager": df.groupby("Manager Code")[["Opening Balance","Total Collection","End Balance"]].sum().reset_index() if "Manager Code" in df.columns else pd.DataFrame(),
-        "area": df.groupby("Area Code")[["Opening Balance","Total Collection","End Balance"]].sum().reset_index() if "Area Code" in df.columns else pd.DataFrame(),
-        "supervisor": df.groupby("Supervisor Code")[["Opening Balance","Total Collection","End Balance"]].sum().reset_index() if "Supervisor Code" in df.columns else pd.DataFrame(),
+        "manager": df.groupby("Manager Code")[["Opening Balance","Total Collection","End Balance"]].sum().reset_index()
+        if "Manager Code" in df.columns else pd.DataFrame(),
+        "area": df.groupby("Area Code")[["Opening Balance","Total Collection","End Balance"]].sum().reset_index()
+        if "Area Code" in df.columns else pd.DataFrame(),
+        "supervisor": df.groupby("Supervisor Code")[["Opening Balance","Total Collection","End Balance"]].sum().reset_index()
+        if "Supervisor Code" in df.columns else pd.DataFrame(),
     }
 
 
@@ -195,7 +216,7 @@ def target_pipeline(df, id_col, mapping):
 
 
 # =========================
-# 🚀 RUN ALL PIPELINES
+# 🚀 RUN PIPELINES
 # =========================
 sales = sales_pipeline(data["sales"], data["mapping"], data["codes"])
 overdue = overdue_pipeline(data["overdue"], data["codes"])
@@ -209,7 +230,7 @@ targets = {
 
 
 # =========================
-# 🎯 UI (TABS)
+# 🎯 UI
 # =========================
 tab1, tab2, tab3, tab4 = st.tabs(["💰 Sales", "⚠️ Overdue", "🏦 Opening", "🎯 Targets"])
 
@@ -217,13 +238,10 @@ tab1, tab2, tab3, tab4 = st.tabs(["💰 Sales", "⚠️ Overdue", "🏦 Opening"
 with tab1:
     st.subheader("Rep")
     st.dataframe(sales.get("rep", pd.DataFrame()), use_container_width=True)
-
     st.subheader("Manager")
     st.dataframe(sales.get("manager", pd.DataFrame()), use_container_width=True)
-
     st.subheader("Area")
     st.dataframe(sales.get("area", pd.DataFrame()), use_container_width=True)
-
     st.subheader("Supervisor")
     st.dataframe(sales.get("supervisor", pd.DataFrame()), use_container_width=True)
 
