@@ -44,7 +44,7 @@ for col in num_cols:
 overdue["Overdue"] = overdue["120 Days"] + overdue["More Than 120 Days"]
 
 # =========================
-# REP EXTRACTION
+# 🔥 REP EXTRACTION (قبل الحذف)
 # =========================
 overdue["Rep Code"] = pd.NA
 
@@ -52,6 +52,18 @@ mask = overdue["Client Name"].astype(str).str.strip().eq("كود المندوب"
 overdue.loc[mask, "Rep Code"] = overdue.loc[mask, "Client Code"]
 
 overdue["Rep Code"] = overdue["Rep Code"].ffill()
+
+# =========================
+# 🔥 FILTER VALID ROWS (بعد استخراج الريپ)
+# =========================
+overdue = overdue[
+    overdue['Client Name'].notna() &
+    (overdue['Client Name'].astype(str).str.strip() != '') &
+    (~overdue['Client Name'].astype(str).str.contains(
+        'اجمالــــــي التقرير|اجمالى الفرع/المندوب|كود الفرع|كود المندوب|اسم العميل',
+        na=False
+    ))
+].copy()
 
 # =========================
 # CLEAN CODES
@@ -62,7 +74,7 @@ overdue["Rep Code"] = pd.to_numeric(overdue["Rep Code"], errors="coerce").astype
 overdue = overdue.merge(codes, on="Rep Code", how="left")
 
 # =========================
-# 🔎 FILTERS
+# 🔎 FILTERS (UI)
 # =========================
 st.sidebar.header("🔎 Filters")
 
@@ -94,23 +106,28 @@ if selected_supervisor != "All":
     filtered_df = filtered_df[filtered_df["Supervisor Code"] == selected_supervisor]
 
 # =========================
-# FUNCTION
+# FUNCTION (🔥 Clean Details)
 # =========================
 def build_level(df, level_code):
-    # DETAILS (متأثرة بالفلترة)
-    details = df[[level_code, "Client Code", "Overdue"]].copy()
-    
+    clean_df = df[
+        df["Client Code"].notna() &
+        (df["Client Code"] != 0)
+    ].copy()
+
+    # DETAILS
+    details = clean_df[[level_code, "Client Code", "Overdue"]]
+
     # SUMMARY
     summary = (
-        df.groupby(level_code)["Overdue"]
+        clean_df.groupby(level_code)["Overdue"]
         .sum()
         .reset_index()
     )
-    
+
     return summary, details
 
 # =========================
-# LEVELS (باستخدام filtered_df)
+# LEVELS
 # =========================
 rep_summary, rep_details = build_level(filtered_df, "Rep Code")
 manager_summary, manager_details = build_level(filtered_df, "Manager Code")
