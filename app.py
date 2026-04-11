@@ -19,7 +19,9 @@ def load_data():
         "target_area": pd.read_excel("Target Area.xlsx"),
         "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
         "target_evak": pd.read_excel("Target Evak.xlsx"),
+
         "sales": pd.read_excel("Sales.xlsx", header=None),
+
         "mapping": pd.read_excel("Mapping.xlsx"),
         "codes": pd.read_excel("Code.xlsx"),
     }
@@ -104,7 +106,7 @@ def build_target_pipeline(df, id_name, mapping):
 
 
 # =========================
-# 🚀 SALES PIPELINE
+# 🚀 SALES PIPELINE (ALL LEVELS)
 # =========================
 def build_sales_pipeline(sales, codes):
 
@@ -113,6 +115,7 @@ def build_sales_pipeline(sales, codes):
     sales.columns = sales.columns.str.strip()
     codes.columns = codes.columns.str.strip()
 
+    # 🔢 numeric clean
     for col in [
         "Sales Unit Before Edit",
         "Returns Unit Before Edit",
@@ -121,23 +124,40 @@ def build_sales_pipeline(sales, codes):
     ]:
         sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
 
+    # 🆔 ids
     sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
     codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
 
+    # 🔗 merge
     sales = sales.merge(codes, on="Rep Code", how="inner")
 
     if sales.empty:
         st.error("❌ مفيش تطابق بين Sales و Code")
-        return {"rep": pd.DataFrame()}
+        return {
+            "rep": pd.DataFrame(),
+            "manager": pd.DataFrame(),
+            "area": pd.DataFrame(),
+            "supervisor": pd.DataFrame()
+        }
 
+    # 💰 calculations
     sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
     sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
     sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
 
-    return {
-        "rep": sales.groupby("Rep Code", as_index=False)[
+    # 📊 group function
+    def group(df, col):
+        if col not in df.columns:
+            return pd.DataFrame()
+        return df.groupby(col, as_index=False)[
             ["Total Sales Value", "Returns Value", "Sales After Returns"]
         ].sum()
+
+    return {
+        "rep": group(sales, "Rep Code"),
+        "manager": group(sales, "Manager Code"),
+        "area": group(sales, "Area Code"),
+        "supervisor": group(sales, "Supervisor Code")
     }
 
 
@@ -149,15 +169,25 @@ st.title("📊 Unified KPI System")
 
 data = load_data()
 
-# TARGET
-st.header("🎯 TARGET")
+# =========================
+# 🎯 TARGET SECTION
+# =========================
+st.header("🎯 TARGET KPI")
+
 st.dataframe(build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"]))
 st.dataframe(build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"]))
 st.dataframe(build_target_pipeline(data["target_area"], "Area Code", data["mapping"]))
 st.dataframe(build_target_pipeline(data["target_supervisor"], "Supervisor Code", data["mapping"]))
 st.dataframe(build_target_pipeline(data["target_evak"], "Evak Code", data["mapping"]))
 
-# SALES
-st.header("💰 SALES")
+# =========================
+# 💰 SALES SECTION
+# =========================
+st.header("💰 SALES KPI")
+
 sales = build_sales_pipeline(data["sales"], data["codes"])
+
 st.dataframe(sales["rep"], use_container_width=True)
+st.dataframe(sales["manager"], use_container_width=True)
+st.dataframe(sales["area"], use_container_width=True)
+st.dataframe(sales["supervisor"], use_container_width=True)
