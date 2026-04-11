@@ -62,10 +62,42 @@ overdue["Rep Code"] = pd.to_numeric(overdue["Rep Code"], errors="coerce").astype
 overdue = overdue.merge(codes, on="Rep Code", how="left")
 
 # =========================
+# 🔎 FILTERS
+# =========================
+st.sidebar.header("🔎 Filters")
+
+rep_list = sorted(overdue["Rep Code"].dropna().unique())
+manager_list = sorted(overdue["Manager Code"].dropna().unique())
+area_list = sorted(overdue["Area Code"].dropna().unique())
+supervisor_list = sorted(overdue["Supervisor Code"].dropna().unique())
+
+selected_rep = st.sidebar.selectbox("Rep", ["All"] + list(rep_list))
+selected_manager = st.sidebar.selectbox("Manager", ["All"] + list(manager_list))
+selected_area = st.sidebar.selectbox("Area", ["All"] + list(area_list))
+selected_supervisor = st.sidebar.selectbox("Supervisor", ["All"] + list(supervisor_list))
+
+# =========================
+# APPLY FILTERS
+# =========================
+filtered_df = overdue.copy()
+
+if selected_rep != "All":
+    filtered_df = filtered_df[filtered_df["Rep Code"] == selected_rep]
+
+if selected_manager != "All":
+    filtered_df = filtered_df[filtered_df["Manager Code"] == selected_manager]
+
+if selected_area != "All":
+    filtered_df = filtered_df[filtered_df["Area Code"] == selected_area]
+
+if selected_supervisor != "All":
+    filtered_df = filtered_df[filtered_df["Supervisor Code"] == selected_supervisor]
+
+# =========================
 # FUNCTION
 # =========================
 def build_level(df, level_code):
-    # DETAILS
+    # DETAILS (متأثرة بالفلترة)
     details = df[[level_code, "Client Code", "Overdue"]].copy()
     
     # SUMMARY
@@ -78,12 +110,12 @@ def build_level(df, level_code):
     return summary, details
 
 # =========================
-# LEVELS
+# LEVELS (باستخدام filtered_df)
 # =========================
-rep_summary, rep_details = build_level(overdue, "Rep Code")
-manager_summary, manager_details = build_level(overdue, "Manager Code")
-area_summary, area_details = build_level(overdue, "Area Code")
-supervisor_summary, supervisor_details = build_level(overdue, "Supervisor Code")
+rep_summary, rep_details = build_level(filtered_df, "Rep Code")
+manager_summary, manager_details = build_level(filtered_df, "Manager Code")
+area_summary, area_details = build_level(filtered_df, "Area Code")
+supervisor_summary, supervisor_details = build_level(filtered_df, "Supervisor Code")
 
 # =========================
 # UI
