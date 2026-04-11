@@ -6,20 +6,36 @@ import numpy as np
 # 🎨 APP SETUP
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 Unified KPI Dashboard (ULTIMATE AUTO FIX)")
+st.title("📊 Unified KPI Dashboard (ULTIMATE ROBUST VERSION)")
 
 
 # =========================
-# 📥 SMART EXCEL READER (IMPORTANT FIX)
+# 🧠 ULTRA SMART EXCEL READER
 # =========================
 def smart_read(file):
-    df = pd.read_excel(file)
+    # اقرأ بدون افتراض headers
+    raw = pd.read_excel(file, header=None)
 
-    # لو الأعمدة Unnamed → جرب header مختلف
-    if all("Unnamed" in str(c) for c in df.columns):
-        df = pd.read_excel(file, header=1)
+    # امسح الصفوف الفاضية
+    raw = raw.dropna(how="all")
 
-    # تنظيف أسماء الأعمدة
+    # حاول تلاقي صف الهيدر الحقيقي
+    header_row = None
+
+    for i in range(min(15, len(raw))):
+        row = raw.iloc[i].astype(str)
+
+        if (
+            row.str.contains("كود|عميل|صنف|سعر|qty|sales|return", case=False).any()
+        ):
+            header_row = i
+            break
+
+    if header_row is not None:
+        df = pd.read_excel(file, header=header_row)
+    else:
+        df = pd.read_excel(file)
+
     df.columns = df.columns.astype(str).str.strip()
 
     return df
@@ -47,7 +63,7 @@ data = load_data()
 
 
 # =========================
-# 🧠 HELPERS
+# HELPERS
 # =========================
 def to_numeric(df, cols):
     for c in cols:
@@ -56,10 +72,16 @@ def to_numeric(df, cols):
     return df
 
 
-def merge_codes(df, codes, key):
-    df = df.copy()
-    codes = codes.copy()
+def find_col(df, keywords):
+    for col in df.columns:
+        col_str = str(col).lower()
+        for k in keywords:
+            if k.lower() in col_str:
+                return col
+    return None
 
+
+def merge_codes(df, codes, key):
     if key not in df.columns:
         df[key] = pd.NA
 
@@ -69,54 +91,45 @@ def merge_codes(df, codes, key):
     return df.merge(codes, on=key, how="left")
 
 
-def find_col(df, options):
-    for c in options:
-        if c in df.columns:
-            return c
-    return None
-
-
 # =========================
-# 🚀 SALES PIPELINE (AUTO SAFE)
+# 🚀 SALES PIPELINE (AUTO FIX FINAL)
 # =========================
 def sales_pipeline(sales, mapping, codes):
 
     sales = sales.copy()
 
-    unit_col = find_col(sales, [
-        "Sales Unit Before Edit","Sales Unit","Units","Qty","Sales Qty"
-    ])
-
-    return_col = find_col(sales, [
-        "Returns Unit Before Edit","Returns Unit","Returns"
-    ])
-
-    price_col = find_col(sales, [
-        "Sales Price","Price","Unit Price"
-    ])
+    # 🔥 detect ANY structure (Arabic / English)
+    unit_col = find_col(sales, ["unit","qty","quantity","كمية","عدد"])
+    price_col = find_col(sales, ["price","سعر","value","unit price"])
+    return_col = find_col(sales, ["return","مرتجع","returns"])
 
     if unit_col is None or price_col is None:
-        st.error("❌ Sales structure not detected")
+        st.error("❌ Cannot detect Sales structure")
         st.write("Columns:", sales.columns.tolist())
         return {}
 
-    for c in [unit_col, return_col, price_col]:
-        if c:
-            sales[c] = pd.to_numeric(sales[c], errors="coerce").fillna(0)
+    sales[unit_col] = pd.to_numeric(sales[unit_col], errors="coerce").fillna(0)
+    sales[price_col] = pd.to_numeric(sales[price_col], errors="coerce").fillna(0)
+
+    if return_col:
+        sales[return_col] = pd.to_numeric(sales[return_col], errors="coerce").fillna(0)
+    else:
+        sales["__return__"] = 0
+        return_col = "__return__"
 
     sales = merge_codes(sales, codes, "Rep Code")
 
-    sales["Total Sales Value"] = sales[unit_col] * sales[price_col]
-    sales["Returns Value"] = sales[return_col] * sales[price_col] if return_col else 0
-    sales["Net Sales"] = sales["Total Sales Value"] - sales["Returns Value"]
+    sales["Total Sales"] = sales[unit_col] * sales[price_col]
+    sales["Returns"] = sales[return_col] * sales[price_col]
+    sales["Net Sales"] = sales["Total Sales"] - sales["Returns"]
 
     return {
-        "rep": sales.groupby("Rep Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index(),
-        "manager": sales.groupby("Manager Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index()
+        "rep": sales.groupby("Rep Code")[["Total Sales","Returns","Net Sales"]].sum().reset_index(),
+        "manager": sales.groupby("Manager Code")[["Total Sales","Returns","Net Sales"]].sum().reset_index()
         if "Manager Code" in sales.columns else pd.DataFrame(),
-        "area": sales.groupby("Area Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index()
+        "area": sales.groupby("Area Code")[["Total Sales","Returns","Net Sales"]].sum().reset_index()
         if "Area Code" in sales.columns else pd.DataFrame(),
-        "supervisor": sales.groupby("Supervisor Code")[["Total Sales Value","Returns Value","Net Sales"]].sum().reset_index()
+        "supervisor": sales.groupby("Supervisor Code")[["Total Sales","Returns","Net Sales"]].sum().reset_index()
         if "Supervisor Code" in sales.columns else pd.DataFrame(),
     }
 
@@ -139,7 +152,7 @@ def overdue_pipeline(df, codes):
     df["Overdue"] = df["120"] + df["120+"]
 
     df["Rep Code"] = pd.NA
-    mask = df["Client Name"].astype(str).str.strip().eq("كود المندوب")
+    mask = df["Client Name"].astype(str).str.contains("كود المندوب", na=False)
 
     if mask.any():
         df.loc[mask, "Rep Code"] = df.loc[mask, "Client Code"]
@@ -235,7 +248,7 @@ def target_pipeline(df, id_col, mapping):
 
 
 # =========================
-# 🚀 RUN ALL PIPELINES
+# 🚀 RUN ALL
 # =========================
 sales = sales_pipeline(data["sales"], data["mapping"], data["codes"])
 overdue = overdue_pipeline(data["overdue"], data["codes"])
