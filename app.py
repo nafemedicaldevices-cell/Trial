@@ -22,6 +22,10 @@ def load_data():
         "sales": pd.read_excel("Sales.xlsx"),
         "mapping": pd.read_excel("Mapping.xlsx"),
         "codes": pd.read_excel("Code.xlsx"),
+        "overdue": pd.read_excel("Overdue.xlsx"),
+        "extra_discounts": pd.read_excel("Extradiscounts.xlsx"),
+        "opening": pd.read_excel("Opening.xlsx"),
+        "opening_detail": pd.read_excel("Opening Detail.xlsx"),
     }
 
 # =========================
