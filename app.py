@@ -6,7 +6,7 @@ import numpy as np
 # 🎨 APP SETUP
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 Unified KPI Dashboard (FINAL STABLE VERSION)")
+st.title("📊 Unified KPI Dashboard (FINAL FIXED VERSION)")
 
 
 # =========================
@@ -33,7 +33,7 @@ data = load_data()
 
 
 # =========================
-# 🧠 HELPERS (SAFE CORE)
+# 🧠 HELPERS
 # =========================
 def to_numeric(df, cols):
     for c in cols:
@@ -122,7 +122,6 @@ def overdue_pipeline(df, codes):
 
     df["Overdue"] = df["120"] + df["120+"]
 
-    # Rep extraction
     df["Rep Code"] = pd.NA
     mask = df["Client Name"].astype(str).str.strip().eq("كود المندوب")
 
@@ -135,16 +134,21 @@ def overdue_pipeline(df, codes):
     if "Rep Code" not in df.columns:
         df["Rep Code"] = "Unknown"
 
+    def safe_group(col):
+        if col not in df.columns:
+            return pd.DataFrame()
+        return df.groupby(col)["Overdue"].sum().reset_index()
+
     return {
-        "rep": df.groupby("Rep Code")["Overdue"].sum().reset_index(),
-        "manager": df.groupby("Manager Code")["Overdue"].sum().reset_index() if "Manager Code" in df.columns else pd.DataFrame(),
-        "area": df.groupby("Area Code")["Overdue"].sum().reset_index() if "Area Code" in df.columns else pd.DataFrame(),
-        "supervisor": df.groupby("Supervisor Code")["Overdue"].sum().reset_index() if "Supervisor Code" in df.columns else pd.DataFrame(),
+        "rep": safe_group("Rep Code"),
+        "manager": safe_group("Manager Code"),
+        "area": safe_group("Area Code"),
+        "supervisor": safe_group("Supervisor Code"),
     }
 
 
 # =========================
-# 🏦 OPENING PIPELINE (FIXED)
+# 🏦 OPENING PIPELINE (FIXED GROUPBY)
 # =========================
 def opening_pipeline(df, codes):
 
@@ -169,26 +173,20 @@ def opening_pipeline(df, codes):
     if "Rep Code" not in df.columns:
         df["Rep Code"] = "Unknown"
 
-    result = {
-        "rep": df.groupby("Rep Code")[["Opening Balance","Total Collection","End Balance"]].sum().reset_index()
+    def safe_group(col):
+        if col not in df.columns:
+            return pd.DataFrame()
+
+        return df.groupby(col)[
+            ["Opening Balance","Total Collection","End Balance"]
+        ].sum().reset_index()
+
+    return {
+        "rep": safe_group("Rep Code"),
+        "manager": safe_group("Manager Code"),
+        "area": safe_group("Area Code"),
+        "supervisor": safe_group("Supervisor Code"),
     }
-
-    if "Manager Code" in df.columns:
-        result["manager"] = df.groupby("Manager Code")[["Opening Balance","Total Collection","End Balance"]].sum().reset_index()
-    else:
-        result["manager"] = pd.DataFrame()
-
-    if "Area Code" in df.columns:
-        result["area"] = df.groupby("Area Code")[["Opening Balance","Total Collection","End Balance"]].reset_index()
-    else:
-        result["area"] = pd.DataFrame()
-
-    if "Supervisor Code" in df.columns:
-        result["supervisor"] = df.groupby("Supervisor Code")[["Opening Balance","Total Collection","End Balance"]].reset_index()
-    else:
-        result["supervisor"] = pd.DataFrame()
-
-    return result
 
 
 # =========================
@@ -221,7 +219,7 @@ def target_pipeline(df, id_col, mapping):
 
 
 # =========================
-# 🚀 RUN ALL
+# 🚀 RUN PIPELINES
 # =========================
 sales = sales_pipeline(data["sales"], data["mapping"], data["codes"])
 overdue = overdue_pipeline(data["overdue"], data["codes"])
