@@ -3,35 +3,51 @@ import pandas as pd
 import numpy as np
 
 # =========================
-# 🎨 SETUP
+# 🎨 APP SETUP
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 Smart Unified KPI Dashboard (AUTO FIX VERSION)")
+st.title("📊 Unified KPI Dashboard (ULTIMATE AUTO FIX)")
 
 
 # =========================
-# 📥 LOAD DATA
+# 📥 SMART EXCEL READER (IMPORTANT FIX)
+# =========================
+def smart_read(file):
+    df = pd.read_excel(file)
+
+    # لو الأعمدة Unnamed → جرب header مختلف
+    if all("Unnamed" in str(c) for c in df.columns):
+        df = pd.read_excel(file, header=1)
+
+    # تنظيف أسماء الأعمدة
+    df.columns = df.columns.astype(str).str.strip()
+
+    return df
+
+
+# =========================
+# LOAD DATA
 # =========================
 @st.cache_data
 def load_data():
     return {
-        "sales": pd.read_excel("Sales.xlsx"),
-        "overdue": pd.read_excel("Overdue.xlsx"),
-        "opening": pd.read_excel("Opening.xlsx"),
-        "mapping": pd.read_excel("Mapping.xlsx"),
-        "codes": pd.read_excel("Code.xlsx"),
+        "sales": smart_read("Sales.xlsx"),
+        "overdue": smart_read("Overdue.xlsx"),
+        "opening": smart_read("Opening.xlsx"),
+        "mapping": smart_read("Mapping.xlsx"),
+        "codes": smart_read("Code.xlsx"),
 
-        "target_rep": pd.read_excel("Target Rep.xlsx"),
-        "target_manager": pd.read_excel("Target Manager.xlsx"),
-        "target_area": pd.read_excel("Target Area.xlsx"),
-        "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
+        "target_rep": smart_read("Target Rep.xlsx"),
+        "target_manager": smart_read("Target Manager.xlsx"),
+        "target_area": smart_read("Target Area.xlsx"),
+        "target_supervisor": smart_read("Target Supervisor.xlsx"),
     }
 
 data = load_data()
 
 
 # =========================
-# 🧠 HELPERS (SMART CORE)
+# 🧠 HELPERS
 # =========================
 def to_numeric(df, cols):
     for c in cols:
@@ -61,29 +77,27 @@ def find_col(df, options):
 
 
 # =========================
-# 🚀 SALES PIPELINE (AUTO FIX)
+# 🚀 SALES PIPELINE (AUTO SAFE)
 # =========================
 def sales_pipeline(sales, mapping, codes):
 
     sales = sales.copy()
-    sales.columns = sales.columns.str.strip()
 
     unit_col = find_col(sales, [
-        "Sales Unit Before Edit","Sales Unit","Units","Qty",
-        "Sales Qty","Quantity"
+        "Sales Unit Before Edit","Sales Unit","Units","Qty","Sales Qty"
     ])
 
     return_col = find_col(sales, [
-        "Returns Unit Before Edit","Returns Unit","Returns","Return Qty"
+        "Returns Unit Before Edit","Returns Unit","Returns"
     ])
 
     price_col = find_col(sales, [
-        "Sales Price","Price","Unit Price","Price Value"
+        "Sales Price","Price","Unit Price"
     ])
 
     if unit_col is None or price_col is None:
-        st.error("❌ Sales columns not found")
-        st.write("Available columns:", sales.columns.tolist())
+        st.error("❌ Sales structure not detected")
+        st.write("Columns:", sales.columns.tolist())
         return {}
 
     for c in [unit_col, return_col, price_col]:
@@ -108,7 +122,7 @@ def sales_pipeline(sales, mapping, codes):
 
 
 # =========================
-# ⚠️ OVERDUE PIPELINE (SAFE)
+# ⚠️ OVERDUE PIPELINE
 # =========================
 def overdue_pipeline(df, codes):
 
@@ -150,7 +164,7 @@ def overdue_pipeline(df, codes):
 
 
 # =========================
-# 🏦 OPENING PIPELINE (FULL SAFE FIX)
+# 🏦 OPENING PIPELINE
 # =========================
 def opening_pipeline(df, codes):
 
@@ -197,7 +211,7 @@ def opening_pipeline(df, codes):
 def target_pipeline(df, id_col, mapping):
 
     df = df.copy()
-    df.columns = df.columns.str.strip()
+    df.columns = df.columns.astype(str).str.strip()
 
     fixed = [c for c in ["Year","Product Code","Product Name","Sales Price"] if c in df.columns]
     dyn = [c for c in df.columns if c not in fixed]
@@ -221,7 +235,7 @@ def target_pipeline(df, id_col, mapping):
 
 
 # =========================
-# 🚀 RUN ALL
+# 🚀 RUN ALL PIPELINES
 # =========================
 sales = sales_pipeline(data["sales"], data["mapping"], data["codes"])
 overdue = overdue_pipeline(data["overdue"], data["codes"])
