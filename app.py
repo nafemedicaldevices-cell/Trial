@@ -30,7 +30,7 @@ def load_data():
     }
 
 # =========================
-# 🚀 TARGET PIPELINE (FIXED PRODUCTS)
+# 🚀 TARGET PIPELINE
 # =========================
 def build_target_pipeline(df, id_name, mapping):
 
@@ -70,9 +70,6 @@ def build_target_pipeline(df, id_name, mapping):
     quarter = df.copy()
     ytd = df.copy()
 
-    # =========================
-    # VALUE KPI
-    # =========================
     def group(d):
         return d.groupby([id_name], as_index=False)["Value"].sum()
 
@@ -81,11 +78,7 @@ def build_target_pipeline(df, id_name, mapping):
     value_table["Quarter 📊"] = group(quarter)["Value"]
     value_table["YTD 📈"] = group(ytd)["Value"]
 
-    # =========================
-    # PRODUCTS KPI (FIXED SAFE)
-    # =========================
     def product_group(d):
-
         if "Product Name" not in d.columns:
             d["Product Name"] = "UNKNOWN"
 
@@ -106,7 +99,7 @@ def build_target_pipeline(df, id_name, mapping):
     }
 
 # =========================
-# 🚀 SALES PIPELINE (FIXED FINAL)
+# 🚀 SALES PIPELINE (100% SAFE FIX)
 # =========================
 def build_sales_pipeline(sales, mapping, codes):
 
@@ -114,50 +107,64 @@ def build_sales_pipeline(sales, mapping, codes):
     sales.columns = sales.columns.str.strip()
 
     # =========================
-    # CLEAN NUMERIC
+    # 🔎 AUTO COLUMN DETECTION
     # =========================
-    num_cols = [
-        'Sales Unit Before Edit',
-        'Returns Unit Before Edit',
-        'Sales Price',
-        'Invoice Discounts',
-        'Sales Value'
-    ]
+    def get_col(df, options):
+        for c in options:
+            if c in df.columns:
+                return c
+        return None
 
-    for col in num_cols:
-        if col in sales.columns:
-            sales[col] = pd.to_numeric(sales[col], errors='coerce').fillna(0)
+    sales_unit = get_col(sales, ["Sales Unit Before Edit", "Sales Unit", "Qty", "Quantity"])
+    returns_unit = get_col(sales, ["Returns Unit Before Edit", "Returns Unit"])
+    price = get_col(sales, ["Sales Price", "Price"])
 
-    # =========================
-    # FIX IDS
-    # =========================
-    if 'Rep Code' not in sales.columns:
-        sales['Rep Code'] = np.nan
-
-    sales['Rep Code'] = pd.to_numeric(sales['Rep Code'], errors='coerce')
-    codes['Rep Code'] = pd.to_numeric(codes['Rep Code'], errors='coerce')
+    if not sales_unit or not price:
+        st.error("Missing Sales Unit or Price columns in Sales file")
+        st.stop()
 
     # =========================
-    # MERGE CODES SAFELY
+    # 🔢 NUMERIC CLEAN
+    # =========================
+    for col in [sales_unit, returns_unit, price]:
+        if col and col in sales.columns:
+            sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
+
+    # =========================
+    # 🆔 IDS SAFE
+    # =========================
+    if "Rep Code" not in sales.columns:
+        sales["Rep Code"] = np.nan
+
+    sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
+    codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
+
+    # =========================
+    # 🧩 MERGE CODES
     # =========================
     sales = sales.merge(codes, on="Rep Code", how="left")
 
     # =========================
-    # ENSURE LEVEL COLUMNS
+    # 🧠 ENSURE HIERARCHY
     # =========================
     for c in ["Manager Code", "Area Code", "Supervisor Code"]:
         if c not in sales.columns:
             sales[c] = np.nan
 
     # =========================
-    # KPI CALC
+    # 💰 CALCULATION
     # =========================
-    sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
-    sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
+    sales["Total Sales Value"] = sales[sales_unit] * sales[price]
+
+    if returns_unit:
+        sales["Returns Value"] = sales[returns_unit] * sales[price]
+    else:
+        sales["Returns Value"] = 0
+
     sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
 
     # =========================
-    # SAFE GROUP
+    # 📊 GROUP FUNCTION
     # =========================
     def safe_group(df, group_cols):
         return df.groupby(group_cols, as_index=False)[
@@ -198,7 +205,7 @@ sales = build_sales_pipeline(
 )
 
 # =========================
-# 📊 TARGET KPI
+# 📊 TARGET VIEW
 # =========================
 st.header("🎯 TARGET KPI")
 
@@ -209,7 +216,7 @@ st.dataframe(supervisor["value_table"], use_container_width=True)
 st.dataframe(evak["value_table"], use_container_width=True)
 
 # =========================
-# 💰 SALES KPI
+# 💰 SALES VIEW
 # =========================
 st.header("💰 SALES KPI")
 
