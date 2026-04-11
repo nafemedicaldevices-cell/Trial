@@ -36,7 +36,7 @@ opening.loc[mask, "Old Rep Name"] = opening.loc[mask, "Total Sales After Invoice
 opening[["Rep Code", "Old Rep Name"]] = opening[["Rep Code", "Old Rep Name"]].ffill()
 
 # =========================
-# FINAL DISPLAY ✅
+# FINAL DISPLAY
 # =========================
-st.subheader("Final Data")
+st.subheader("Opening Data After Rep Extraction")
 st.dataframe(opening.head(20))
