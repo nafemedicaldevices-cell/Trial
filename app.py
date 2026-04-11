@@ -1,216 +1,111 @@
+import streamlit as st
 import pandas as pd
 import numpy as np
 
 # =========================
-# 📅 TIME SETTINGS
+# 🎨 PAGE CONFIG (لازم أول سطر عرض)
 # =========================
-current_month = pd.Timestamp.today().month
-current_quarter = (current_month - 1) // 3 + 1
-past_quarters = max(current_quarter - 1, 0)
+st.set_page_config(layout="wide")
+st.title("📊 Unified KPI Dashboard - SAFE VERSION")
+
+st.write("🚀 App Started Successfully")
 
 
 # =========================
-# 📥 LOAD ALL FILES
+# 📥 LOAD FILES SAFE
 # =========================
 def load_data():
 
-    return {
-        "sales": pd.read_excel("Sales.xlsx"),
-        "overdue": pd.read_excel("Overdue.xlsx"),
-        "opening": pd.read_excel("Opening.xlsx"),
-
-        "target_rep": pd.read_excel("Target Rep.xlsx"),
-        "target_manager": pd.read_excel("Target Manager.xlsx"),
-        "target_area": pd.read_excel("Target Area.xlsx"),
-        "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
-        "target_evak": pd.read_excel("Target Evak.xlsx"),
-
-        "mapping": pd.read_excel("Mapping.xlsx"),
-        "codes": pd.read_excel("Code.xlsx"),
+    files = {
+        "sales": "Sales.xlsx",
+        "overdue": "Overdue.xlsx",
+        "opening": "Opening.xlsx",
+        "mapping": "Mapping.xlsx",
+        "codes": "Code.xlsx",
+        "target_rep": "Target Rep.xlsx",
+        "target_manager": "Target Manager.xlsx",
+        "target_area": "Target Area.xlsx",
+        "target_supervisor": "Target Supervisor.xlsx",
+        "target_evak": "Target Evak.xlsx",
     }
 
+    data = {}
 
-# =========================
-# 🧩 SAFE GROUP FUNCTION
-# =========================
-def safe_group(df, group_cols, sum_cols):
-    group_cols = [c for c in group_cols if c in df.columns]
-    sum_cols = [c for c in sum_cols if c in df.columns]
+    for name, file in files.items():
+        try:
+            df = pd.read_excel(file)
 
-    if not group_cols:
-        return pd.DataFrame()
+            st.subheader(f"📄 {name}")
+            st.write("Shape:", df.shape)
+            st.write(list(df.columns))
+            st.dataframe(df.head())
 
-    return df.groupby(group_cols, as_index=False)[sum_cols].sum()
+            data[name] = df
 
+        except Exception as e:
+            st.error(f"❌ Error loading {name}")
+            st.exception(e)
 
-# =========================
-# 🎯 TARGET PIPELINE (FIXED)
-# =========================
-def build_target_pipeline(df, id_name, mapping):
-
-    df = df.copy()
-    mapping = mapping.copy()
-
-    df.columns = df.columns.str.strip()
-
-    fixed_cols = [c for c in ["Year", "Product Code", "Product Name", "Sales Price"] if c in df.columns]
-    dynamic_cols = [c for c in df.columns if c not in fixed_cols]
-
-    df = df.melt(
-        id_vars=fixed_cols,
-        value_vars=dynamic_cols,
-        var_name=id_name,
-        value_name="Target (Unit)"
-    )
-
-    df[id_name] = (
-        df[id_name]
-        .astype(str)
-        .str.replace(r"[^0-9]", "", regex=True)
-    )
-
-    df[id_name] = pd.to_numeric(df[id_name], errors="coerce")
-    df["Product Code"] = pd.to_numeric(df["Product Code"], errors="coerce")
-    mapping["Product Code"] = pd.to_numeric(mapping["Product Code"], errors="coerce")
-
-    mapping = mapping.drop_duplicates("Product Code")
-
-    df = df.merge(mapping, on="Product Code", how="left")
-
-    df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
-
-    if "Sales Price" in df.columns:
-        df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
-    else:
-        df["Sales Price"] = 0
-
-    df["Target Value"] = df["Target (Unit)"] * df["Sales Price"]
-
-    return {
-        "value": safe_group(df, [id_name], ["Target Value"]),
-        "products": safe_group(df, [id_name, "Product Code", "Product Name"], ["Target Value", "Target (Unit)"])
-    }
+    return data
 
 
 # =========================
-# 💰 SALES PIPELINE (SAFE)
+# 🚀 LOAD DATA
 # =========================
-def build_sales_pipeline(df, codes):
-
-    df = df.copy()
-    df.columns = df.columns.str.strip()
-    df = df.dropna(how="all")
-
-    num_cols = [
-        "Sales Unit Before Edit",
-        "Returns Unit Before Edit",
-        "Sales Price",
-        "Invoice Discounts"
-    ]
-
-    for c in num_cols:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
-
-    if "Sales Unit Before Edit" in df.columns and "Sales Price" in df.columns:
-        df["Sales Value"] = df["Sales Unit Before Edit"] * df["Sales Price"]
-    else:
-        df["Sales Value"] = 0
-
-    df["Returns Value"] = df.get("Returns Unit Before Edit", 0) * df.get("Sales Price", 0)
-    df["Net Sales"] = df["Sales Value"] - df["Returns Value"]
-
-    if "Rep Code" in df.columns:
-        df = df.merge(codes, on="Rep Code", how="left")
-
-    return {
-        "rep": safe_group(df, ["Rep Code"], ["Net Sales"]),
-        "manager": safe_group(df, ["Manager Code"], ["Net Sales"]),
-        "area": safe_group(df, ["Area Code"], ["Net Sales"]),
-        "supervisor": safe_group(df, ["Supervisor Code"], ["Net Sales"])
-    }
+data = load_data()
 
 
 # =========================
-# ⚠️ OVERDUE PIPELINE
+# 🧪 STOP IF SALES MISSING
 # =========================
-def build_overdue(df, codes):
-
-    df = df.copy()
-    df = df.iloc[:, :9]
-
-    df.columns = [
-        "Client Name","Client Code","15","30","60","90","120","120+","Balance"
-    ]
-
-    for c in df.columns[2:]:
-        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
-
-    df["Overdue"] = df["120"] + df["120+"]
-
-    df["Rep Code"] = np.nan
-    mask = df["Client Name"].astype(str).eq("كود المندوب")
-    df.loc[mask, "Rep Code"] = df.loc[mask, "Client Code"]
-    df["Rep Code"] = df["Rep Code"].ffill()
-
-    df = df.merge(codes, on="Rep Code", how="left")
-
-    return {
-        "rep": safe_group(df, ["Rep Code"], ["Overdue"]),
-        "manager": safe_group(df, ["Manager Code"], ["Overdue"]),
-        "area": safe_group(df, ["Area Code"], ["Overdue"]),
-        "supervisor": safe_group(df, ["Supervisor Code"], ["Overdue"])
-    }
+if "sales" not in data:
+    st.error("❌ Sales file not loaded - stopping app")
+    st.stop()
 
 
 # =========================
-# 🏦 OPENING PIPELINE
+# 💰 SIMPLE SALES CHECK (NO CRASH)
 # =========================
-def build_opening(df, codes):
+st.header("💰 Sales Quick Check")
 
-    df = df.copy()
+sales = data["sales"].copy()
+sales.columns = sales.columns.astype(str)
 
-    df.columns = [
-        "Branch","Evak","Opening","Sales","Returns",
-        "SalesBefore","Cash","Checks","Returned","Returned2",
-        "Discounts","Debt","EndBalance"
-    ]
-
-    for c in df.columns[2:]:
-        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
-
-    df["TotalCollection"] = df["Cash"] + df["Checks"]
-
-    if "Rep Code" in df.columns:
-        df = df.merge(codes, on="Rep Code", how="left")
-
-    return {
-        "rep": safe_group(df, ["Rep Code"], ["Opening","TotalCollection","EndBalance"]),
-        "manager": safe_group(df, ["Manager Code"], ["Opening","EndBalance"]),
-        "area": safe_group(df, ["Area Code"], ["Opening","EndBalance"]),
-        "supervisor": safe_group(df, ["Supervisor Code"], ["Opening","EndBalance"])
-    }
+st.write("Sales Shape:", sales.shape)
+st.dataframe(sales.head())
 
 
 # =========================
-# 🚀 MAIN RUNNER
+# ⚠️ OVERDUE CHECK
 # =========================
-def run_all():
+if "overdue" in data:
+    st.header("⚠️ Overdue Quick Check")
 
-    data = load_data()
+    overdue = data["overdue"].copy()
+    st.write(overdue.shape)
+    st.dataframe(overdue.head())
 
-    results = {}
 
-    # Targets
-    results["target_rep"] = build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
-    results["target_manager"] = build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"])
-    results["target_area"] = build_target_pipeline(data["target_area"], "Area Code", data["mapping"])
-    results["target_supervisor"] = build_target_pipeline(data["target_supervisor"], "Supervisor Code", data["mapping"])
-    results["target_evak"] = build_target_pipeline(data["target_evak"], "Evak Code", data["mapping"])
+# =========================
+# 🏦 OPENING CHECK
+# =========================
+if "opening" in data:
+    st.header("🏦 Opening Quick Check")
 
-    # Sales / Overdue / Opening
-    results["sales"] = build_sales_pipeline(data["sales"], data["codes"])
-    results["overdue"] = build_overdue(data["overdue"], data["codes"])
-    results["opening"] = build_opening(data["opening"], data["codes"])
+    opening = data["opening"].copy()
+    st.write(opening.shape)
+    st.dataframe(opening.head())
 
-    return results
+
+# =========================
+# 🎯 TARGET CHECK
+# =========================
+target_keys = ["target_rep","target_manager","target_area","target_supervisor","target_evak"]
+
+st.header("🎯 Targets Check")
+
+for k in target_keys:
+    if k in data:
+        st.subheader(k)
+        st.write(data[k].shape)
+        st.dataframe(data[k].head())
