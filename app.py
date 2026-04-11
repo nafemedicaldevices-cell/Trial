@@ -8,7 +8,7 @@ import streamlit as st
 # =========================
 current_month = pd.Timestamp.today().month
 current_quarter = (current_month - 1) // 3 + 1
-
+past_quarters = max(current_quarter - 1, 0)
 # =========================
 # 📂 LOAD DATA
 # =========================
