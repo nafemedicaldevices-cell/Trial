@@ -15,7 +15,7 @@ past_quarters = max(current_quarter - 1, 0)
 # =========================
 def load_data():
     return {
-        # TARGET
+        # TARGETS
         "target_rep": pd.read_excel("Target Rep.xlsx"),
         "target_manager": pd.read_excel("Target Manager.xlsx"),
         "target_area": pd.read_excel("Target Area.xlsx"),
@@ -107,43 +107,66 @@ def build_target_pipeline(df, id_name, mapping):
 
 
 # =========================
-# 🚀 SALES PIPELINE
+# 🚀 SALES PIPELINE (ROBUST)
 # =========================
 def build_sales_pipeline(sales, mapping, codes):
 
     sales = sales.copy()
     sales.columns = sales.columns.str.strip()
 
-    num_cols = [
-        'Sales Unit Before Edit',
-        'Returns Unit Before Edit',
-        'Sales Price'
-    ]
+    # =========================
+    # SAFE NUMERIC CONVERSION
+    # =========================
+    for col in ["Sales Unit Before Edit", "Returns Unit Before Edit", "Sales Price"]:
+        if col not in sales.columns:
+            sales[col] = 0
+        sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
 
-    for col in num_cols:
-        if col in sales.columns:
-            sales[col] = pd.to_numeric(sales[col], errors='coerce').fillna(0)
+    # =========================
+    # REP CODE SAFE CHECK
+    # =========================
+    if "Rep Code" not in sales.columns:
+        st.error("❌ Rep Code missing in Sales file")
+        st.write(sales.columns.tolist())
+        return {}
 
-    if 'Rep Code' in sales.columns:
-        sales['Rep Code'] = pd.to_numeric(sales['Rep Code'], errors='coerce').astype('Int64')
+    sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
 
-    codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce").astype("Int64")
+    codes = codes.copy()
+    codes.columns = codes.columns.str.strip()
+
+    if "Rep Code" not in codes.columns:
+        st.error("❌ Rep Code missing in Code file")
+        return {}
+
+    codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
+
     sales = sales.merge(codes, on="Rep Code", how="left")
 
-    # add missing levels if not exist
+    # =========================
+    # AUTO ADD MISSING LEVELS
+    # =========================
     for c in ["Manager Code", "Area Code", "Supervisor Code"]:
         if c not in sales.columns:
             sales[c] = np.nan
 
+    # =========================
+    # KPI CALCULATIONS
+    # =========================
     sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
     sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
     sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
 
+    # =========================
+    # GROUP ENGINE
+    # =========================
     def safe_group(df, group_cols, sum_cols):
         group_cols = [c for c in group_cols if c in df.columns]
         sum_cols = [c for c in sum_cols if c in df.columns]
+
         if not group_cols:
             return pd.DataFrame()
+
         return df.groupby(group_cols, as_index=False)[sum_cols].sum()
 
     return {
@@ -158,13 +181,13 @@ def build_sales_pipeline(sales, mapping, codes):
 # 🎨 STREAMLIT UI
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 Unified KPI System (TARGET + SALES)")
+st.title("📊 UNIFIED KPI SYSTEM (TARGET + SALES)")
 
 
 data = load_data()
 
 # =========================
-# RUN TARGET
+# 🚀 RUN TARGET
 # =========================
 rep = build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
 manager = build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"])
@@ -173,14 +196,15 @@ supervisor = build_target_pipeline(data["target_supervisor"], "Supervisor Code",
 evak = build_target_pipeline(data["target_evak"], "Evak Code", data["mapping"])
 
 # =========================
-# RUN SALES
+# 🚀 RUN SALES
 # =========================
 sales = build_sales_pipeline(data["sales"], data["mapping"], data["codes"])
 
 # =========================
-# TARGET UI
+# 📊 TARGET VIEW
 # =========================
 st.header("🎯 TARGET KPI")
+
 st.dataframe(rep["value_table"])
 st.dataframe(manager["value_table"])
 st.dataframe(area["value_table"])
@@ -188,9 +212,10 @@ st.dataframe(supervisor["value_table"])
 st.dataframe(evak["value_table"])
 
 # =========================
-# SALES UI
+# 💰 SALES VIEW
 # =========================
 st.header("💰 SALES KPI")
+
 st.dataframe(sales["rep_value"])
 st.dataframe(sales["manager_value"])
 st.dataframe(sales["area_value"])
