@@ -7,24 +7,18 @@ import streamlit as st
 # =========================
 current_month = pd.Timestamp.today().month
 current_quarter = (current_month - 1) // 3 + 1
-past_quarters = max(current_quarter - 1, 0)
 
 # =========================
 # 📂 LOAD DATA
 # =========================
 def load_data():
     return {
-        # TARGET
         "target_rep": pd.read_excel("Target Rep.xlsx"),
         "target_manager": pd.read_excel("Target Manager.xlsx"),
         "target_area": pd.read_excel("Target Area.xlsx"),
         "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
         "target_evak": pd.read_excel("Target Evak.xlsx"),
-
-        # SALES
         "sales": pd.read_excel("Sales.xlsx"),
-
-        # COMMON
         "mapping": pd.read_excel("Mapping.xlsx"),
         "codes": pd.read_excel("Code.xlsx"),
     }
@@ -55,7 +49,10 @@ def build_target_pipeline(df, id_name, mapping):
         value_name="Target (Unit)"
     )
 
-    df[id_name] = pd.to_numeric(df[id_name].astype(str).str.replace(r"[^0-9]", "", regex=True), errors="coerce")
+    df[id_name] = pd.to_numeric(
+        df[id_name].astype(str).str.replace(r"[^0-9]", "", regex=True),
+        errors="coerce"
+    )
 
     # MERGE SAFE
     df = df.merge(mapping, on="Product Code", how="left")
@@ -65,45 +62,61 @@ def build_target_pipeline(df, id_name, mapping):
 
     df["Full Value"] = df["Target (Unit)"] * df["Sales Price"]
 
-    # TIME SPLIT
+    # =========================
+    # 📊 TIME SPLIT (FIXED)
+    # =========================
     full = df.copy()
     month = df.copy()
     quarter = df.copy()
     ytd = df.copy()
 
-    month["Value"] = full["Full Value"] * (current_month / 12)
-    quarter["Value"] = full["Full Value"] * (current_quarter / 4)
-    ytd["Value"] = full["Full Value"] * (current_month / 12)
+    month["Value"] = month["Full Value"] * (current_month / 12)
+    quarter["Value"] = quarter["Full Value"] * (current_quarter / 4)
+    ytd["Value"] = ytd["Full Value"] * (current_month / 12)
+    full["Value"] = full["Full Value"]
 
     def group(d):
         return d.groupby([id_name], as_index=False)["Value"].sum()
 
     value_table = group(full).rename(columns={"Value": "Full Year 🏆"})
-    value_table["Month 📅"] = group(month)["Value"]
-    value_table["Quarter 📊"] = group(quarter)["Value"]
-    value_table["YTD 📈"] = group(ytd)["Value"]
+
+    value_table = value_table.merge(
+        group(month).rename(columns={"Value": "Month 📅"}),
+        on=id_name, how="left"
+    )
+
+    value_table = value_table.merge(
+        group(quarter).rename(columns={"Value": "Quarter 📊"}),
+        on=id_name, how="left"
+    )
+
+    value_table = value_table.merge(
+        group(ytd).rename(columns={"Value": "YTD 📈"}),
+        on=id_name, how="left"
+    )
 
     return value_table
 
+
 # =========================
-# 🚀 SALES PIPELINE (FIXED FINAL)
+# 🚀 SALES PIPELINE (FIXED)
 # =========================
 def build_sales_pipeline(sales, mapping, codes):
 
     sales = sales.copy()
     sales.columns = sales.columns.str.strip()
 
-    # CLEAN NUMERIC
+    # NUMERIC CLEAN
     num_cols = [
-        'Sales Unit Before Edit',
-        'Returns Unit Before Edit',
-        'Sales Price',
-        'Invoice Discounts'
+        "Sales Unit Before Edit",
+        "Returns Unit Before Edit",
+        "Sales Price",
+        "Invoice Discounts"
     ]
 
     for col in num_cols:
         if col in sales.columns:
-            sales[col] = pd.to_numeric(sales[col], errors='coerce').fillna(0)
+            sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
 
     # IDS
     sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
@@ -111,7 +124,7 @@ def build_sales_pipeline(sales, mapping, codes):
 
     sales = sales.merge(codes, on="Rep Code", how="left")
 
-    # CALCULATIONS
+    # CALC
     sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
     sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
     sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
@@ -133,27 +146,34 @@ def build_sales_pipeline(sales, mapping, codes):
         "supervisor_value": safe_group(sales, ["Supervisor Code"], ["Total Sales Value","Returns Value","Sales After Returns"]),
     }
 
+
 # =========================
 # 🎨 STREAMLIT UI
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 Unified KPI System (FIXED VERSION)")
+st.title("📊 Unified KPI System (FINAL FIXED)")
 
 data = load_data()
 
-# TARGET
+# =========================
+# 🎯 TARGET UI
+# =========================
 st.header("🎯 TARGET KPI")
+
 st.dataframe(build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"]))
 st.dataframe(build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"]))
 st.dataframe(build_target_pipeline(data["target_area"], "Area Code", data["mapping"]))
 st.dataframe(build_target_pipeline(data["target_supervisor"], "Supervisor Code", data["mapping"]))
 st.dataframe(build_target_pipeline(data["target_evak"], "Evak Code", data["mapping"]))
 
-# SALES
+# =========================
+# 💰 SALES UI
+# =========================
 st.header("💰 SALES KPI")
+
 sales = build_sales_pipeline(data["sales"], data["mapping"], data["codes"])
 
-st.dataframe(sales["rep_value"])
-st.dataframe(sales["manager_value"])
-st.dataframe(sales["area_value"])
-st.dataframe(sales["supervisor_value"])
+st.dataframe(sales["rep_value"], use_container_width=True)
+st.dataframe(sales["manager_value"], use_container_width=True)
+st.dataframe(sales["area_value"], use_container_width=True)
+st.dataframe(sales["supervisor_value"], use_container_width=True)
