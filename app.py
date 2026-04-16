@@ -1,16 +1,30 @@
+import os
 import pandas as pd
 import numpy as np
 import streamlit as st
 
-# ==============================
-# 🎯 PAGE CONFIG
-# ==============================
-st.set_page_config(page_title="Rep KPI Dashboard", layout="wide")
+st.set_page_config(page_title="Rep Dashboard", layout="wide")
 st.title("📊 Unified Rep Performance Dashboard")
 
+BASE_DIR = os.path.dirname(__file__)
+
 
 # ==============================
-# 🧹 CLEAN FUNCTIONS
+# 📂 LOAD FILES (FIXED)
+# ==============================
+target_rep_value_uptodate = pd.read_excel(os.path.join(BASE_DIR, "Target Rep.xlsx"))
+target_manager_value_uptodate = pd.read_excel(os.path.join(BASE_DIR, "Target Manager.xlsx"))
+target_area_value_uptodate = pd.read_excel(os.path.join(BASE_DIR, "Target Area.xlsx"))
+target_supervisor_value_uptodate = pd.read_excel(os.path.join(BASE_DIR, "Target Supervisor.xlsx"))
+
+opening_rep = pd.read_excel(os.path.join(BASE_DIR, "Opening.xlsx"))
+extra_discounts_rep = pd.read_excel(os.path.join(BASE_DIR, "Extra Discounts.xlsx"))
+overdue_rep = pd.read_excel(os.path.join(BASE_DIR, "Overdue.xlsx"))
+sales_rep_value = pd.read_excel(os.path.join(BASE_DIR, "Sales.xlsx"))
+
+
+# ==============================
+# 🧹 CLEAN FUNCTION
 # ==============================
 def clean_numeric(df, cols):
     for col in cols:
@@ -29,16 +43,6 @@ def unify_rep_code(df):
 
 
 # ==============================
-# 📂 LOAD DATA
-# ==============================
-opening_rep = pd.read_excel("Opening.xlsx")
-target_rep_value_uptodate = pd.read_excel("Target.xlsx")
-extra_discounts_rep = pd.read_excel("Extra Discounts.xlsx")
-overdue_rep = pd.read_excel("Overdue.xlsx")
-sales_rep_value = pd.read_excel("Sales.xlsx")
-
-
-# ==============================
 # 🧹 CLEAN DATA
 # ==============================
 financial_cols_opening = [
@@ -48,12 +52,20 @@ financial_cols_opening = [
 ]
 
 opening_rep = clean_numeric(opening_rep, financial_cols_opening)
+
 target_rep_value_uptodate = clean_numeric(target_rep_value_uptodate, ['Target Value'])
+target_manager_value_uptodate = clean_numeric(target_manager_value_uptodate, ['Target Value'])
+target_area_value_uptodate = clean_numeric(target_area_value_uptodate, ['Target Value'])
+target_supervisor_value_uptodate = clean_numeric(target_supervisor_value_uptodate, ['Target Value'])
+
 extra_discounts_rep = clean_numeric(extra_discounts_rep, ['Extra Disocunts'])
 overdue_rep = clean_numeric(overdue_rep, ['Overdue'])
 
 opening_rep = unify_rep_code(opening_rep)
 target_rep_value_uptodate = unify_rep_code(target_rep_value_uptodate)
+target_manager_value_uptodate = unify_rep_code(target_manager_value_uptodate)
+target_area_value_uptodate = unify_rep_code(target_area_value_uptodate)
+target_supervisor_value_uptodate = unify_rep_code(target_supervisor_value_uptodate)
 extra_discounts_rep = unify_rep_code(extra_discounts_rep)
 overdue_rep = unify_rep_code(overdue_rep)
 sales_rep_value = unify_rep_code(sales_rep_value)
@@ -72,7 +84,7 @@ if 'Invoice Discounts' in sales_rep_value.columns:
 
 
 # ==============================
-# 🔗 MERGE DATA
+# 🔗 MERGE (REP LEVEL)
 # ==============================
 rep_summary = opening_rep.merge(
     target_rep_value_uptodate[['Rep Code','Target Value']], on='Rep Code', how='left'
@@ -106,18 +118,7 @@ rep_summary['Achievement %'] = np.where(
 
 
 # ==============================
-# 🎯 FILTERS
-# ==============================
-st.sidebar.header("🔎 Filters")
-
-rep_list = rep_summary["Rep Code"].unique()
-selected_rep = st.sidebar.selectbox("Select Rep", rep_list)
-
-filtered_df = rep_summary[rep_summary["Rep Code"] == selected_rep]
-
-
-# ==============================
-# 📌 KPI CARDS
+# 🎯 DASHBOARD
 # ==============================
 col1, col2, col3, col4 = st.columns(4)
 
@@ -128,50 +129,17 @@ col4.metric("⏳ Overdue", f"{rep_summary['Overdue'].sum():,.0f}")
 
 
 # ==============================
-# 📋 DETAILS TABLE
+# 📋 TABLE
 # ==============================
 st.subheader("📋 Rep Details")
-st.dataframe(filtered_df, use_container_width=True)
+st.dataframe(rep_summary, use_container_width=True)
 
 
 # ==============================
-# 📊 CHART 1 - Achievement (FIXED)
+# 📊 CHART (NO PLOTLY)
 # ==============================
-st.subheader("📊 Achievement % by Rep")
+st.subheader("📊 Achievement %")
 
-chart_data = rep_summary.copy()
-chart_data = chart_data.set_index("Rep Code")[["Achievement %"]]
-
-st.bar_chart(chart_data)
-
-
-# ==============================
-# 📊 CHART 2 - Net Sales vs Target
-# ==============================
-st.subheader("🎯 Net Sales vs Target")
-
-chart2 = rep_summary.copy()
-chart2 = chart2.set_index("Rep Code")[["Net Sales", "Target Value"]]
-
-st.bar_chart(chart2)
-
-
-# ==============================
-# 📊 CHART 3 - Discounts
-# ==============================
-st.subheader("💸 Discounts Breakdown")
-
-chart3 = rep_summary.copy()
-chart3 = chart3.set_index("Rep Code")[[
-    "Extra Disocunts",
-    "Invoice Discounts",
-    "Total Discounts"
-]]
-
-st.bar_chart(chart3)
-
-
-# ==============================
-# ✅ SUCCESS
-# ==============================
-st.success("✅ Dashboard running successfully بدون Plotly")
+st.bar_chart(
+    rep_summary.set_index("Rep Code")[["Achievement %"]]
+)
