@@ -322,19 +322,22 @@ def build_overdue_pipeline(overdue, codes):
 
 
 # =========================
-# 🚀 OPENING DETAIL PIPELINE
+# 🚀 OPENING DETAIL PIPELINE (FIXED)
 # =========================
 def build_opening_detail_pipeline(opening_detail):
 
     df = opening_detail.copy()
 
-    df.columns = [
+    expected_cols = [
         'Branch',"Evak",'Opening Balance','Total Sales',
         'Returned Sales','Sales Value Before Extra Discounts',
         'Cash Collection',"Blank1",'Collection Checks',
         "Blank2",'Returned Chick','Collection Returned Chick',
         "Madinah",'Daienah','End Balance'
     ]
+
+    df = df.iloc[:, :len(expected_cols)].copy()
+    df.columns = expected_cols
 
     df['Client Code'] = None
     df['Client Name'] = None
