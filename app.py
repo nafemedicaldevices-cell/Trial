@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import streamlit as st
-import plotly.express as px
 
 # ==============================
 # 🎯 PAGE CONFIG
@@ -61,7 +60,7 @@ sales_rep_value = unify_rep_code(sales_rep_value)
 
 
 # ==============================
-# 💸 SALES CLEAN (Invoice Discounts)
+# 💸 SALES CLEAN
 # ==============================
 if 'Invoice Discounts' in sales_rep_value.columns:
     sales_rep_value['Invoice Discounts'] = pd.to_numeric(
@@ -73,7 +72,7 @@ if 'Invoice Discounts' in sales_rep_value.columns:
 
 
 # ==============================
-# 🔗 MERGE DATASETS
+# 🔗 MERGE DATA
 # ==============================
 rep_summary = opening_rep.merge(
     target_rep_value_uptodate[['Rep Code','Target Value']], on='Rep Code', how='left'
@@ -136,53 +135,43 @@ st.dataframe(filtered_df, use_container_width=True)
 
 
 # ==============================
-# 📊 CHART 1 - Achievement
+# 📊 CHART 1 - Achievement (FIXED)
 # ==============================
-st.subheader("📊 Achievement by Rep")
+st.subheader("📊 Achievement % by Rep")
 
-fig1 = px.bar(
-    rep_summary,
-    x="Rep Code",
-    y="Achievement %",
-    text_auto=".0%"
-)
+chart_data = rep_summary.copy()
+chart_data = chart_data.set_index("Rep Code")[["Achievement %"]]
 
-st.plotly_chart(fig1, use_container_width=True)
+st.bar_chart(chart_data)
 
 
 # ==============================
-# 📊 CHART 2 - Target vs Net Sales
+# 📊 CHART 2 - Net Sales vs Target
 # ==============================
-st.subheader("🎯 Target vs Net Sales")
+st.subheader("🎯 Net Sales vs Target")
 
-fig2 = px.scatter(
-    rep_summary,
-    x="Target Value",
-    y="Net Sales",
-    color="Rep Code",
-    size="Overdue",
-    hover_data=["Rep Code"]
-)
+chart2 = rep_summary.copy()
+chart2 = chart2.set_index("Rep Code")[["Net Sales", "Target Value"]]
 
-st.plotly_chart(fig2, use_container_width=True)
+st.bar_chart(chart2)
 
 
 # ==============================
-# 📊 CHART 3 - Discounts Impact
+# 📊 CHART 3 - Discounts
 # ==============================
-st.subheader("💸 Discounts Impact")
+st.subheader("💸 Discounts Breakdown")
 
-fig3 = px.bar(
-    rep_summary,
-    x="Rep Code",
-    y=["Extra Disocunts", "Invoice Discounts", "Total Discounts"],
-    barmode="group"
-)
+chart3 = rep_summary.copy()
+chart3 = chart3.set_index("Rep Code")[[
+    "Extra Disocunts",
+    "Invoice Discounts",
+    "Total Discounts"
+]]
 
-st.plotly_chart(fig3, use_container_width=True)
+st.bar_chart(chart3)
 
 
 # ==============================
 # ✅ SUCCESS
 # ==============================
-st.success("✅ Dashboard is running successfully!")
+st.success("✅ Dashboard running successfully بدون Plotly")
