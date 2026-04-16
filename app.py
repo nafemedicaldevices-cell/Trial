@@ -10,6 +10,9 @@ from pipelines import (
 st.set_page_config(layout="wide")
 st.title("📊 Unified KPI System")
 
+# =========================
+# LOAD
+# =========================
 data = load_data()
 
 # =========================
