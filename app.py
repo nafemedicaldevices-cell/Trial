@@ -240,3 +240,100 @@ st.dataframe(sales["area"], use_container_width=True)
 
 st.subheader("Supervisor Sales")
 st.dataframe(sales["supervisor"], use_container_width=True)
+
+
+# =========================
+# 🚀 OPENING PIPELINE
+# =========================
+def build_opening_pipeline(opening, codes):
+
+    opening = opening.copy()
+    codes = codes.copy()
+
+    # ----------------------
+    # 🧹 Rename Columns
+    # ----------------------
+    opening.columns = [
+        'Branch',"Evak",'Opening Balance','Total Sales',
+        'Returns','Sales Value Before Extra Discounts',
+        'Cash Collection','Collection Checks',
+        'Returned Chick','Collection Returned Chick',
+        "Madinah",'Daienah','End Balance'
+    ]
+
+    # ----------------------
+    # 🧠 Extract Rep Info
+    # ----------------------
+    opening['Rep Code'] = None
+    opening['Old Rep Name'] = None
+
+    mask = opening['Branch'].astype(str).str.strip() == "كود المندوب"
+
+    opening.loc[mask, 'Rep Code'] = opening.loc[mask, 'Opening Balance']
+    opening.loc[mask, 'Old Rep Name'] = opening.loc[mask, 'Total Sales']
+
+    opening[['Rep Code', 'Old Rep Name']] = opening[['Rep Code', 'Old Rep Name']].ffill()
+
+    # ----------------------
+    # 🚫 Filter Rows
+    # ----------------------
+    opening = opening[
+        opening['Branch'].notna() &
+        (opening['Branch'].astype(str).str.strip() != '') &
+        (~opening['Branch'].astype(str).str.contains('نسبة المندوب|كود المندوب|اجماليات|كود الفرع', na=False))
+    ].copy()
+
+    # ----------------------
+    # 🔢 Numeric Conversion
+    # ----------------------
+    num_cols = [
+        'Opening Balance','Total Sales','Returns',
+        'Sales Value Before Extra Discounts',
+        'Cash Collection','Collection Checks',
+        'Returned Chick','Collection Returned Chick',
+        'Madinah','Daienah','End Balance'
+    ]
+
+    for col in num_cols:
+        opening[col] = pd.to_numeric(opening[col], errors='coerce').fillna(0)
+
+    # ----------------------
+    # ➕ Calculations
+    # ----------------------
+    opening['Total Collection'] = opening['Cash Collection'] + opening['Collection Checks']
+    opening["Sales After Returns"] = opening["Total Sales"] - opening['Returns']
+
+    # ----------------------
+    # 🔗 Merge Mapping
+    # ----------------------
+    opening['Rep Code'] = pd.to_numeric(opening['Rep Code'], errors='coerce')
+    codes['Rep Code'] = pd.to_numeric(codes['Rep Code'], errors='coerce')
+
+    opening = opening.merge(
+        codes[['Rep Code',"Rep Name","Area Name",'Area Code',"Manager Name", 'Manager Code']],
+        on='Rep Code',
+        how='left'
+    )
+
+    # ----------------------
+    # 📊 Group Function
+    # ----------------------
+    def group(df, col):
+        if col not in df.columns:
+            return pd.DataFrame()
+
+        return df.groupby(col, as_index=False)[[
+            'Opening Balance',
+            'Total Sales',
+            'Returns',
+            'Sales After Returns',
+            'Total Collection',
+            'End Balance'
+        ]].sum()
+
+    return {
+        "rep": group(opening, "Rep Code"),
+        "area": group(opening, "Area Code"),
+        "manager": group(opening, "Manager Code"),
+        "full_data": opening
+    }
