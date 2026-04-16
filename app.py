@@ -41,60 +41,16 @@ def fix_sales_columns(sales):
         'Sales Price','Invoice Discounts','Sales Value'
     ]
 
+    current_cols = sales.shape[1]
+
+    if current_cols < len(expected_cols):
+        for i in range(len(expected_cols) - current_cols):
+            sales[f'extra_{i}'] = np.nan
+
     sales = sales.iloc[:, :len(expected_cols)]
     sales.columns = expected_cols
 
     return sales
-
-
-# =========================
-# 🚀 TARGET PIPELINE
-# =========================
-def build_target_pipeline(df, id_name, mapping):
-
-    df = df.copy()
-    mapping = mapping.copy()
-
-    df.columns = df.columns.str.strip()
-    mapping.columns = mapping.columns.str.strip()
-
-    if "Product Code" not in df.columns:
-        df["Product Code"] = np.nan
-
-    if "Sales Price" not in df.columns:
-        df["Sales Price"] = 0
-
-    df["Product Code"] = pd.to_numeric(df["Product Code"], errors="coerce")
-    mapping["Product Code"] = pd.to_numeric(mapping["Product Code"], errors="coerce")
-
-    mapping = mapping.drop_duplicates("Product Code")
-
-    fixed_cols = [c for c in ["Year", "Product Code", "Sales Price"] if c in df.columns]
-    dynamic_cols = [c for c in df.columns if c not in fixed_cols]
-
-    df = df.melt(
-        id_vars=fixed_cols,
-        value_vars=dynamic_cols,
-        var_name=id_name,
-        value_name="Target (Unit)"
-    )
-
-    df[id_name] = pd.to_numeric(
-        df[id_name].astype(str).str.replace(r"[^0-9]", "", regex=True),
-        errors="coerce"
-    )
-
-    df = df.merge(mapping[["Product Code", "Product Name"]], on="Product Code", how="left")
-
-    df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
-    df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
-
-    df["Value"] = df["Target (Unit)"] * df["Sales Price"]
-
-    def group(d):
-        return d.groupby([id_name], as_index=False)["Value"].sum()
-
-    return {"value_table": group(df)}
 
 
 # =========================
@@ -146,6 +102,10 @@ def build_opening_pipeline(opening, codes):
         "Madinah",'Daienah','End Balance'
     ]
 
+    if opening.shape[1] < len(expected_cols):
+        for i in range(len(expected_cols) - opening.shape[1]):
+            opening[f'extra_{i}'] = np.nan
+
     opening = opening.iloc[:, :len(expected_cols)]
     opening.columns = expected_cols
 
@@ -181,7 +141,7 @@ def build_opening_pipeline(opening, codes):
 
 
 # =========================
-# 🚀 OPENING DETAIL PIPELINE (FIXED)
+# 🚀 OPENING DETAIL PIPELINE (FIX FINAL)
 # =========================
 def build_opening_detail_pipeline(opening_detail, codes):
 
@@ -193,10 +153,15 @@ def build_opening_detail_pipeline(opening_detail, codes):
         "Madinah",'Daienah','End Balance'
     ]
 
-    # 🔥 الحل هنا
+    # 🔥 FIX: handle missing columns
+    if opening_detail.shape[1] < len(expected_cols):
+        for i in range(len(expected_cols) - opening_detail.shape[1]):
+            opening_detail[f'extra_{i}'] = np.nan
+
     opening_detail = opening_detail.iloc[:, :len(expected_cols)]
     opening_detail.columns = expected_cols
 
+    # Extract Client
     opening_detail['Client Code'] = None
     opening_detail['Client Name'] = None
 
@@ -207,14 +172,17 @@ def build_opening_detail_pipeline(opening_detail, codes):
 
     opening_detail[['Client Code', 'Client Name']] = opening_detail[['Client Code', 'Client Name']].ffill()
 
+    # Clean
     opening_detail = opening_detail[
         opening_detail['Branch'].notna() &
         (~opening_detail['Branch'].astype(str).str.contains('كود|اجماليات', na=False))
     ]
 
+    # Convert
     for col in ['Opening Balance','Total Sales','Returned Sales','Cash Collection','Collection Checks','End Balance']:
         opening_detail[col] = pd.to_numeric(opening_detail[col], errors='coerce').fillna(0)
 
+    # KPI
     opening_detail["Sales After Returns"] = opening_detail["Total Sales"] - opening_detail['Returned Sales']
     opening_detail['Total Collection'] = opening_detail['Cash Collection'] + opening_detail['Collection Checks']
 
@@ -233,6 +201,10 @@ def build_overdue_pipeline(overdue):
         "120 Days", "150 Days", "More Than 150 Days", "Balance"
     ]
 
+    if overdue.shape[1] < len(expected_cols):
+        for i in range(len(expected_cols) - overdue.shape[1]):
+            overdue[f'extra_{i}'] = np.nan
+
     overdue = overdue.iloc[:, :len(expected_cols)]
     overdue.columns = expected_cols
 
@@ -249,18 +221,22 @@ st.title("📊 Unified KPI System")
 
 data = load_data()
 
-st.header("💰 SALES")
+# SALES
+st.header("💰 SALES KPI")
 sales = build_sales_pipeline(data["sales"], data["codes"])
 st.dataframe(sales["rep"])
 
-st.header("📦 OPENING")
+# OPENING
+st.header("📦 OPENING KPI")
 opening = build_opening_pipeline(data["opening"], data["codes"])
 st.dataframe(opening["rep"])
 
-st.header("📦 OPENING DETAIL")
+# OPENING DETAIL
+st.header("📦 OPENING DETAIL KPI")
 opening_detail = build_opening_detail_pipeline(data["opening_detail"], data["codes"])
 st.dataframe(opening_detail)
 
-st.header("⏳ OVERDUE")
+# OVERDUE
+st.header("⏳ OVERDUE KPI")
 overdue = build_overdue_pipeline(data["overdue"])
 st.dataframe(overdue)
