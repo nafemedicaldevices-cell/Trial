@@ -347,3 +347,98 @@ st.dataframe(opening["rep"], use_container_width=True)
 st.dataframe(opening["manager"], use_container_width=True)
 st.dataframe(opening["area"], use_container_width=True)
 st.dataframe(opening["supervisor"], use_container_width=True)
+
+
+# =========================
+# 🚀 OVERDUE PIPELINE
+# =========================
+def build_overdue_pipeline(overdue, codes):
+
+    overdue = overdue.copy()
+    codes = codes.copy()
+
+    # -----------------------------
+    # Column Standardization
+    # -----------------------------
+    overdue.columns = [
+        "Client Name", "Client Code", "30 Days", "60 Days", "90 Days", "120 Days",
+        "150 Days", "More Than 150 Days", "Balance"
+    ]
+
+    # -----------------------------
+    # Extract Rep Code
+    # -----------------------------
+    overdue['Rep Code'] = None
+    overdue['Old Rep Name'] = None
+
+    mask = overdue['Client Name'].astype(str).str.strip() == "كود المندوب"
+
+    overdue.loc[mask, 'Rep Code'] = overdue.loc[mask, 'Client Code']
+    overdue.loc[mask, 'Old Rep Name'] = overdue.loc[mask, '30 Days']
+
+    overdue[['Rep Code', 'Old Rep Name']] = overdue[['Rep Code', 'Old Rep Name']].ffill()
+
+    # -----------------------------
+    # Filter rows
+    # -----------------------------
+    overdue = overdue[
+        overdue['Client Name'].notna() &
+        (overdue['Client Name'].astype(str).str.strip() != '') &
+        (~overdue['Client Name'].astype(str).str.contains(
+            'اجمالــــــي التقرير|اجمالى الفرع/المندوب|كود الفرع|كود المندوب|اسم العميل',
+            na=False
+        ))
+    ].copy()
+
+    # -----------------------------
+    # Convert numeric
+    # -----------------------------
+    num_cols = [
+        '30 Days','60 Days','90 Days','120 Days',
+        '150 Days','More Than 150 Days','Client Code','Rep Code'
+    ]
+
+    for col in num_cols:
+        overdue[col] = pd.to_numeric(overdue[col], errors='coerce').fillna(0)
+
+    overdue['Rep Code'] = overdue['Rep Code'].astype(int)
+
+    # -----------------------------
+    # Calculations
+    # -----------------------------
+    overdue['Overdue Value'] = (
+        overdue['120 Days'] +
+        overdue['150 Days'] +
+        overdue['More Than 150 Days']
+    )
+
+    overdue['Total Balance'] = overdue[
+        ['30 Days','60 Days','90 Days','120 Days','150 Days','More Than 150 Days']
+    ].sum(axis=1)
+
+    # -----------------------------
+    # Mapping
+    # -----------------------------
+    overdue = overdue.merge(
+        codes[['Rep Code',"Rep Name","Area Name",'Area Code',"Manager Name",'Manager Code',"Supervisor Code"]],
+        on='Rep Code',
+        how='left'
+    )
+
+    # -----------------------------
+    # Grouping (زي sales)
+    # -----------------------------
+    def group(df, col):
+        if col not in df.columns:
+            return pd.DataFrame()
+
+        return df.groupby(col, as_index=False)[
+            ["Overdue Value", "Total Balance"]
+        ].sum()
+
+    return {
+        "rep": group(overdue, "Rep Code"),
+        "manager": group(overdue, "Manager Code"),
+        "area": group(overdue, "Area Code"),
+        "supervisor": group(overdue, "Supervisor Code")
+    }
