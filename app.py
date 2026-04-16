@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import streamlit as st
+import plotly.express as px
 
 # =========================
 # 📅 TIME SETTINGS
@@ -15,237 +16,106 @@ current_quarter = (current_month - 1) // 3 + 1
 def load_data():
     return {
         "target_rep": pd.read_excel("Target Rep.xlsx"),
-        "target_manager": pd.read_excel("Target Manager.xlsx"),
-        "target_area": pd.read_excel("Target Area.xlsx"),
-        "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
-        "target_evak": pd.read_excel("Target Evak.xlsx"),
-
         "sales": pd.read_excel("Sales.xlsx", header=None),
-
-        "mapping": pd.read_excel("Mapping.xlsx"),
         "codes": pd.read_excel("Code.xlsx"),
-
         "opening": pd.read_excel("Opening.xlsx", header=None),
         "overdue": pd.read_excel("Overdue.xlsx", header=None),
+        "mapping": pd.read_excel("Mapping.xlsx"),
     }
 
 
 # =========================
-# 🧠 FIX SALES COLUMNS
+# 🧠 SALES FIX
 # =========================
-def fix_sales_columns(sales):
-
-    expected_cols = [
-        'Date','Warehouse Name','Client Code','Client Name','Notes','MF','Mostanad',
-        'Rep Code','Sales Unit Before Edit','Returns Unit Before Edit',
-        'Sales Price','Invoice Discounts','Sales Value'
+def fix_sales(sales):
+    cols = [
+        'Date','Warehouse','Client Code','Client Name','Notes','MF','Doc',
+        'Rep Code','Sales Unit','Return Unit','Price','Discount','Sales Value'
     ]
-
-    sales = sales.iloc[:, :len(expected_cols)].copy()
-    sales.columns = expected_cols
+    sales = sales.iloc[:, :len(cols)].copy()
+    sales.columns = cols
     return sales
-
-
-# =========================
-# 🚀 TARGET PIPELINE
-# =========================
-def build_target_pipeline(df, id_name, mapping):
-
-    df = df.copy()
-    mapping = mapping.copy()
-
-    df.columns = df.columns.str.strip()
-    mapping.columns = mapping.columns.str.strip()
-
-    if "Product Code" not in df.columns:
-        df["Product Code"] = np.nan
-
-    if "Product Name" not in df.columns:
-        df["Product Name"] = np.nan
-
-    if "Sales Price" not in df.columns:
-        df["Sales Price"] = 0
-
-    df["Product Code"] = pd.to_numeric(df["Product Code"], errors="coerce")
-    mapping["Product Code"] = pd.to_numeric(mapping["Product Code"], errors="coerce")
-
-    mapping = mapping.drop_duplicates("Product Code")
-
-    fixed_cols = [c for c in ["Year", "Product Code", "Old Product Name", "Sales Price"] if c in df.columns]
-    dynamic_cols = [c for c in df.columns if c not in fixed_cols]
-
-    df = df.melt(
-        id_vars=fixed_cols,
-        value_vars=dynamic_cols,
-        var_name=id_name,
-        value_name="Target (Unit)"
-    )
-
-    df[id_name] = pd.to_numeric(
-        df[id_name].astype(str).str.replace(r"[^0-9]", "", regex=True),
-        errors="coerce"
-    )
-
-    if "Product Name" in mapping.columns:
-        df = df.merge(
-            mapping[["Product Code", "Product Name"]],
-            on="Product Code",
-            how="left"
-        )
-
-    df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
-    df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
-
-    df["Value"] = df["Target (Unit)"] * df["Sales Price"]
-
-    def group(d):
-        return d.groupby([id_name], as_index=False)["Value"].sum()
-
-    value_table = group(df).rename(columns={"Value": "Full Year 🏆"})
-
-    return {
-        "value_table": value_table,
-        "products_full": df.groupby([id_name, "Product Code", "Product Name"], as_index=False)
-                          .agg(Units=("Target (Unit)", "sum"), Value=("Value", "sum"))
-    }
 
 
 # =========================
 # 🚀 SALES PIPELINE
 # =========================
-def build_sales_pipeline(sales, codes):
+def sales_pipeline(sales, codes):
 
-    sales = fix_sales_columns(sales)
+    sales = fix_sales(sales)
 
-    for col in [
-        "Sales Unit Before Edit",
-        "Returns Unit Before Edit",
-        "Sales Price",
-        "Invoice Discounts"
-    ]:
-        sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
+    for c in ["Sales Unit","Return Unit","Price"]:
+        sales[c] = pd.to_numeric(sales[c], errors="coerce").fillna(0)
 
     sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
     codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
 
     sales = sales.merge(codes, on="Rep Code", how="inner")
 
-    sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
-    sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
-    sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
+    sales["Sales Value"] = sales["Sales Unit"] * sales["Price"]
+    sales["Return Value"] = sales["Return Unit"] * sales["Price"]
+    sales["Net Sales"] = sales["Sales Value"] - sales["Return Value"]
 
-    def group(df, col):
-        return df.groupby(col, as_index=False)[
-            ["Total Sales Value", "Returns Value", "Sales After Returns"]
-        ].sum()
-
-    return {
-        "rep": group(sales, "Rep Code"),
-        "manager": group(sales, "Manager Code"),
-        "area": group(sales, "Area Code"),
-        "supervisor": group(sales, "Supervisor Code")
-    }
+    return sales
 
 
 # =========================
 # 🚀 OPENING PIPELINE
 # =========================
-def build_opening_pipeline(opening, codes):
+def opening_pipeline(opening, codes):
 
     opening.columns = [
-        'Branch',"Evak",'Opening Balance','Total Sales',
-        'Returns','Sales Value Before Extra Discounts',
-        'Cash Collection','Collection Checks',
-        'Returned Chick','Collection Returned Chick',
-        "Madinah",'Daienah','End Balance'
+        'Branch','Evak','Opening','Sales','Returns',
+        'Extra','Cash','Checks','Return Chick','Return Cash',
+        'Area1','Area2','End Balance'
     ]
 
-    opening['Rep Code'] = None
-    mask = opening['Branch'].astype(str).str.strip() == "كود المندوب"
-    opening.loc[mask, 'Rep Code'] = opening.loc[mask, 'Opening Balance']
-    opening['Rep Code'] = opening['Rep Code'].ffill()
+    opening["Rep Code"] = None
+    mask = opening["Branch"].astype(str).str.contains("كود")
+    opening.loc[mask, "Rep Code"] = opening.loc[mask, "Opening"]
+    opening["Rep Code"] = opening["Rep Code"].ffill()
 
-    opening = opening[
-        opening['Branch'].notna() &
-        (~opening['Branch'].astype(str).str.contains('كود|اجماليات', na=False))
-    ]
+    opening = opening[~opening["Branch"].astype(str).str.contains("اجمالي|كود", na=False)]
 
-    num_cols = [
-        'Opening Balance','Total Sales','Returns',
-        'Cash Collection','Collection Checks','End Balance'
-    ]
+    for c in ["Sales","Returns","Cash","Checks"]:
+        opening[c] = pd.to_numeric(opening[c], errors="coerce").fillna(0)
 
-    for col in num_cols:
-        opening[col] = pd.to_numeric(opening[col], errors='coerce').fillna(0)
-
-    opening['Total Collection'] = opening['Cash Collection'] + opening['Collection Checks']
-    opening["Sales After Returns"] = opening["Total Sales"] - opening['Returns']
+    opening["Net Sales"] = opening["Sales"] - opening["Returns"]
+    opening["Collection"] = opening["Cash"] + opening["Checks"]
 
     opening["Rep Code"] = pd.to_numeric(opening["Rep Code"], errors="coerce")
     codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
 
-    opening = opening.merge(codes, on='Rep Code', how='left')
+    opening = opening.merge(codes, on="Rep Code", how="left")
 
-    def group(df, col):
-        return df.groupby(col, as_index=False)[
-            ["Total Sales", "Returns", "Sales After Returns", "Total Collection"]
-        ].sum()
-
-    return {
-        "rep": group(opening, "Rep Code"),
-        "manager": group(opening, "Manager Code"),
-        "area": group(opening, "Area Code"),
-        "supervisor": group(opening, "Supervisor Code")
-    }
+    return opening
 
 
 # =========================
 # 🚀 OVERDUE PIPELINE
 # =========================
-def build_overdue_pipeline(overdue, codes):
-
-    overdue = overdue.copy()
-    codes = codes.copy()
+def overdue_pipeline(overdue, codes):
 
     overdue.columns = [
-        "Client Name", "Client Code", "30 Days", "60 Days", "90 Days", "120 Days",
-        "150 Days", "More Than 150 Days", "Balance"
+        "Client","Client Code","30","60","90","120","150","150+","Balance"
     ]
 
-    overdue['Rep Code'] = None
-    mask = overdue['Client Name'].astype(str).str.strip() == "كود المندوب"
+    overdue["Rep Code"] = None
+    mask = overdue["Client"].astype(str).str.contains("كود")
+    overdue.loc[mask, "Rep Code"] = overdue.loc[mask, "Client Code"]
+    overdue["Rep Code"] = overdue["Rep Code"].ffill()
 
-    overdue.loc[mask, 'Rep Code'] = overdue.loc[mask, 'Client Code']
-    overdue['Rep Code'] = overdue['Rep Code'].ffill()
+    overdue = overdue[~overdue["Client"].astype(str).str.contains("اجمالي", na=False)]
 
-    overdue = overdue[
-        overdue['Client Name'].notna() &
-        (~overdue['Client Name'].astype(str).str.contains('اجمال', na=False))
-    ]
+    for c in overdue.columns:
+        if overdue[c].dtype != "object":
+            overdue[c] = pd.to_numeric(overdue[c], errors="coerce").fillna(0)
 
-    for col in overdue.columns:
-        if overdue[col].dtype != 'object':
-            overdue[col] = pd.to_numeric(overdue[col], errors='coerce').fillna(0)
+    overdue["Overdue"] = overdue["120"] + overdue["150"] + overdue["150+"]
 
-    overdue['Overdue Value'] = overdue['120 Days'] + overdue['150 Days'] + overdue['More Than 150 Days']
+    overdue = overdue.merge(codes, on="Rep Code", how="left")
 
-    overdue = overdue.merge(
-        codes[['Rep Code',"Manager Code","Area Code","Supervisor Code"]],
-        on="Rep Code",
-        how="left"
-    )
-
-    def group(df, col):
-        return df.groupby(col, as_index=False)[
-            ["Overdue Value"]
-        ].sum()
-
-    return {
-        "rep": group(overdue, "Rep Code"),
-        "manager": group(overdue, "Manager Code"),
-        "area": group(overdue, "Area Code"),
-        "supervisor": group(overdue, "Supervisor Code")
-    }
+    return overdue
 
 
 # =========================
@@ -255,64 +125,96 @@ st.set_page_config(layout="wide")
 st.title("📊 Unified KPI Dashboard")
 
 data = load_data()
-
-codes_df = data["codes"]
+codes = data["codes"]
 
 # =========================
 # 🎛️ FILTERS
 # =========================
 st.sidebar.header("🔎 Filters")
 
-rep_filter = st.sidebar.multiselect("Rep Name", codes_df["Rep Name"].dropna().unique())
-manager_filter = st.sidebar.multiselect("Manager Name", codes_df["Manager Name"].dropna().unique())
-area_filter = st.sidebar.multiselect("Area Name", codes_df["Area Name"].dropna().unique())
-supervisor_filter = st.sidebar.multiselect("Supervisor Name", codes_df["Supervisor Name"].dropna().unique())
+rep = st.sidebar.selectbox("Rep Name", ["All"] + list(codes["Rep Name"].dropna().unique()))
+manager = st.sidebar.selectbox("Manager Name", ["All"] + list(codes["Manager Name"].dropna().unique()))
+area = st.sidebar.selectbox("Area Name", ["All"] + list(codes["Area Name"].dropna().unique()))
 
 
-def apply_filter(df, col, values):
-    if values and col in df.columns:
-        return df[df[col].isin(values)]
-    return df
+def filter_codes(df):
+    temp = df.copy()
+    if rep != "All":
+        temp = temp[temp["Rep Name"] == rep]
+    if manager != "All":
+        temp = temp[temp["Manager Name"] == manager]
+    if area != "All":
+        temp = temp[temp["Area Name"] == area]
+    return temp
 
 
-# =========================
-# 🎯 TARGET
-# =========================
-st.header("🎯 TARGET KPI")
-
-target_rep = build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])["value_table"]
-
-st.dataframe(target_rep)
-
-
-# =========================
-# 💰 SALES
-# =========================
-st.header("💰 SALES KPI")
-
-sales = build_sales_pipeline(data["sales"], data["codes"])
-sales_rep = apply_filter(sales["rep"], "Rep Code", rep_filter)
-
-st.dataframe(sales_rep)
+filtered_codes = filter_codes(codes)
+rep_codes = filtered_codes["Rep Code"].unique()
 
 
 # =========================
-# 📦 OPENING
+# 📦 BUILD DATA
 # =========================
-st.header("📦 OPENING KPI")
+sales = sales_pipeline(data["sales"], codes)
+opening = opening_pipeline(data["opening"], codes)
+overdue = overdue_pipeline(data["overdue"], codes)
 
-opening = build_opening_pipeline(data["opening"], data["codes"])
-opening_rep = apply_filter(opening["rep"], "Rep Code", rep_filter)
 
-st.dataframe(opening_rep)
+sales = sales[sales["Rep Code"].isin(rep_codes)]
+opening = opening[opening["Rep Code"].isin(rep_codes)]
+overdue = overdue[overdue["Rep Code"].isin(rep_codes)]
 
 
 # =========================
-# ⏳ OVERDUE
+# 🎴 KPI CARDS
 # =========================
-st.header("⏳ OVERDUE KPI")
+st.header("📊 KPI Overview")
 
-overdue = build_overdue_pipeline(data["overdue"], data["codes"])
-overdue_rep = apply_filter(overdue["rep"], "Rep Code", rep_filter)
+c1, c2, c3 = st.columns(3)
 
-st.dataframe(overdue_rep)
+c1.metric("💰 Sales", round(sales["Net Sales"].sum()))
+c2.metric("📦 Opening", round(opening["Net Sales"].sum()))
+c3.metric("⏳ Overdue", round(overdue["Overdue"].sum()))
+
+
+# =========================
+# 📊 CHARTS
+# =========================
+
+st.subheader("💰 Sales by Rep")
+fig1 = px.bar(sales, x="Rep Code", y="Net Sales")
+st.plotly_chart(fig1, use_container_width=True)
+
+
+st.subheader("📦 Opening Performance")
+fig2 = px.bar(opening, x="Rep Code", y="Net Sales")
+st.plotly_chart(fig2, use_container_width=True)
+
+
+st.subheader("⏳ Overdue Analysis")
+fig3 = px.bar(overdue, x="Rep Code", y="Overdue")
+st.plotly_chart(fig3, use_container_width=True)
+
+
+# =========================
+# 🎯 TARGET VS SALES
+# =========================
+st.subheader("🎯 Target vs Sales")
+
+target = data["target_rep"]
+target["Rep Code"] = pd.to_numeric(target["Rep Code"], errors="coerce")
+
+compare = target.merge(
+    sales.groupby("Rep Code", as_index=False)["Net Sales"].sum(),
+    on="Rep Code",
+    how="left"
+)
+
+fig4 = px.scatter(
+    compare,
+    x="Target",
+    y="Net Sales",
+    text="Rep Code"
+)
+
+st.plotly_chart(fig4, use_container_width=True)
