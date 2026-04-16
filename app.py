@@ -22,6 +22,9 @@ def load_data():
 
         "sales": pd.read_excel("Sales.xlsx", header=None),
 
+        # ✅ NEW
+        "opening": pd.read_excel("Opening.xlsx", header=None),
+
         "mapping": pd.read_excel("Mapping.xlsx"),
         "codes": pd.read_excel("Code.xlsx"),
     }
@@ -31,7 +34,6 @@ def load_data():
 # 🧠 FIX SALES COLUMNS
 # =========================
 def fix_sales_columns(sales):
-
     expected_cols = [
         'Date','Warehouse Name','Client Code','Client Name','Notes','MF','Mostanad',
         'Rep Code','Sales Unit Before Edit','Returns Unit Before Edit',
@@ -40,7 +42,6 @@ def fix_sales_columns(sales):
 
     sales = sales.iloc[:, :len(expected_cols)].copy()
     sales.columns = expected_cols
-
     return sales
 
 
@@ -84,46 +85,11 @@ def build_target_pipeline(df, id_name, mapping):
 
     df["Value"] = df["Target (Unit)"] * df["Sales Price"]
 
-    full = df.copy()
-    month = df.copy()
-    quarter = df.copy()
-    ytd = df.copy()
-
-    month["Value"] = month["Value"] * (current_month / 12)
-    quarter["Value"] = quarter["Value"] * (current_quarter / 4)
-    ytd["Value"] = ytd["Value"] * (current_month / 12)
-
     def group(d):
         return d.groupby([id_name], as_index=False)["Value"].sum()
 
-    value_table = group(full).rename(columns={"Value": "Full Year 🏆"})
-    value_table = value_table.merge(group(month).rename(columns={"Value": "Month 📅"}), on=id_name, how="left")
-    value_table = value_table.merge(group(quarter).rename(columns={"Value": "Quarter 📊"}), on=id_name, how="left")
-    value_table = value_table.merge(group(ytd).rename(columns={"Value": "YTD 📈"}), on=id_name, how="left")
-
-    # =========================
-    # 📦 PRODUCTS
-    # =========================
-    def product_group(d):
-        if "Product Code" not in d.columns:
-            d["Product Code"] = np.nan
-        if "Product Name" not in d.columns:
-            d["Product Name"] = "Unknown"
-
-        return d.groupby(
-            [id_name, "Product Code", "Product Name"],
-            as_index=False
-        ).agg(
-            Units=("Target (Unit)", "sum"),
-            Value=("Value", "sum")
-        )
-
     return {
-        "value_table": value_table,
-        "products_full": product_group(full),
-        "products_month": product_group(month),
-        "products_quarter": product_group(quarter),
-        "products_ytd": product_group(ytd),
+        "value_table": group(df),
     }
 
 
@@ -152,94 +118,17 @@ def build_sales_pipeline(sales, codes):
 
     if sales.empty:
         st.error("❌ مفيش تطابق بين Sales و Code")
-        return {}
+        return {"rep": pd.DataFrame()}
 
     sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
     sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
     sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
 
-    def group(df, col):
-        if col not in df.columns:
-            return pd.DataFrame()
-        return df.groupby(col, as_index=False)[
+    return {
+        "rep": sales.groupby("Rep Code", as_index=False)[
             ["Total Sales Value", "Returns Value", "Sales After Returns"]
         ].sum()
-
-    return {
-        "rep": group(sales, "Rep Code"),
-        "manager": group(sales, "Manager Code"),
-        "area": group(sales, "Area Code"),
-        "supervisor": group(sales, "Supervisor Code")
     }
-
-
-# =========================
-# 🎨 STREAMLIT UI
-# =========================
-st.set_page_config(layout="wide")
-st.title("📊 Unified KPI System")
-
-data = load_data()
-
-# =========================
-# 🎯 TARGET
-# =========================
-st.header("🎯 TARGET KPI")
-
-target_rep = build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
-target_manager = build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"])
-target_area = build_target_pipeline(data["target_area"], "Area Code", data["mapping"])
-target_supervisor = build_target_pipeline(data["target_supervisor"], "Supervisor Code", data["mapping"])
-
-st.subheader("Rep Target")
-st.dataframe(target_rep["value_table"])
-
-st.subheader("Manager Target")
-st.dataframe(target_manager["value_table"])
-
-st.subheader("Area Target")
-st.dataframe(target_area["value_table"])
-
-st.subheader("Supervisor Target")
-st.dataframe(target_supervisor["value_table"])
-
-
-# =========================
-# 📦 PRODUCTS
-# =========================
-st.header("📦 PRODUCTS")
-
-st.subheader("Rep Products")
-st.dataframe(target_rep["products_full"], use_container_width=True)
-
-st.subheader("Manager Products")
-st.dataframe(target_manager["products_full"], use_container_width=True)
-
-st.subheader("Area Products")
-st.dataframe(target_area["products_full"], use_container_width=True)
-
-st.subheader("Supervisor Products")
-st.dataframe(target_supervisor["products_full"], use_container_width=True)
-
-
-# =========================
-# 💰 SALES
-# =========================
-st.header("💰 SALES KPI")
-
-sales = build_sales_pipeline(data["sales"], data["codes"])
-
-st.subheader("Rep Sales")
-st.dataframe(sales["rep"], use_container_width=True)
-
-st.subheader("Manager Sales")
-st.dataframe(sales["manager"], use_container_width=True)
-
-st.subheader("Area Sales")
-st.dataframe(sales["area"], use_container_width=True)
-
-st.subheader("Supervisor Sales")
-st.dataframe(sales["supervisor"], use_container_width=True)
 
 
 # =========================
@@ -248,11 +137,9 @@ st.dataframe(sales["supervisor"], use_container_width=True)
 def build_opening_pipeline(opening, codes):
 
     opening = opening.copy()
-    codes = codes.copy()
 
-    # ----------------------
-    # 🧹 Rename Columns
-    # ----------------------
+    # 🧹 rename
+    opening = opening.iloc[:, :13]
     opening.columns = [
         'Branch',"Evak",'Opening Balance','Total Sales',
         'Returns','Sales Value Before Extra Discounts',
@@ -261,79 +148,73 @@ def build_opening_pipeline(opening, codes):
         "Madinah",'Daienah','End Balance'
     ]
 
-    # ----------------------
-    # 🧠 Extract Rep Info
-    # ----------------------
+    # 🧠 extract rep
     opening['Rep Code'] = None
-    opening['Old Rep Name'] = None
-
     mask = opening['Branch'].astype(str).str.strip() == "كود المندوب"
-
     opening.loc[mask, 'Rep Code'] = opening.loc[mask, 'Opening Balance']
-    opening.loc[mask, 'Old Rep Name'] = opening.loc[mask, 'Total Sales']
+    opening['Rep Code'] = opening['Rep Code'].ffill()
 
-    opening[['Rep Code', 'Old Rep Name']] = opening[['Rep Code', 'Old Rep Name']].ffill()
-
-    # ----------------------
-    # 🚫 Filter Rows
-    # ----------------------
+    # 🧹 filter
     opening = opening[
         opening['Branch'].notna() &
-        (opening['Branch'].astype(str).str.strip() != '') &
-        (~opening['Branch'].astype(str).str.contains('نسبة المندوب|كود المندوب|اجماليات|كود الفرع', na=False))
-    ].copy()
+        (~opening['Branch'].astype(str).str.contains('كود المندوب|اجماليات', na=False))
+    ]
 
-    # ----------------------
-    # 🔢 Numeric Conversion
-    # ----------------------
+    # 🔢 numeric
     num_cols = [
         'Opening Balance','Total Sales','Returns',
-        'Sales Value Before Extra Discounts',
-        'Cash Collection','Collection Checks',
-        'Returned Chick','Collection Returned Chick',
-        'Madinah','Daienah','End Balance'
+        'Cash Collection','Collection Checks','End Balance'
     ]
 
     for col in num_cols:
-        opening[col] = pd.to_numeric(opening[col], errors='coerce').fillna(0)
+        opening[col] = pd.to_numeric(opening[col], errors="coerce").fillna(0)
 
-    # ----------------------
-    # ➕ Calculations
-    # ----------------------
+    # ➕ calc
     opening['Total Collection'] = opening['Cash Collection'] + opening['Collection Checks']
     opening["Sales After Returns"] = opening["Total Sales"] - opening['Returns']
 
-    # ----------------------
-    # 🔗 Merge Mapping
-    # ----------------------
-    opening['Rep Code'] = pd.to_numeric(opening['Rep Code'], errors='coerce')
-    codes['Rep Code'] = pd.to_numeric(codes['Rep Code'], errors='coerce')
+    # 🔗 merge
+    opening['Rep Code'] = pd.to_numeric(opening['Rep Code'], errors="coerce")
+    codes['Rep Code'] = pd.to_numeric(codes['Rep Code'], errors="coerce")
 
-    opening = opening.merge(
-        codes[['Rep Code',"Rep Name","Area Name",'Area Code',"Manager Name", 'Manager Code']],
-        on='Rep Code',
-        how='left'
-    )
+    opening = opening.merge(codes, on='Rep Code', how='left')
 
-    # ----------------------
-    # 📊 Group Function
-    # ----------------------
-    def group(df, col):
-        if col not in df.columns:
-            return pd.DataFrame()
-
-        return df.groupby(col, as_index=False)[[
-            'Opening Balance',
-            'Total Sales',
-            'Returns',
-            'Sales After Returns',
-            'Total Collection',
-            'End Balance'
-        ]].sum()
+    # 📊 group
+    rep = opening.groupby('Rep Code', as_index=False)[
+        ['Opening Balance','Total Sales','Returns','Sales After Returns','Total Collection','End Balance']
+    ].sum()
 
     return {
-        "rep": group(opening, "Rep Code"),
-        "area": group(opening, "Area Code"),
-        "manager": group(opening, "Manager Code"),
-        "full_data": opening
+        "rep": rep,
+        "full": opening
     }
+
+
+# =========================
+# 🎨 UI
+# =========================
+st.set_page_config(layout="wide")
+st.title("📊 Unified KPI System")
+
+data = load_data()
+
+# TARGET
+st.header("🎯 TARGET KPI")
+target_rep = build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
+st.dataframe(target_rep["value_table"])
+
+# SALES
+st.header("💰 SALES KPI")
+sales = build_sales_pipeline(data["sales"], data["codes"])
+st.dataframe(sales["rep"])
+
+# OPENING
+st.header("💵 COLLECTION KPI")
+opening = build_opening_pipeline(data["opening"], data["codes"])
+
+st.subheader("Rep Collection")
+st.dataframe(opening["rep"], use_container_width=True)
+
+# DEBUG (احذفها بعد ما تتأكد)
+st.subheader("🔍 Debug Opening Data")
+st.dataframe(opening["full"])
