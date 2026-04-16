@@ -8,6 +8,7 @@ import streamlit as st
 current_month = pd.Timestamp.today().month
 current_quarter = (current_month - 1) // 3 + 1
 
+
 # =========================
 # 📂 LOAD DATA
 # =========================
@@ -25,21 +26,27 @@ def load_data():
         "codes": pd.read_excel("Code.xlsx"),
 
         "opening": pd.read_excel("Opening.xlsx", header=None),
+        "opening_detail": pd.read_excel("Opening Detail.xlsx", header=None),
         "overdue": pd.read_excel("Overdue.xlsx", header=None),
     }
 
+
 # =========================
-# 🧠 FIX SALES COLUMNS
+# 🧠 FIX SALES
 # =========================
 def fix_sales_columns(sales):
+
     expected_cols = [
         'Date','Warehouse Name','Client Code','Client Name','Notes','MF','Mostanad',
         'Rep Code','Sales Unit Before Edit','Returns Unit Before Edit',
         'Sales Price','Invoice Discounts','Sales Value'
     ]
+
     sales = sales.iloc[:, :len(expected_cols)].copy()
     sales.columns = expected_cols
+
     return sales
+
 
 # =========================
 # 🚀 TARGET PIPELINE
@@ -54,8 +61,10 @@ def build_target_pipeline(df, id_name, mapping):
 
     if "Product Code" not in df.columns:
         df["Product Code"] = np.nan
+
     if "Product Name" not in df.columns:
         df["Product Name"] = np.nan
+
     if "Sales Price" not in df.columns:
         df["Sales Price"] = 0
 
@@ -103,13 +112,16 @@ def build_target_pipeline(df, id_name, mapping):
     def group(d):
         return d.groupby([id_name], as_index=False)["Value"].sum()
 
-    value_table = group(full).rename(columns={"Value": "Full Year"})
-    value_table = value_table.merge(group(month).rename(columns={"Value": "Month"}), on=id_name)
-    value_table = value_table.merge(group(quarter).rename(columns={"Value": "Quarter"}), on=id_name)
-    value_table = value_table.merge(group(ytd).rename(columns={"Value": "YTD"}), on=id_name)
+    value_table = group(full).rename(columns={"Value": "Full Year 🏆"})
+    value_table = value_table.merge(group(month).rename(columns={"Value": "Month 📅"}), on=id_name)
+    value_table = value_table.merge(group(quarter).rename(columns={"Value": "Quarter 📊"}), on=id_name)
+    value_table = value_table.merge(group(ytd).rename(columns={"Value": "YTD 📈"}), on=id_name)
 
     def product_group(d):
-        return d.groupby([id_name, "Product Code", "Product Name"], as_index=False).agg(
+        return d.groupby(
+            [id_name, "Product Code", "Product Name"],
+            as_index=False
+        ).agg(
             Units=("Target (Unit)", "sum"),
             Value=("Value", "sum")
         )
@@ -118,6 +130,7 @@ def build_target_pipeline(df, id_name, mapping):
         "value_table": value_table,
         "products_full": product_group(full),
     }
+
 
 # =========================
 # 🚀 SALES PIPELINE
@@ -155,8 +168,9 @@ def build_sales_pipeline(sales, codes):
         "supervisor": group(sales, "Supervisor Code")
     }
 
+
 # =========================
-# 🚀 OPENING PIPELINE + DETAILS
+# 🚀 OPENING PIPELINE
 # =========================
 def build_opening_pipeline(opening, codes):
 
@@ -189,9 +203,6 @@ def build_opening_pipeline(opening, codes):
     opening['Total Collection'] = opening['Cash Collection'] + opening['Collection Checks']
     opening["Sales After Returns"] = opening["Total Sales"] - opening['Returns']
 
-    opening["Rep Code"] = pd.to_numeric(opening["Rep Code"], errors="coerce")
-    codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
-
     opening = opening.merge(codes, on='Rep Code', how='left')
 
     def group(df, col):
@@ -199,8 +210,26 @@ def build_opening_pipeline(opening, codes):
             ["Total Sales","Returns","Sales After Returns","Total Collection"]
         ].sum()
 
-    # DETAILS
-    opening_detail = opening.copy()
+    return {
+        "rep": group(opening, "Rep Code"),
+        "manager": group(opening, "Manager Code"),
+        "area": group(opening, "Area Code"),
+        "supervisor": group(opening, "Supervisor Code")
+    }
+
+
+# =========================
+# 🚀 OPENING DETAIL PIPELINE
+# =========================
+def build_opening_detail_pipeline(opening_detail, codes):
+
+    opening_detail.columns = [
+        'Branch',"Evak",'Opening Balance','Total Sales',
+        'Returned Sales','Sales Value Before Extra Discounts',
+        'Cash Collection',"Blank1",'Collection Checks',
+        "Blank2",'Returned Chick','Collection Returned Chick',
+        "Madinah",'Daienah','End Balance'
+    ]
 
     opening_detail['Client Code'] = None
     opening_detail['Client Name'] = None
@@ -212,13 +241,31 @@ def build_opening_pipeline(opening, codes):
 
     opening_detail[['Client Code', 'Client Name']] = opening_detail[['Client Code', 'Client Name']].ffill()
 
+    opening_detail = opening_detail[
+        opening_detail['Branch'].notna() &
+        (~opening_detail['Branch'].astype(str).str.contains('كود|اجماليات', na=False))
+    ]
+
+    num_cols = [
+        'Opening Balance','Total Sales','Returned Sales',
+        'Cash Collection','Collection Checks','End Balance'
+    ]
+
+    for col in num_cols:
+        opening_detail[col] = pd.to_numeric(opening_detail[col], errors='coerce').fillna(0)
+
+    opening_detail["Sales After Returns"] = opening_detail["Total Sales"] - opening_detail['Returned Sales']
+    opening_detail['Total Collection'] = opening_detail['Cash Collection'] + opening_detail['Collection Checks']
+
+    def group(df, col):
+        return df.groupby(col, as_index=False)[
+            ["Total Sales","Returned Sales","Sales After Returns","Total Collection"]
+        ].sum()
+
     return {
-        "rep": group(opening, "Rep Code"),
-        "manager": group(opening, "Manager Code"),
-        "area": group(opening, "Area Code"),
-        "supervisor": group(opening, "Supervisor Code"),
-        "details": opening_detail
+        "client": group(opening_detail, "Client Code")
     }
+
 
 # =========================
 # 🚀 OVERDUE PIPELINE
@@ -230,33 +277,19 @@ def build_overdue_pipeline(overdue, codes):
         "150 Days", "More Than 150 Days", "Balance"
     ]
 
-    overdue['Rep Code'] = None
-    mask = overdue['Client Name'].astype(str).str.strip() == "كود المندوب"
-    overdue.loc[mask, 'Rep Code'] = overdue.loc[mask, 'Client Code']
-    overdue['Rep Code'] = overdue['Rep Code'].ffill()
-
-    overdue = overdue[
-        overdue['Client Name'].notna() &
-        (~overdue['Client Name'].astype(str).str.contains('اجمال', na=False))
-    ]
-
-    for col in ["120 Days","150 Days","More Than 150 Days"]:
-        overdue[col] = pd.to_numeric(overdue[col], errors="coerce").fillna(0)
-
-    overdue["Overdue Value"] = overdue["120 Days"] + overdue["150 Days"] + overdue["More Than 150 Days"]
-
-    overdue = overdue.merge(codes, on="Rep Code", how="left")
+    overdue['Overdue Value'] = (
+        overdue['120 Days'] +
+        overdue['150 Days'] +
+        overdue['More Than 150 Days']
+    )
 
     def group(df, col):
         return df.groupby(col, as_index=False)[["Overdue Value"]].sum()
 
     return {
-        "rep": group(overdue, "Rep Code"),
-        "manager": group(overdue, "Manager Code"),
-        "area": group(overdue, "Area Code"),
-        "supervisor": group(overdue, "Supervisor Code"),
-        "details": overdue
+        "client": group(overdue, "Client Code")
     }
+
 
 # =========================
 # 🎨 UI
@@ -266,32 +299,7 @@ st.title("📊 Unified KPI System")
 
 data = load_data()
 
-# TARGET
-st.header("🎯 TARGET KPI")
-target_rep = build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
-st.dataframe(target_rep["value_table"])
+st.header("📦 OPENING DETAIL KPI")
 
-# PRODUCTS
-st.header("📦 PRODUCTS")
-st.dataframe(target_rep["products_full"])
-
-# SALES
-st.header("💰 SALES KPI")
-sales = build_sales_pipeline(data["sales"], data["codes"])
-st.dataframe(sales["rep"])
-
-# OPENING
-st.header("📦 OPENING KPI")
-opening = build_opening_pipeline(data["opening"], data["codes"])
-st.dataframe(opening["rep"])
-
-st.subheader("📄 Opening Details")
-st.dataframe(opening["details"])
-
-# OVERDUE
-st.header("⏳ OVERDUE KPI")
-overdue = build_overdue_pipeline(data["overdue"], data["codes"])
-st.dataframe(overdue["rep"])
-
-st.subheader("📄 Overdue Details")
-st.dataframe(overdue["details"])
+opening_detail = build_opening_detail_pipeline(data["opening_detail"], data["codes"])
+st.dataframe(opening_detail["client"])
