@@ -116,26 +116,43 @@ def overdue_pipeline(overdue, codes):
 
 
 # =========================
-# 🎛️ FILTERS
+# 🎛️ DEPENDENT FILTERS
 # =========================
 st.sidebar.header("🔎 Filters")
 
-rep = st.sidebar.selectbox("Rep Name", ["All"] + list(codes["Rep Name"].dropna().unique()))
-manager = st.sidebar.selectbox("Manager Name", ["All"] + list(codes["Manager Name"].dropna().unique()))
-area = st.sidebar.selectbox("Area Name", ["All"] + list(codes["Area Name"].dropna().unique()))
+rep_options = ["All"] + list(codes["Rep Name"].dropna().unique())
+manager_options = ["All"] + list(codes["Manager Name"].dropna().unique())
+area_options = ["All"] + list(codes["Area Name"].dropna().unique())
+
+rep = st.sidebar.selectbox("👤 Rep Name", rep_options)
+
+# 🧠 Rep has highest priority
+if rep != "All":
+    manager = "All"
+    area = "All"
+    st.sidebar.info("⚠️ Rep selected → other filters ignored")
+else:
+    manager = st.sidebar.selectbox("👔 Manager Name", manager_options)
+    area = st.sidebar.selectbox("🌍 Area Name", area_options)
 
 
+# =========================
+# 🧠 FILTER ENGINE
+# =========================
 def filter_codes(df):
     temp = df.copy()
 
     if rep != "All":
         temp = temp[temp["Rep Name"] == rep]
+        return temp
 
     if manager != "All":
         temp = temp[temp["Manager Name"] == manager]
+        return temp
 
     if area != "All":
         temp = temp[temp["Area Name"] == area]
+        return temp
 
     return temp
 
@@ -150,7 +167,6 @@ rep_codes = filtered["Rep Code"].unique()
 sales = sales_pipeline(data["sales"], codes)
 opening = opening_pipeline(data["opening"], codes)
 overdue = overdue_pipeline(data["overdue"], codes)
-
 
 sales = sales[sales["Rep Code"].isin(rep_codes)]
 opening = opening[opening["Rep Code"].isin(rep_codes)]
@@ -170,7 +186,7 @@ c3.metric("⏳ Overdue", round(overdue["Overdue"].sum()))
 
 
 # =========================
-# 📊 TABLES
+# 📊 TABLES (DETAIL VIEW)
 # =========================
 st.subheader("💰 Sales Data")
 st.dataframe(sales)
