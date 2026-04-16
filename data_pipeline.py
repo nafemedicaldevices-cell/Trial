@@ -18,9 +18,12 @@ def load_data():
         "target_area": pd.read_excel("Target Area.xlsx"),
         "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
         "target_evak": pd.read_excel("Target Evak.xlsx"),
+
         "sales": pd.read_excel("Sales.xlsx", header=None),
+
         "mapping": pd.read_excel("Mapping.xlsx"),
         "codes": pd.read_excel("Code.xlsx"),
+
         "opening": pd.read_excel("Opening.xlsx", header=None),
         "overdue": pd.read_excel("Overdue.xlsx", header=None),
     }
@@ -35,6 +38,7 @@ def fix_sales_columns(sales):
         'Rep Code','Sales Unit Before Edit','Returns Unit Before Edit',
         'Sales Price','Invoice Discounts','Sales Value'
     ]
+
     sales = sales.iloc[:, :len(expected_cols)].copy()
     sales.columns = expected_cols
     return sales
@@ -98,7 +102,7 @@ def build_target_pipeline(df, id_name, mapping):
 
     return {
         "value_table": value_table,
-        "products": df
+        "products_full": df
     }
 
 
@@ -148,8 +152,13 @@ def build_opening_pipeline(opening, codes):
 
     opening = opening[opening['Branch'].notna()]
 
-    for c in ['Total Sales','Returns','Cash Collection','Collection Checks']:
-        opening[c] = pd.to_numeric(opening[c], errors="coerce").fillna(0)
+    num_cols = [
+        'Opening Balance','Total Sales','Returns',
+        'Cash Collection','Collection Checks','End Balance'
+    ]
+
+    for col in num_cols:
+        opening[col] = pd.to_numeric(opening[col], errors='coerce').fillna(0)
 
     opening["Sales After Returns"] = opening["Total Sales"] - opening["Returns"]
 
@@ -173,25 +182,32 @@ def build_opening_pipeline(opening, codes):
 # =========================
 def build_overdue_pipeline(overdue, codes):
 
+    overdue = overdue.copy()
+
     overdue.columns = [
         "Client Name", "Client Code", "30 Days", "60 Days", "90 Days", "120 Days",
         "150 Days", "More Than 150 Days", "Balance"
     ]
 
-    overdue = overdue.copy()
-
     overdue["Rep Code"] = None
     mask = overdue["Client Name"].astype(str).str.strip() == "كود المندوب"
+
     overdue.loc[mask, "Rep Code"] = overdue.loc[mask, "Client Code"]
     overdue["Rep Code"] = overdue["Rep Code"].ffill()
 
-    overdue = overdue[~overdue["Client Name"].astype(str).str.contains("اجمال", na=False)]
+    overdue = overdue[
+        ~overdue["Client Name"].astype(str).str.contains("اجمال", na=False)
+    ]
 
     for c in overdue.columns:
-        if c not in ["Client Name"]:
+        if c != "Client Name":
             overdue[c] = pd.to_numeric(overdue[c], errors="coerce").fillna(0)
 
-    overdue["Overdue Value"] = overdue["120 Days"] + overdue["150 Days"] + overdue["More Than 150 Days"]
+    overdue["Overdue Value"] = (
+        overdue["120 Days"] +
+        overdue["150 Days"] +
+        overdue["More Than 150 Days"]
+    )
 
     overdue = overdue.merge(codes, on="Rep Code", how="left")
 
