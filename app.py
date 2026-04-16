@@ -1,13 +1,12 @@
 import pandas as pd
 import numpy as np
 import streamlit as st
-import plotly.express as px
 
 # =========================
-# 📅 TIME SETTINGS
+# 📅 SETTINGS
 # =========================
-current_month = pd.Timestamp.today().month
-current_quarter = (current_month - 1) // 3 + 1
+st.set_page_config(layout="wide")
+st.title("📊 Unified KPI Dashboard")
 
 
 # =========================
@@ -20,31 +19,27 @@ def load_data():
         "codes": pd.read_excel("Code.xlsx"),
         "opening": pd.read_excel("Opening.xlsx", header=None),
         "overdue": pd.read_excel("Overdue.xlsx", header=None),
-        "mapping": pd.read_excel("Mapping.xlsx"),
     }
 
 
+data = load_data()
+codes = data["codes"]
+
+
 # =========================
-# 🧠 SALES FIX
+# 🧠 SALES PIPELINE
 # =========================
-def fix_sales(sales):
+def sales_pipeline(sales, codes):
+
     cols = [
         'Date','Warehouse','Client Code','Client Name','Notes','MF','Doc',
         'Rep Code','Sales Unit','Return Unit','Price','Discount','Sales Value'
     ]
+
     sales = sales.iloc[:, :len(cols)].copy()
     sales.columns = cols
-    return sales
 
-
-# =========================
-# 🚀 SALES PIPELINE
-# =========================
-def sales_pipeline(sales, codes):
-
-    sales = fix_sales(sales)
-
-    for c in ["Sales Unit","Return Unit","Price"]:
+    for c in ["Sales Unit", "Return Unit", "Price"]:
         sales[c] = pd.to_numeric(sales[c], errors="coerce").fillna(0)
 
     sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
@@ -60,14 +55,14 @@ def sales_pipeline(sales, codes):
 
 
 # =========================
-# 🚀 OPENING PIPELINE
+# 📦 OPENING PIPELINE
 # =========================
 def opening_pipeline(opening, codes):
 
     opening.columns = [
         'Branch','Evak','Opening','Sales','Returns',
         'Extra','Cash','Checks','Return Chick','Return Cash',
-        'Area1','Area2','End Balance'
+        'A','B','End'
     ]
 
     opening["Rep Code"] = None
@@ -92,7 +87,7 @@ def opening_pipeline(opening, codes):
 
 
 # =========================
-# 🚀 OVERDUE PIPELINE
+# ⏳ OVERDUE PIPELINE
 # =========================
 def overdue_pipeline(overdue, codes):
 
@@ -108,24 +103,17 @@ def overdue_pipeline(overdue, codes):
     overdue = overdue[~overdue["Client"].astype(str).str.contains("اجمالي", na=False)]
 
     for c in overdue.columns:
-        if overdue[c].dtype != "object":
-            overdue[c] = pd.to_numeric(overdue[c], errors="coerce").fillna(0)
+        overdue[c] = pd.to_numeric(overdue[c], errors="coerce").fillna(0)
 
     overdue["Overdue"] = overdue["120"] + overdue["150"] + overdue["150+"]
+
+    overdue["Rep Code"] = pd.to_numeric(overdue["Rep Code"], errors="coerce")
+    codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
 
     overdue = overdue.merge(codes, on="Rep Code", how="left")
 
     return overdue
 
-
-# =========================
-# 🎨 STREAMLIT UI
-# =========================
-st.set_page_config(layout="wide")
-st.title("📊 Unified KPI Dashboard")
-
-data = load_data()
-codes = data["codes"]
 
 # =========================
 # 🎛️ FILTERS
@@ -139,21 +127,25 @@ area = st.sidebar.selectbox("Area Name", ["All"] + list(codes["Area Name"].dropn
 
 def filter_codes(df):
     temp = df.copy()
+
     if rep != "All":
         temp = temp[temp["Rep Name"] == rep]
+
     if manager != "All":
         temp = temp[temp["Manager Name"] == manager]
+
     if area != "All":
         temp = temp[temp["Area Name"] == area]
+
     return temp
 
 
-filtered_codes = filter_codes(codes)
-rep_codes = filtered_codes["Rep Code"].unique()
+filtered = filter_codes(codes)
+rep_codes = filtered["Rep Code"].unique()
 
 
 # =========================
-# 📦 BUILD DATA
+# 🚀 BUILD DATA
 # =========================
 sales = sales_pipeline(data["sales"], codes)
 opening = opening_pipeline(data["opening"], codes)
@@ -178,22 +170,16 @@ c3.metric("⏳ Overdue", round(overdue["Overdue"].sum()))
 
 
 # =========================
-# 📊 CHARTS
+# 📊 TABLES
 # =========================
+st.subheader("💰 Sales Data")
+st.dataframe(sales)
 
-st.subheader("💰 Sales by Rep")
-fig1 = px.bar(sales, x="Rep Code", y="Net Sales")
-st.plotly_chart(fig1, use_container_width=True)
+st.subheader("📦 Opening Data")
+st.dataframe(opening)
 
-
-st.subheader("📦 Opening Performance")
-fig2 = px.bar(opening, x="Rep Code", y="Net Sales")
-st.plotly_chart(fig2, use_container_width=True)
-
-
-st.subheader("⏳ Overdue Analysis")
-fig3 = px.bar(overdue, x="Rep Code", y="Overdue")
-st.plotly_chart(fig3, use_container_width=True)
+st.subheader("⏳ Overdue Data")
+st.dataframe(overdue)
 
 
 # =========================
@@ -210,11 +196,4 @@ compare = target.merge(
     how="left"
 )
 
-fig4 = px.scatter(
-    compare,
-    x="Target",
-    y="Net Sales",
-    text="Rep Code"
-)
-
-st.plotly_chart(fig4, use_container_width=True)
+st.dataframe(compare)
