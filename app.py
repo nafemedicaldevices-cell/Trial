@@ -48,7 +48,7 @@ def fix_sales_columns(sales):
 
 
 # =========================
-# 🚀 TARGET PIPELINE
+# 🚀 TARGET PIPELINE (FIXED PRODUCTS)
 # =========================
 def build_target_pipeline(df, id_name, mapping):
 
@@ -56,15 +56,31 @@ def build_target_pipeline(df, id_name, mapping):
     mapping = mapping.copy()
 
     df.columns = df.columns.str.strip()
+    mapping.columns = mapping.columns.str.strip()
 
+    # -------------------------
+    # Ensure Product Columns
+    # -------------------------
     if "Product Code" not in df.columns:
         df["Product Code"] = np.nan
 
+    if "Product Name" not in df.columns:
+        df["Product Name"] = np.nan
+
+    if "Sales Price" not in df.columns:
+        df["Sales Price"] = 0
+
+    # -------------------------
+    # Normalize types
+    # -------------------------
     df["Product Code"] = pd.to_numeric(df["Product Code"], errors="coerce")
     mapping["Product Code"] = pd.to_numeric(mapping["Product Code"], errors="coerce")
 
     mapping = mapping.drop_duplicates("Product Code")
 
+    # -------------------------
+    # Melt logic
+    # -------------------------
     fixed_cols = [c for c in ["Year", "Product Code", "Old Product Name", "Sales Price"] if c in df.columns]
     dynamic_cols = [c for c in df.columns if c not in fixed_cols]
 
@@ -80,8 +96,19 @@ def build_target_pipeline(df, id_name, mapping):
         errors="coerce"
     )
 
-    df = df.merge(mapping, on="Product Code", how="left")
+    # -------------------------
+    # FIX PRODUCT NAME FROM MAPPING (IMPORTANT)
+    # -------------------------
+    if "Product Name" in mapping.columns:
+        df = df.merge(
+            mapping[["Product Code", "Product Name"]],
+            on="Product Code",
+            how="left"
+        )
 
+    # -------------------------
+    # Calculations
+    # -------------------------
     df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
     df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
 
@@ -104,9 +131,14 @@ def build_target_pipeline(df, id_name, mapping):
     value_table = value_table.merge(group(quarter).rename(columns={"Value": "Quarter 📊"}), on=id_name, how="left")
     value_table = value_table.merge(group(ytd).rename(columns={"Value": "YTD 📈"}), on=id_name, how="left")
 
+    # -------------------------
+    # PRODUCTS FIXED (NO EMPTY ISSUE)
+    # -------------------------
     def product_group(d):
+
         if "Product Code" not in d.columns:
             d["Product Code"] = np.nan
+
         if "Product Name" not in d.columns:
             d["Product Name"] = "Unknown"
 
@@ -289,7 +321,7 @@ def build_overdue_pipeline(overdue, codes):
     ].sum(axis=1)
 
     overdue = overdue.merge(
-        codes[['Rep Code',"Rep Name","Area Name",'Area Code',"Manager Name",'Manager Code',"Supervisor Code"]],
+        codes[['Rep Code',"Rep Name","Area Name",'Area Code',"Manager Name","Manager Code","Supervisor Code"]],
         on='Rep Code',
         how='left'
     )
@@ -352,10 +384,10 @@ st.header("💰 SALES KPI")
 
 sales = build_sales_pipeline(data["sales"], data["codes"])
 
-st.dataframe(sales.get("rep", pd.DataFrame()))
-st.dataframe(sales.get("manager", pd.DataFrame()))
-st.dataframe(sales.get("area", pd.DataFrame()))
-st.dataframe(sales.get("supervisor", pd.DataFrame()))
+st.dataframe(sales["rep"])
+st.dataframe(sales["manager"])
+st.dataframe(sales["area"])
+st.dataframe(sales["supervisor"])
 
 
 # =========================
@@ -365,20 +397,20 @@ st.header("📦 OPENING KPI")
 
 opening = build_opening_pipeline(data["opening"], data["codes"])
 
-st.dataframe(opening.get("rep", pd.DataFrame()))
-st.dataframe(opening.get("manager", pd.DataFrame()))
-st.dataframe(opening.get("area", pd.DataFrame()))
-st.dataframe(opening.get("supervisor", pd.DataFrame()))
+st.dataframe(opening["rep"])
+st.dataframe(opening["manager"])
+st.dataframe(opening["area"])
+st.dataframe(opening["supervisor"])
 
 
 # =========================
-# ⏳ OVERDUE KPI
+# ⏳ OVERDUE
 # =========================
 st.header("⏳ OVERDUE KPI")
 
 overdue = build_overdue_pipeline(data["overdue"], data["codes"])
 
-st.dataframe(overdue.get("rep", pd.DataFrame()))
-st.dataframe(overdue.get("manager", pd.DataFrame()))
-st.dataframe(overdue.get("area", pd.DataFrame()))
-st.dataframe(overdue.get("supervisor", pd.DataFrame()))
+st.dataframe(overdue["rep"])
+st.dataframe(overdue["manager"])
+st.dataframe(overdue["area"])
+st.dataframe(overdue["supervisor"])
