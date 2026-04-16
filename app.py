@@ -244,16 +244,6 @@ st.dataframe(sales["supervisor"], use_container_width=True)
 
 
 
-
-
-
-
-
-
-
-
-
-
 # =========================
 # 🚀 OPENING PIPELINE
 # =========================
@@ -309,34 +299,6 @@ def build_opening_pipeline(opening, codes):
         "area": group(opening, "Area Code"),
         "supervisor": group(opening, "Supervisor Code")
     }
-
-
-# =========================
-# 🎨 STREAMLIT UI
-# =========================
-st.set_page_config(layout="wide")
-st.title("📊 Unified KPI System")
-
-data = load_data()
-
-# =========================
-# 🎯 TARGET
-# =========================
-st.header("🎯 TARGET KPI")
-target_rep = build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
-st.dataframe(target_rep["value_table"], use_container_width=True)
-
-# =========================
-# 💰 SALES
-# =========================
-st.header("💰 SALES KPI")
-sales = build_sales_pipeline(data["sales"], data["codes"])
-
-st.dataframe(sales["rep"], use_container_width=True)
-st.dataframe(sales["manager"], use_container_width=True)
-st.dataframe(sales["area"], use_container_width=True)
-st.dataframe(sales["supervisor"], use_container_width=True)
-
 # =========================
 # 📦 OPENING
 # =========================
@@ -347,6 +309,7 @@ st.dataframe(opening["rep"], use_container_width=True)
 st.dataframe(opening["manager"], use_container_width=True)
 st.dataframe(opening["area"], use_container_width=True)
 st.dataframe(opening["supervisor"], use_container_width=True)
+
 
 # =========================
 # 🚀 OVERDUE PIPELINE
@@ -441,8 +404,6 @@ def build_overdue_pipeline(overdue, codes):
         "area": group(overdue, "Area Code"),
         "supervisor": group(overdue, "Supervisor Code")
     }
-
-
 # =========================
 # ⏳ OVERDUE KPI
 # =========================
@@ -461,6 +422,10 @@ st.dataframe(overdue["area"], use_container_width=True)
 
 st.subheader("Supervisor Overdue")
 st.dataframe(overdue["supervisor"], use_container_width=True)
+
+
+
+
 
 
 
