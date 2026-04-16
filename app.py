@@ -193,7 +193,7 @@ def build_sales_pipeline(sales, codes):
 
 
 # =========================
-# 🚀 OPENING PIPELINE (FIXED)
+# 🚀 OPENING PIPELINE (UPDATED)
 # =========================
 def build_opening_pipeline(opening, codes):
 
@@ -238,6 +238,12 @@ def build_opening_pipeline(opening, codes):
         opening.get("Returns", 0)
     )
 
+    # 🔥 NEW KPI TOTAL
+    opening["Opening KPI Total"] = (
+        opening["Sales After Returns"] +
+        opening["Total Collection"]
+    )
+
     opening["Rep Code"] = pd.to_numeric(opening["Rep Code"], errors="coerce")
     codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
 
@@ -253,7 +259,8 @@ def build_opening_pipeline(opening, codes):
         "Total Sales Value",
         "Returns Value",
         "Sales After Returns",
-        "Total Collection"
+        "Total Collection",
+        "Opening KPI Total"
     ]
 
     for col in required_cols:
