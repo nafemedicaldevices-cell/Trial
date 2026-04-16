@@ -348,7 +348,6 @@ st.dataframe(opening["manager"], use_container_width=True)
 st.dataframe(opening["area"], use_container_width=True)
 st.dataframe(opening["supervisor"], use_container_width=True)
 
-
 # =========================
 # 🚀 OVERDUE PIPELINE
 # =========================
@@ -442,3 +441,30 @@ def build_overdue_pipeline(overdue, codes):
         "area": group(overdue, "Area Code"),
         "supervisor": group(overdue, "Supervisor Code")
     }
+
+
+# =========================
+# ⏳ OVERDUE KPI
+# =========================
+st.header("⏳ OVERDUE KPI")
+
+overdue = build_overdue_pipeline(data["overdue"], data["codes"])
+
+st.subheader("Rep Overdue")
+st.dataframe(overdue["rep"], use_container_width=True)
+
+st.subheader("Manager Overdue")
+st.dataframe(overdue["manager"], use_container_width=True)
+
+st.subheader("Area Overdue")
+st.dataframe(overdue["area"], use_container_width=True)
+
+st.subheader("Supervisor Overdue")
+st.dataframe(overdue["supervisor"], use_container_width=True)
+
+
+
+
+
+
+
