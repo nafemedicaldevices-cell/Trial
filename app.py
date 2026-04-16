@@ -26,6 +26,8 @@ def load_data():
         "codes": pd.read_excel("Code.xlsx"),
 
         "opening": pd.read_excel("Opening.xlsx", header=None),
+        "opening_details": pd.read_excel("Opening Details.xlsx", header=None),
+
         "overdue": pd.read_excel("Overdue.xlsx", header=None),
     }
 
@@ -193,7 +195,7 @@ def build_sales_pipeline(sales, codes):
 
 
 # =========================
-# 🚀 OPENING PIPELINE (UPDATED)
+# 🚀 OPENING PIPELINE (SUMMARY)
 # =========================
 def build_opening_pipeline(opening, codes):
 
@@ -238,7 +240,6 @@ def build_opening_pipeline(opening, codes):
         opening.get("Returns", 0)
     )
 
-    # 🔥 NEW KPI TOTAL
     opening["Opening KPI Total"] = (
         opening["Sales After Returns"] +
         opening["Total Collection"]
@@ -279,6 +280,38 @@ def build_opening_pipeline(opening, codes):
         "area": group(opening, "Area Code"),
         "supervisor": group(opening, "Supervisor Code"),
         "raw": opening
+    }
+
+
+# =========================
+# 🚀 OPENING DETAILS PIPELINE
+# =========================
+def build_opening_details_pipeline(opening_details, codes):
+
+    df = opening_details.copy()
+    codes = codes.copy()
+
+    df.columns = df.columns.str.strip()
+
+    for col in df.columns:
+        if df[col].dtype == "object":
+            df[col] = pd.to_numeric(df[col], errors="ignore")
+
+    df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce")
+    codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
+
+    df = df.merge(codes, on="Rep Code", how="left")
+
+    kpi_cols = [c for c in df.columns if c not in ["Rep Code"]]
+
+    df[kpi_cols] = df[kpi_cols].apply(pd.to_numeric, errors="coerce").fillna(0)
+
+    return {
+        "rep": df.groupby("Rep Code", as_index=False)[kpi_cols].sum(),
+        "manager": df.groupby("Manager Code", as_index=False)[kpi_cols].sum(),
+        "area": df.groupby("Area Code", as_index=False)[kpi_cols].sum(),
+        "supervisor": df.groupby("Supervisor Code", as_index=False)[kpi_cols].sum(),
+        "raw": df
     }
 
 
@@ -405,7 +438,7 @@ st.dataframe(sales["supervisor"])
 
 
 # =========================
-# 📦 OPENING
+# 📦 OPENING SUMMARY
 # =========================
 st.header("📦 OPENING KPI")
 
@@ -415,6 +448,19 @@ st.dataframe(opening["rep"])
 st.dataframe(opening["manager"])
 st.dataframe(opening["area"])
 st.dataframe(opening["supervisor"])
+
+
+# =========================
+# 📦 OPENING DETAILS
+# =========================
+st.header("📊 OPENING DETAILS KPI")
+
+opening_details = build_opening_details_pipeline(data["opening_details"], data["codes"])
+
+st.dataframe(opening_details["rep"])
+st.dataframe(opening_details["manager"])
+st.dataframe(opening_details["area"])
+st.dataframe(opening_details["supervisor"])
 
 
 # =========================
