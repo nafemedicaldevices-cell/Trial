@@ -3,12 +3,12 @@ import numpy as np
 import streamlit as st
 
 # =========================
-# ⚠️ SAFE IMPORT (plotly fallback)
+# ⚠️ SAFE IMPORT (IMPORTANT FIX)
 # =========================
 try:
     import plotly.graph_objects as go
     PLOTLY_OK = True
-except:
+except Exception:
     PLOTLY_OK = False
 
 # =========================
@@ -89,16 +89,15 @@ def build_opening_pipeline(opening, codes):
 # 🚀 UI
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 KPI Dashboard (Stable Version)")
+st.title("📊 KPI Dashboard (Safe Version)")
 
 data = load_data()
 
 sales = build_sales_pipeline(data["sales"], data["codes"])
 opening = build_opening_pipeline(data["opening"], data["codes"])
-overdue = data["overdue"]
 
 # =========================
-# 🎛️ FILTER (SIMPLE SAFE)
+# 🎛️ FILTER
 # =========================
 rep_list = sales["Rep Name"].dropna().unique() if "Rep Name" in sales.columns else []
 
@@ -119,7 +118,7 @@ st.markdown(f"""
 """)
 
 # =========================
-# 💰 FLOW DATA
+# 💰 FLOW CALC
 # =========================
 total_sales = filtered_sales["Sales After Returns"].sum()
 returns = filtered_sales["Returns Value"].sum()
@@ -149,7 +148,7 @@ if PLOTLY_OK:
     st.plotly_chart(fig, use_container_width=True)
 
 else:
-    st.warning("Plotly not installed - showing simple flow")
+    st.warning("Plotly not installed → showing simple flow")
 
     st.markdown(f"""
     💰 Total Sales → {total_sales:,.0f}  
