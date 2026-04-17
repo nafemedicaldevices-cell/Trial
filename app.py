@@ -3,13 +3,6 @@ import numpy as np
 import streamlit as st
 
 # =========================
-# 📅 TIME SETTINGS
-# =========================
-current_month = pd.Timestamp.today().month
-current_quarter = (current_month - 1) // 3 + 1
-
-
-# =========================
 # 📂 LOAD DATA
 # =========================
 @st.cache_data
@@ -43,6 +36,9 @@ def fix_sales_columns(sales):
 def build_sales_pipeline(sales, codes):
 
     sales = fix_sales_columns(sales)
+
+    sales.columns = sales.columns.str.strip()
+    codes.columns = codes.columns.str.strip()
 
     for col in [
         "Sales Unit Before Edit","Returns Unit Before Edit",
@@ -148,14 +144,41 @@ def build_overdue_pipeline(overdue, codes):
 
 
 # =========================
-# 🎯 TARGET
+# 🎯 TARGET (FIXED)
 # =========================
 def build_target(target, codes):
+
+    target = target.copy()
+    codes = codes.copy()
+
+    target.columns = target.columns.str.strip()
+    codes.columns = codes.columns.str.strip()
+
+    # 🔍 محاولة اكتشاف اسم العمود
+    possible_rep_cols = ["Rep Code", "RepCode", "كود المندوب"]
+
+    rep_col = None
+    for col in possible_rep_cols:
+        if col in target.columns:
+            rep_col = col
+            break
+
+    if rep_col is None:
+        st.error(f"❌ الأعمدة الموجودة: {list(target.columns)}")
+        return pd.DataFrame()
+
+    target.rename(columns={rep_col: "Rep Code"}, inplace=True)
 
     target["Rep Code"] = pd.to_numeric(target["Rep Code"], errors="coerce")
     codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
 
     target = target.merge(codes, on="Rep Code", how="left")
+
+    if "Target (Unit)" not in target.columns:
+        target["Target (Unit)"] = 0
+
+    if "Sales Price" not in target.columns:
+        target["Sales Price"] = 0
 
     target["Target (Unit)"] = pd.to_numeric(target["Target (Unit)"], errors="coerce").fillna(0)
     target["Sales Price"] = pd.to_numeric(target["Sales Price"], errors="coerce").fillna(0)
@@ -203,21 +226,17 @@ overdue = build_overdue_pipeline(data["overdue"], data["codes"])
 target = build_target(data["target"], data["codes"])
 
 # =========================
-# 🎛️ FILTER UI
+# 🎛️ FILTER
 # =========================
 st.sidebar.header("Filters")
 
-filter_type = st.sidebar.radio(
-    "Filter By",
-    ["Rep","Supervisor","Area","Manager"]
-)
+filter_type = st.sidebar.radio("Filter By", ["Rep","Supervisor","Area","Manager"])
 
 options = sales[filter_type.lower()][f"{filter_type} Name"].dropna().unique()
-
 selected_value = st.sidebar.selectbox("Select", options)
 
 # =========================
-# 📊 KPI CALCULATION
+# 📊 KPI
 # =========================
 filtered_sales = apply_filter(sales, filter_type, selected_value)
 total_sales = filtered_sales["Sales After Returns"].sum()
@@ -227,17 +246,13 @@ total_target = target_filtered["Target Value"].sum()
 
 achievement = (total_sales / total_target * 100) if total_target != 0 else 0
 
-# =========================
-# 🧾 KPI CARDS
-# =========================
 col1, col2, col3 = st.columns(3)
-
-col1.metric("🎯 Target Full Year", f"{total_target:,.0f}")
-col2.metric("💰 Sales Total", f"{total_sales:,.0f}")
+col1.metric("🎯 Target", f"{total_target:,.0f}")
+col2.metric("💰 Sales", f"{total_sales:,.0f}")
 col3.metric("📊 Achievement %", f"{achievement:.1f}%")
 
 # =========================
-# 📊 OUTPUT
+# 📊 TABLES
 # =========================
 st.header("💰 SALES")
 st.dataframe(filtered_sales)
