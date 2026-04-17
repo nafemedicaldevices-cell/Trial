@@ -174,7 +174,7 @@ def apply_filter(data, filter_type, value):
 
 
 # =========================
-# 🚀 UI SETUP
+# 🚀 UI
 # =========================
 st.set_page_config(layout="wide")
 st.title("📊 KPI Dashboard")
@@ -187,18 +187,18 @@ overdue = build_overdue_pipeline(data["overdue"], data["codes"])
 
 
 # =========================
-# 🎯 KPI TARGET CARDS
+# 🎯 KPI CALC
 # =========================
-st.subheader("🎯 Target Performance Overview")
-
 actual_year = sales["rep"]["Sales After Returns"].sum()
-actual_month = actual_year * 0.1
-actual_quarter = actual_year * 0.3
-actual_uptodate = actual_year * 0.7
-
 target_year = 1000000
+
+actual_month = actual_year * 0.1
 target_month = 90000
+
+actual_quarter = actual_year * 0.3
 target_quarter = 250000
+
+actual_uptodate = actual_year * 0.7
 target_uptodate = 700000
 
 
@@ -206,19 +206,82 @@ def pct(a, t):
     return (a / t * 100) if t else 0
 
 
+# =========================
+# 🎨 KPI STYLE
+# =========================
+st.markdown("""
+<style>
+.kpi-card {
+    background: #0f172a;
+    padding: 16px;
+    border-radius: 14px;
+    border: 1px solid #1f2937;
+    text-align: center;
+}
+
+.kpi-title {
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.kpi-value {
+    font-size: 28px;
+    font-weight: bold;
+    color: white;
+    margin-top: 5px;
+}
+
+.kpi-sub {
+    font-size: 12px;
+    color: #64748b;
+    margin-top: 5px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# =========================
+# 📊 KPI CARDS UI
+# =========================
+st.subheader("🎯 Target Performance Overview")
+
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    st.metric("📅 Year", f"{pct(actual_year, target_year):.1f}%", f"{actual_year:,.0f}/{target_year:,.0f}")
+    st.markdown(f"""
+    <div class="kpi-card">
+        <div class="kpi-title">Year Target</div>
+        <div class="kpi-value">{pct(actual_year, target_year):.1f}%</div>
+        <div class="kpi-sub">{actual_year:,.0f} / {target_year:,.0f}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 with col2:
-    st.metric("📆 Month", f"{pct(actual_month, target_month):.1f}%", f"{actual_month:,.0f}/{target_month:,.0f}")
+    st.markdown(f"""
+    <div class="kpi-card">
+        <div class="kpi-title">Month Target</div>
+        <div class="kpi-value">{pct(actual_month, target_month):.1f}%</div>
+        <div class="kpi-sub">{actual_month:,.0f} / {target_month:,.0f}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 with col3:
-    st.metric("📊 Quarter", f"{pct(actual_quarter, target_quarter):.1f}%", f"{actual_quarter:,.0f}/{target_quarter:,.0f}")
+    st.markdown(f"""
+    <div class="kpi-card">
+        <div class="kpi-title">Quarter Target</div>
+        <div class="kpi-value">{pct(actual_quarter, target_quarter):.1f}%</div>
+        <div class="kpi-sub">{actual_quarter:,.0f} / {target_quarter:,.0f}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 with col4:
-    st.metric("⏳ Up To Date", f"{pct(actual_uptodate, target_uptodate):.1f}%", f"{actual_uptodate:,.0f}/{target_uptodate:,.0f}")
+    st.markdown(f"""
+    <div class="kpi-card">
+        <div class="kpi-title">Up To Date</div>
+        <div class="kpi-value">{pct(actual_uptodate, target_uptodate):.1f}%</div>
+        <div class="kpi-sub">{actual_uptodate:,.0f} / {target_uptodate:,.0f}</div>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # =========================
@@ -236,7 +299,7 @@ selected_value = st.sidebar.selectbox("Select", options)
 
 
 # =========================
-# 📊 OUTPUT TABLES
+# 📊 TABLES
 # =========================
 st.header("💰 SALES")
 st.dataframe(apply_filter(sales, filter_type, selected_value))
