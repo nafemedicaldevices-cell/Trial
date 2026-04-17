@@ -182,24 +182,22 @@ st.title("📊 KPI Dashboard")
 data = load_data()
 
 sales = build_sales_pipeline(data["sales"], data["codes"])
-opening = build_opening_pipeline(data["opening"], data["codes"])
-overdue = build_overdue_pipeline(data["overdue"], data["codes"])
 
 
 # =========================
 # 🎯 KPI VALUES
 # =========================
 actual_year = sales["rep"]["Sales After Returns"].sum()
-target_year = 1000000
+target_year = 2000000
 
 actual_month = actual_year * 0.1
-target_month = 90000
+target_month = 200000
 
 actual_quarter = actual_year * 0.3
-target_quarter = 250000
+target_quarter = 600000
 
 actual_uptodate = actual_year * 0.7
-target_uptodate = 700000
+target_uptodate = 1400000
 
 
 def pct(a, t):
@@ -207,26 +205,30 @@ def pct(a, t):
 
 
 # =========================
-# 🎨 KPI STYLE (NEW DESIGN)
+# 🎨 KPI DESIGN (MATCH IMAGE)
 # =========================
+st.subheader("🎯 Target Overview")
+
 st.markdown("""
 <style>
 .kpi-box {
     background: #0f172a;
     padding: 18px;
-    border-radius: 14px;
+    border-radius: 12px;
     border: 1px solid #1f2937;
+    text-align: left;
 }
 
 .kpi-title {
-    font-size: 12px;
-    color: #94a3b8;
-    margin-bottom: 4px;
+    font-size: 16px;
+    font-weight: bold;
+    color: white;
+    margin-bottom: 8px;
 }
 
-.kpi-target {
-    font-size: 11px;
-    color: #64748b;
+.kpi-line {
+    font-size: 13px;
+    color: #94a3b8;
     border-bottom: 1px solid #334155;
     padding-bottom: 6px;
     margin-bottom: 10px;
@@ -235,102 +237,124 @@ st.markdown("""
 .kpi-row {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    margin: 4px 0;
 }
 
-.kpi-sales {
-    font-size: 18px;
+.kpi-label {
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+.kpi-value {
+    font-size: 14px;
     font-weight: bold;
     color: white;
 }
 
-.kpi-pct {
-    font-size: 22px;
+.kpi-ach {
+    font-size: 20px;
     font-weight: bold;
-    color: #38bdf8;
+    color: red;
+    text-align: right;
 }
 </style>
 """, unsafe_allow_html=True)
 
 
-# =========================
-# 📊 KPI CARDS
-# =========================
-st.subheader("🎯 Target Performance Overview")
-
 col1, col2, col3, col4 = st.columns(4)
+
 
 with col1:
     st.markdown(f"""
     <div class="kpi-box">
         <div class="kpi-title">Year</div>
-        <div class="kpi-target">Target: {target_year:,.0f}</div>
+
+        <div class="kpi-line">Target</div>
         <div class="kpi-row">
-            <div class="kpi-sales">{actual_year:,.0f}</div>
-            <div class="kpi-pct">{pct(actual_year, target_year):.1f}%</div>
+            <div class="kpi-label">Target</div>
+            <div class="kpi-value">{target_year:,.0f}</div>
+        </div>
+
+        <div class="kpi-row">
+            <div class="kpi-label">Sales</div>
+            <div class="kpi-value">{actual_year:,.0f}</div>
+        </div>
+
+        <div class="kpi-row">
+            <div class="kpi-label">Achievement</div>
+            <div class="kpi-ach">{pct(actual_year, target_year):.0f}%</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
+
 
 with col2:
     st.markdown(f"""
     <div class="kpi-box">
         <div class="kpi-title">Month</div>
-        <div class="kpi-target">Target: {target_month:,.0f}</div>
+
+        <div class="kpi-line">Target</div>
         <div class="kpi-row">
-            <div class="kpi-sales">{actual_month:,.0f}</div>
-            <div class="kpi-pct">{pct(actual_month, target_month):.1f}%</div>
+            <div class="kpi-label">Target</div>
+            <div class="kpi-value">{target_month:,.0f}</div>
+        </div>
+
+        <div class="kpi-row">
+            <div class="kpi-label">Sales</div>
+            <div class="kpi-value">{actual_month:,.0f}</div>
+        </div>
+
+        <div class="kpi-row">
+            <div class="kpi-label">Achievement</div>
+            <div class="kpi-ach">{pct(actual_month, target_month):.0f}%</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
+
 
 with col3:
     st.markdown(f"""
     <div class="kpi-box">
         <div class="kpi-title">Quarter</div>
-        <div class="kpi-target">Target: {target_quarter:,.0f}</div>
+
+        <div class="kpi-line">Target</div>
         <div class="kpi-row">
-            <div class="kpi-sales">{actual_quarter:,.0f}</div>
-            <div class="kpi-pct">{pct(actual_quarter, target_quarter):.1f}%</div>
+            <div class="kpi-label">Target</div>
+            <div class="kpi-value">{target_quarter:,.0f}</div>
+        </div>
+
+        <div class="kpi-row">
+            <div class="kpi-label">Sales</div>
+            <div class="kpi-value">{actual_quarter:,.0f}</div>
+        </div>
+
+        <div class="kpi-row">
+            <div class="kpi-label">Achievement</div>
+            <div class="kpi-ach">{pct(actual_quarter, target_quarter):.0f}%</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
+
 
 with col4:
     st.markdown(f"""
     <div class="kpi-box">
         <div class="kpi-title">Up To Date</div>
-        <div class="kpi-target">Target: {target_uptodate:,.0f}</div>
+
+        <div class="kpi-line">Target</div>
         <div class="kpi-row">
-            <div class="kpi-sales">{actual_uptodate:,.0f}</div>
-            <div class="kpi-pct">{pct(actual_uptodate, target_uptodate):.1f}%</div>
+            <div class="kpi-label">Target</div>
+            <div class="kpi-value">{target_uptodate:,.0f}</div>
+        </div>
+
+        <div class="kpi-row">
+            <div class="kpi-label">Sales</div>
+            <div class="kpi-value">{actual_uptodate:,.0f}</div>
+        </div>
+
+        <div class="kpi-row">
+            <div class="kpi-label">Achievement</div>
+            <div class="kpi-ach">{pct(actual_uptodate, target_uptodate):.0f}%</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
-
-
-# =========================
-# 🎛️ FILTER UI
-# =========================
-st.sidebar.header("Filters")
-
-filter_type = st.sidebar.radio(
-    "Filter By",
-    ["Rep","Supervisor","Area","Manager"]
-)
-
-options = sales[filter_type.lower()][f"{filter_type} Name"].dropna().unique()
-selected_value = st.sidebar.selectbox("Select", options)
-
-
-# =========================
-# 📊 TABLES
-# =========================
-st.header("💰 SALES")
-st.dataframe(apply_filter(sales, filter_type, selected_value))
-
-st.header("📦 OPENING")
-st.dataframe(apply_filter(opening, filter_type, selected_value))
-
-st.header("⏳ OVERDUE")
-st.dataframe(apply_filter(overdue, filter_type, selected_value))
