@@ -19,6 +19,7 @@ def load_data():
         "codes": pd.read_excel("Code.xlsx"),
         "opening": pd.read_excel("Opening.xlsx", header=None),
         "overdue": pd.read_excel("Overdue.xlsx", header=None),
+        "target": pd.read_excel("Target Rep.xlsx"),
     }
 
 
@@ -147,6 +148,24 @@ def build_overdue_pipeline(overdue, codes):
 
 
 # =========================
+# 🎯 TARGET
+# =========================
+def build_target(target, codes):
+
+    target["Rep Code"] = pd.to_numeric(target["Rep Code"], errors="coerce")
+    codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
+
+    target = target.merge(codes, on="Rep Code", how="left")
+
+    target["Target (Unit)"] = pd.to_numeric(target["Target (Unit)"], errors="coerce").fillna(0)
+    target["Sales Price"] = pd.to_numeric(target["Sales Price"], errors="coerce").fillna(0)
+
+    target["Target Value"] = target["Target (Unit)"] * target["Sales Price"]
+
+    return target
+
+
+# =========================
 # 🎛️ FILTER
 # =========================
 def apply_filter(data, filter_type, value):
@@ -181,6 +200,7 @@ data = load_data()
 sales = build_sales_pipeline(data["sales"], data["codes"])
 opening = build_opening_pipeline(data["opening"], data["codes"])
 overdue = build_overdue_pipeline(data["overdue"], data["codes"])
+target = build_target(data["target"], data["codes"])
 
 # =========================
 # 🎛️ FILTER UI
@@ -197,10 +217,30 @@ options = sales[filter_type.lower()][f"{filter_type} Name"].dropna().unique()
 selected_value = st.sidebar.selectbox("Select", options)
 
 # =========================
+# 📊 KPI CALCULATION
+# =========================
+filtered_sales = apply_filter(sales, filter_type, selected_value)
+total_sales = filtered_sales["Sales After Returns"].sum()
+
+target_filtered = target[target[f"{filter_type} Name"] == selected_value]
+total_target = target_filtered["Target Value"].sum()
+
+achievement = (total_sales / total_target * 100) if total_target != 0 else 0
+
+# =========================
+# 🧾 KPI CARDS
+# =========================
+col1, col2, col3 = st.columns(3)
+
+col1.metric("🎯 Target Full Year", f"{total_target:,.0f}")
+col2.metric("💰 Sales Total", f"{total_sales:,.0f}")
+col3.metric("📊 Achievement %", f"{achievement:.1f}%")
+
+# =========================
 # 📊 OUTPUT
 # =========================
 st.header("💰 SALES")
-st.dataframe(apply_filter(sales, filter_type, selected_value))
+st.dataframe(filtered_sales)
 
 st.header("📦 OPENING")
 st.dataframe(apply_filter(opening, filter_type, selected_value))
