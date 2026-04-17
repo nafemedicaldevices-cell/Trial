@@ -187,7 +187,7 @@ overdue = build_overdue_pipeline(data["overdue"], data["codes"])
 
 
 # =========================
-# 🎯 KPI CALC
+# 🎯 KPI VALUES
 # =========================
 actual_year = sales["rep"]["Sales After Returns"].sum()
 target_year = 1000000
@@ -207,41 +207,54 @@ def pct(a, t):
 
 
 # =========================
-# 🎨 KPI STYLE
+# 🎨 KPI STYLE (NEW DESIGN)
 # =========================
 st.markdown("""
 <style>
-.kpi-card {
+.kpi-box {
     background: #0f172a;
-    padding: 16px;
+    padding: 18px;
     border-radius: 14px;
     border: 1px solid #1f2937;
-    text-align: center;
 }
 
 .kpi-title {
     font-size: 12px;
     color: #94a3b8;
+    margin-bottom: 4px;
 }
 
-.kpi-value {
-    font-size: 28px;
+.kpi-target {
+    font-size: 11px;
+    color: #64748b;
+    border-bottom: 1px solid #334155;
+    padding-bottom: 6px;
+    margin-bottom: 10px;
+}
+
+.kpi-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.kpi-sales {
+    font-size: 18px;
     font-weight: bold;
     color: white;
-    margin-top: 5px;
 }
 
-.kpi-sub {
-    font-size: 12px;
-    color: #64748b;
-    margin-top: 5px;
+.kpi-pct {
+    font-size: 22px;
+    font-weight: bold;
+    color: #38bdf8;
 }
 </style>
 """, unsafe_allow_html=True)
 
 
 # =========================
-# 📊 KPI CARDS UI
+# 📊 KPI CARDS
 # =========================
 st.subheader("🎯 Target Performance Overview")
 
@@ -249,37 +262,49 @@ col1, col2, col3, col4 = st.columns(4)
 
 with col1:
     st.markdown(f"""
-    <div class="kpi-card">
-        <div class="kpi-title">Year Target</div>
-        <div class="kpi-value">{pct(actual_year, target_year):.1f}%</div>
-        <div class="kpi-sub">{actual_year:,.0f} / {target_year:,.0f}</div>
+    <div class="kpi-box">
+        <div class="kpi-title">Year</div>
+        <div class="kpi-target">Target: {target_year:,.0f}</div>
+        <div class="kpi-row">
+            <div class="kpi-sales">{actual_year:,.0f}</div>
+            <div class="kpi-pct">{pct(actual_year, target_year):.1f}%</div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
 with col2:
     st.markdown(f"""
-    <div class="kpi-card">
-        <div class="kpi-title">Month Target</div>
-        <div class="kpi-value">{pct(actual_month, target_month):.1f}%</div>
-        <div class="kpi-sub">{actual_month:,.0f} / {target_month:,.0f}</div>
+    <div class="kpi-box">
+        <div class="kpi-title">Month</div>
+        <div class="kpi-target">Target: {target_month:,.0f}</div>
+        <div class="kpi-row">
+            <div class="kpi-sales">{actual_month:,.0f}</div>
+            <div class="kpi-pct">{pct(actual_month, target_month):.1f}%</div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
 with col3:
     st.markdown(f"""
-    <div class="kpi-card">
-        <div class="kpi-title">Quarter Target</div>
-        <div class="kpi-value">{pct(actual_quarter, target_quarter):.1f}%</div>
-        <div class="kpi-sub">{actual_quarter:,.0f} / {target_quarter:,.0f}</div>
+    <div class="kpi-box">
+        <div class="kpi-title">Quarter</div>
+        <div class="kpi-target">Target: {target_quarter:,.0f}</div>
+        <div class="kpi-row">
+            <div class="kpi-sales">{actual_quarter:,.0f}</div>
+            <div class="kpi-pct">{pct(actual_quarter, target_quarter):.1f}%</div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
 with col4:
     st.markdown(f"""
-    <div class="kpi-card">
+    <div class="kpi-box">
         <div class="kpi-title">Up To Date</div>
-        <div class="kpi-value">{pct(actual_uptodate, target_uptodate):.1f}%</div>
-        <div class="kpi-sub">{actual_uptodate:,.0f} / {target_uptodate:,.0f}</div>
+        <div class="kpi-target">Target: {target_uptodate:,.0f}</div>
+        <div class="kpi-row">
+            <div class="kpi-sales">{actual_uptodate:,.0f}</div>
+            <div class="kpi-pct">{pct(actual_uptodate, target_uptodate):.1f}%</div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
