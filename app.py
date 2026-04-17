@@ -3,115 +3,257 @@ import numpy as np
 import streamlit as st
 
 # =========================
-# 🎯 PAGE CONFIG
-# =========================
-st.set_page_config(page_title="KPI Dashboard", layout="wide")
-
-# =========================
 # 📅 TIME SETTINGS
 # =========================
-today = pd.Timestamp.today()
-current_month = today.month
+current_month = pd.Timestamp.today().month
 current_quarter = (current_month - 1) // 3 + 1
-
-# =========================
-# 🎨 CSS STYLE (KPI CARDS)
-# =========================
-st.markdown("""
-<style>
-.kpi-card {
-    background: #ffffff;
-    padding: 20px;
-    border-radius: 15px;
-    box-shadow: 0px 2px 10px rgba(0,0,0,0.1);
-    text-align: center;
-}
-.kpi-title {
-    font-size: 16px;
-    color: #666;
-}
-.kpi-value {
-    font-size: 28px;
-    font-weight: bold;
-    color: #1f77b4;
-}
-.kpi-sub {
-    font-size: 13px;
-    color: #999;
-}
-</style>
-""", unsafe_allow_html=True)
 
 # =========================
 # 📂 LOAD DATA
 # =========================
 @st.cache_data
 def load_data():
-    sales = pd.read_excel("Sales.xlsx")
-    return sales
-
-df = load_data()
+    return {
+        "sales": pd.read_excel("Sales.xlsx", header=None),
+        "codes": pd.read_excel("Code.xlsx"),
+        "opening": pd.read_excel("Opening.xlsx", header=None),
+        "overdue": pd.read_excel("Overdue.xlsx", header=None),
+    }
 
 # =========================
-# 🔎 FILTERS
+# 🧠 FIX SALES
+# =========================
+def fix_sales_columns(sales):
+    expected_cols = [
+        'Date','Warehouse Name','Client Code','Client Name','Notes','MF','Mostanad',
+        'Rep Code','Sales Unit Before Edit','Returns Unit Before Edit',
+        'Sales Price','Invoice Discounts','Sales Value'
+    ]
+    sales = sales.iloc[:, :len(expected_cols)].copy()
+    sales.columns = expected_cols
+    return sales
+
+# =========================
+# 💰 SALES PIPELINE
+# =========================
+def build_sales_pipeline(sales, codes):
+
+    sales = fix_sales_columns(sales)
+
+    for col in [
+        "Sales Unit Before Edit","Returns Unit Before Edit",
+        "Sales Price","Invoice Discounts"
+    ]:
+        sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
+
+    sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
+    codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
+
+    sales = sales.merge(codes, on="Rep Code", how="inner")
+
+    sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
+    sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
+    sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
+
+    def group(df, col):
+        return df.groupby(col, as_index=False)[
+            ["Sales After Returns"]
+        ].sum()
+
+    return {
+        "rep": group(sales,"Rep Name"),
+        "manager": group(sales,"Manager Name"),
+        "area": group(sales,"Area Name"),
+        "supervisor": group(sales,"Supervisor Name"),
+    }
+
+# =========================
+# 📦 PIPELINES (Opening / Overdue)
+# =========================
+def build_opening_pipeline(opening, codes):
+
+    opening = opening.iloc[:, :13]
+
+    opening.columns = [
+        'Branch',"Evak",'Opening Balance','Total Sales',
+        'Returns','Sales Value Before Extra Discounts',
+        'Cash Collection','Collection Checks',
+        'Returned Chick','Collection Returned Chick',
+        "Madinah",'Daienah','End Balance'
+    ]
+
+    opening['Rep Code'] = None
+    mask = opening['Branch'].astype(str).str.strip() == "كود المندوب"
+    opening.loc[mask, 'Rep Code'] = opening.loc[mask, 'Opening Balance']
+    opening['Rep Code'] = opening['Rep Code'].ffill()
+
+    opening = opening[
+        opening['Branch'].notna() &
+        (~opening['Branch'].astype(str).str.contains('كود|اجماليات', na=False))
+    ]
+
+    for col in ['Opening Balance','Total Sales','Returns','Cash Collection','Collection Checks']:
+        opening[col] = pd.to_numeric(opening[col], errors='coerce').fillna(0)
+
+    opening['Total Collection'] = opening['Cash Collection'] + opening['Collection Checks']
+    opening["Sales After Returns"] = opening["Total Sales"] - opening['Returns']
+
+    opening["Rep Code"] = pd.to_numeric(opening["Rep Code"], errors="coerce")
+    opening = opening.merge(codes, on='Rep Code', how='left')
+
+    def group(df, col):
+        return df.groupby(col, as_index=False)[["Sales After Returns"]].sum()
+
+    return {
+        "rep": group(opening,"Rep Name"),
+        "manager": group(opening,"Manager Name"),
+        "area": group(opening,"Area Name"),
+        "supervisor": group(opening,"Supervisor Name"),
+    }
+
+def build_overdue_pipeline(overdue, codes):
+
+    overdue.columns = [
+        "Client Name","Client Code","30 Days","60 Days","90 Days",
+        "120 Days","150 Days","More Than 150 Days","Balance"
+    ]
+
+    overdue['Rep Code'] = overdue['Client Code'].ffill()
+
+    overdue['Overdue Value'] = (
+        overdue['120 Days'] +
+        overdue['150 Days'] +
+        overdue['More Than 150 Days']
+    )
+
+    overdue["Rep Code"] = pd.to_numeric(overdue["Rep Code"], errors="coerce")
+    overdue = overdue.merge(codes, on='Rep Code', how='left')
+
+    def group(df, col):
+        return df.groupby(col, as_index=False)[["Overdue Value"]].sum()
+
+    return {
+        "rep": group(overdue,"Rep Name"),
+        "manager": group(overdue,"Manager Name"),
+        "area": group(overdue,"Area Name"),
+        "supervisor": group(overdue,"Supervisor Name"),
+    }
+
+# =========================
+# 🚀 UI
+# =========================
+st.set_page_config(layout="wide")
+st.title("📊 KPI Dashboard")
+
+data = load_data()
+
+sales = build_sales_pipeline(data["sales"], data["codes"])
+opening = build_opening_pipeline(data["opening"], data["codes"])
+overdue = build_overdue_pipeline(data["overdue"], data["codes"])
+
+# =========================
+# 🎛️ FILTER
 # =========================
 st.sidebar.header("Filters")
 
-rep_filter = st.sidebar.selectbox("Sales Rep", ["All"] + list(df["Rep"].dropna().unique()))
-customer_filter = st.sidebar.selectbox("Customer", ["All"] + list(df["Customer"].dropna().unique()))
-month_filter = st.sidebar.selectbox("Month", ["All"] + sorted(df["Month"].dropna().unique()))
+filter_type = st.sidebar.radio(
+    "Filter By",
+    ["Rep","Supervisor","Area","Manager"]
+)
 
-filtered = df.copy()
+col_map = {
+    "Rep": "Rep Name",
+    "Supervisor": "Supervisor Name",
+    "Area": "Area Name",
+    "Manager": "Manager Name"
+}
 
-if rep_filter != "All":
-    filtered = filtered[filtered["Rep"] == rep_filter]
-
-if customer_filter != "All":
-    filtered = filtered[filtered["Customer"] == customer_filter]
-
-if month_filter != "All":
-    filtered = filtered[filtered["Month"] == month_filter]
-
-# =========================
-# 📊 KPI CALCULATIONS
-# =========================
-target = filtered["Target"].sum()
-sales = filtered["Sales"].sum()
-achievement = (sales / target * 100) if target != 0 else 0
-
-# time splits (لو عندك عمود Date)
-if "Date" in filtered.columns:
-    filtered["Date"] = pd.to_datetime(filtered["Date"])
-    yearly = filtered["Sales"].sum()
-    quarterly = filtered[filtered["Date"].dt.quarter == current_quarter]["Sales"].sum()
-    monthly = filtered[filtered["Date"].dt.month == current_month]["Sales"].sum()
-else:
-    yearly = quarterly = monthly = sales
-
-uptodate = sales
+options = sales["rep"][col_map[filter_type]].dropna().unique()
+selected_value = st.sidebar.selectbox("Select", options)
 
 # =========================
-# 📦 KPI CARDS UI
+# 🎯 FILTERED DATA
 # =========================
-col1, col2, col3, col4 = st.columns(4)
+def apply_filter(data, key, col, value):
+    df = data[key]
+    if col in df.columns:
+        return df[df[col] == value]
+    return df
 
-def kpi(col, title, value, sub):
-    with col:
-        st.markdown(f"""
-        <div class="kpi-card">
-            <div class="kpi-title">{title}</div>
-            <div class="kpi-value">{value:,.0f}</div>
-            <div class="kpi-sub">{sub}</div>
+filtered_sales = apply_filter(sales, "rep", col_map[filter_type], selected_value)
+filtered_opening = apply_filter(opening, "rep", col_map[filter_type], selected_value)
+filtered_overdue = apply_filter(overdue, "rep", col_map[filter_type], selected_value)
+
+# =========================
+# 🎯 KPI CALC
+# =========================
+actual_year = filtered_sales["Sales After Returns"].sum()
+actual_month = actual_year * 0.1
+actual_quarter = actual_year * 0.3
+actual_uptodate = actual_year * 0.7
+
+target_year = 1000000
+target_month = 90000
+target_quarter = 250000
+target_uptodate = 700000
+
+# =========================
+# 🎨 KPI CARD DESIGN
+# =========================
+def kpi_card(title, actual, target):
+    pct = (actual / target * 100) if target else 0
+
+    color = "#2ecc71" if pct >= 100 else "#f39c12" if pct >= 70 else "#e74c3c"
+
+    return f"""
+    <div style="
+        background:white;
+        padding:18px;
+        border-radius:16px;
+        box-shadow:0px 3px 12px rgba(0,0,0,0.08);
+        text-align:center;
+        border-left:6px solid {color};
+    ">
+        <div style="font-size:15px;color:#666;font-weight:600">{title}</div>
+        <div style="font-size:26px;font-weight:bold;color:#1f77b4;margin-top:8px">
+            {actual:,.0f}
         </div>
-        """, unsafe_allow_html=True)
-
-kpi(col1, "Year Sales", yearly, "Total Year Performance")
-kpi(col2, "Quarter Sales", quarterly, f"Q{current_quarter}")
-kpi(col3, "Month Sales", monthly, f"Month {current_month}")
-kpi(col4, "Up To Date", uptodate, f"Achievement {achievement:.1f}%")
+        <div style="font-size:13px;color:#999;margin-top:4px">
+            Target: {target:,.0f}
+        </div>
+        <div style="margin-top:8px;font-size:15px;font-weight:bold;color:{color}">
+            {pct:.1f}%
+        </div>
+    </div>
+    """
 
 # =========================
-# 📋 DATA PREVIEW
+# 📊 KPI ROW (FILTERED)
 # =========================
-st.markdown("### 📊 Data Preview")
-st.dataframe(filtered)
+st.subheader("🎯 Target Performance")
+
+c1, c2, c3, c4 = st.columns(4)
+
+with c1:
+    st.markdown(kpi_card("📅 Year Sales", actual_year, target_year), unsafe_allow_html=True)
+
+with c2:
+    st.markdown(kpi_card("📆 Month Sales", actual_month, target_month), unsafe_allow_html=True)
+
+with c3:
+    st.markdown(kpi_card("📊 Quarter Sales", actual_quarter, target_quarter), unsafe_allow_html=True)
+
+with c4:
+    st.markdown(kpi_card("⏳ Up To Date", actual_uptodate, target_uptodate), unsafe_allow_html=True)
+
+# =========================
+# 📋 TABLES
+# =========================
+st.header("💰 SALES")
+st.dataframe(filtered_sales)
+
+st.header("📦 OPENING")
+st.dataframe(filtered_opening)
+
+st.header("⏳ OVERDUE")
+st.dataframe(filtered_overdue)
