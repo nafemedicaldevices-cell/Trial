@@ -144,7 +144,7 @@ def build_overdue_pipeline(overdue, codes):
 # 🚀 UI
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 KPI Dashboard - Waterfall Analysis")
+st.title("📊 KPI Dashboard (Executive View)")
 
 data = load_data()
 
@@ -153,7 +153,7 @@ opening = build_opening_pipeline(data["opening"], data["codes"])
 overdue = build_overdue_pipeline(data["overdue"], data["codes"])
 
 # =========================
-# 🎛️ FILTER
+# 🎛️ FILTERS
 # =========================
 st.sidebar.header("Filters")
 
@@ -194,9 +194,9 @@ st.markdown(f"""
 """)
 
 # =========================
-# 💰 WATERFALL ANALYSIS
+# 💰 WATERFALL (MAIN FLOW)
 # =========================
-st.header("💰 Sales Waterfall Analysis")
+st.header("💰 Sales Flow (Waterfall)")
 
 df = filtered_sales.copy()
 
@@ -207,9 +207,6 @@ discounts = df["Invoice Discounts"].sum() if "Invoice Discounts" in df.columns e
 net_after_returns = total_sales - returns
 net_sales = net_after_returns - discounts
 
-# =========================
-# 📊 WATERFALL CHART
-# =========================
 fig = go.Figure(go.Waterfall(
     name="Sales Flow",
     orientation="v",
@@ -239,7 +236,7 @@ fig = go.Figure(go.Waterfall(
 ))
 
 fig.update_layout(
-    title="Sales Flow (Waterfall Diagram)",
+    title="Sales Flow Analysis",
     showlegend=False
 )
 
