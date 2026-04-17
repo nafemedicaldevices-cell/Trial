@@ -26,7 +26,7 @@ def load_data():
 def fix_sales_columns(sales):
     expected_cols = [
         'Date','Warehouse Name','Client Code','Client Name','Notes','MF','Mostanad',
-        'Rep Code','Sales Unit Before Edit','Returns Unit Before Edit',
+        'Rep Code','Sales Unit','Returns Unit',
         'Sales Price','Invoice Discounts','Sales Value'
     ]
     sales = sales.iloc[:, :len(expected_cols)].copy()
@@ -40,10 +40,11 @@ def build_sales_pipeline(sales, codes):
 
     sales = fix_sales_columns(sales)
 
-    for col in [
-        "Sales Unit Before Edit","Returns Unit Before Edit",
-        "Sales Price","Invoice Discounts"
-    ]:
+    num_cols = [
+        "Sales Unit","Returns Unit","Sales Price","Invoice Discounts"
+    ]
+
+    for col in num_cols:
         sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
 
     sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
@@ -51,8 +52,8 @@ def build_sales_pipeline(sales, codes):
 
     sales = sales.merge(codes, on="Rep Code", how="inner")
 
-    sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
-    sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
+    sales["Total Sales Value"] = sales["Sales Unit"] * sales["Sales Price"]
+    sales["Returns Value"] = sales["Returns Unit"] * sales["Sales Price"]
     sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
 
     def group(df, col):
@@ -68,7 +69,7 @@ def build_sales_pipeline(sales, codes):
     }
 
 # =========================
-# 📦 PIPELINES (Opening / Overdue)
+# 📦 OPENING PIPELINE
 # =========================
 def build_opening_pipeline(opening, codes):
 
@@ -92,7 +93,7 @@ def build_opening_pipeline(opening, codes):
         (~opening['Branch'].astype(str).str.contains('كود|اجماليات', na=False))
     ]
 
-    for col in ['Opening Balance','Total Sales','Returns','Cash Collection','Collection Checks']:
+    for col in ['Total Sales','Returns','Cash Collection','Collection Checks']:
         opening[col] = pd.to_numeric(opening[col], errors='coerce').fillna(0)
 
     opening['Total Collection'] = opening['Cash Collection'] + opening['Collection Checks']
@@ -111,6 +112,9 @@ def build_opening_pipeline(opening, codes):
         "supervisor": group(opening,"Supervisor Name"),
     }
 
+# =========================
+# ⏳ OVERDUE PIPELINE
+# =========================
 def build_overdue_pipeline(overdue, codes):
 
     overdue.columns = [
@@ -171,9 +175,6 @@ col_map = {
 options = sales["rep"][col_map[filter_type]].dropna().unique()
 selected_value = st.sidebar.selectbox("Select", options)
 
-# =========================
-# 🎯 FILTERED DATA
-# =========================
 def apply_filter(data, key, col, value):
     df = data[key]
     if col in df.columns:
@@ -185,9 +186,10 @@ filtered_opening = apply_filter(opening, "rep", col_map[filter_type], selected_v
 filtered_overdue = apply_filter(overdue, "rep", col_map[filter_type], selected_value)
 
 # =========================
-# 🎯 KPI CALC
+# 🎯 KPI TARGETS
 # =========================
 actual_year = filtered_sales["Sales After Returns"].sum()
+
 actual_month = actual_year * 0.1
 actual_quarter = actual_year * 0.3
 actual_uptodate = actual_year * 0.7
@@ -198,19 +200,18 @@ target_quarter = 250000
 target_uptodate = 700000
 
 # =========================
-# 🎨 KPI CARD DESIGN
+# 🎨 KPI CARD
 # =========================
 def kpi_card(title, actual, target):
     pct = (actual / target * 100) if target else 0
-
     color = "#2ecc71" if pct >= 100 else "#f39c12" if pct >= 70 else "#e74c3c"
 
     return f"""
     <div style="
         background:white;
         padding:18px;
-        border-radius:16px;
-        box-shadow:0px 3px 12px rgba(0,0,0,0.08);
+        border-radius:14px;
+        box-shadow:0px 2px 10px rgba(0,0,0,0.08);
         text-align:center;
         border-left:6px solid {color};
     ">
@@ -228,7 +229,7 @@ def kpi_card(title, actual, target):
     """
 
 # =========================
-# 📊 KPI ROW (FILTERED)
+# 📊 KPI SECTION
 # =========================
 st.subheader("🎯 Target Performance")
 
@@ -236,24 +237,69 @@ c1, c2, c3, c4 = st.columns(4)
 
 with c1:
     st.markdown(kpi_card("📅 Year Sales", actual_year, target_year), unsafe_allow_html=True)
-
 with c2:
     st.markdown(kpi_card("📆 Month Sales", actual_month, target_month), unsafe_allow_html=True)
-
 with c3:
     st.markdown(kpi_card("📊 Quarter Sales", actual_quarter, target_quarter), unsafe_allow_html=True)
-
 with c4:
     st.markdown(kpi_card("⏳ Up To Date", actual_uptodate, target_uptodate), unsafe_allow_html=True)
 
 # =========================
+# 📊 SALES ANALYTICS
+# =========================
+st.header("📊 Sales Analytics Overview")
+
+df = filtered_sales.copy()
+
+total_sales_value = df["Sales After Returns"].sum()
+returns_value = df.get("Returns Value", pd.Series([0])).sum()
+invoice_discounts = df.get("Invoice Discounts", pd.Series([0])).sum()
+extra_discounts = 0
+
+total_discounts = invoice_discounts + extra_discounts
+net_sales = total_sales_value - total_discounts
+
+total_collection = filtered_opening["Sales After Returns"].sum() if "Sales After Returns" in filtered_opening.columns else 0
+
+def card(title, value, color):
+    return f"""
+    <div style="
+        background:white;
+        padding:18px;
+        border-radius:14px;
+        box-shadow:0px 2px 10px rgba(0,0,0,0.08);
+        text-align:center;
+        border-left:5px solid {color};
+    ">
+        <div style="font-size:14px;color:#666">{title}</div>
+        <div style="font-size:24px;font-weight:bold;color:{color}">
+            {value:,.0f}
+        </div>
+    </div>
+    """
+
+c1, c2, c3, c4 = st.columns(4)
+
+with c1:
+    st.markdown(card("💰 Total Sales", total_sales_value, "#3498db"), unsafe_allow_html=True)
+with c2:
+    st.markdown(card("↩ Returns", returns_value, "#e74c3c"), unsafe_allow_html=True)
+with c3:
+    st.markdown(card("🎯 Discounts", total_discounts, "#f39c12"), unsafe_allow_html=True)
+with c4:
+    st.markdown(card("💵 Net Sales", net_sales, "#2ecc71"), unsafe_allow_html=True)
+
+st.markdown("### 💳 Collection")
+st.markdown(card("🏦 Total Collection", total_collection, "#9b59b6"), unsafe_allow_html=True)
+
+# =========================
 # 📋 TABLES
 # =========================
-st.header("💰 SALES")
+st.header("💰 SALES DATA")
 st.dataframe(filtered_sales)
 
-st.header("📦 OPENING")
+st.header("📦 OPENING DATA")
 st.dataframe(filtered_opening)
 
-st.header("⏳ OVERDUE")
+st.header("⏳ OVERDUE DATA")
 st.dataframe(filtered_overdue)
