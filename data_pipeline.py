@@ -40,7 +40,9 @@ def build_sales_pipeline(sales, codes):
 
     sales = fix_sales_columns(sales)
 
-    num_cols = ["Sales Unit","Returns Unit","Sales Price","Invoice Discounts"]
+    num_cols = [
+        "Sales Unit","Returns Unit","Sales Price","Invoice Discounts"
+    ]
 
     for col in num_cols:
         sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
@@ -55,7 +57,9 @@ def build_sales_pipeline(sales, codes):
     sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
 
     def group(df, col):
-        return df.groupby(col, as_index=False)[["Sales After Returns"]].sum()
+        return df.groupby(col, as_index=False)[
+            ["Sales After Returns"]
+        ].sum()
 
     return {
         "rep": group(sales,"Rep Name"),
@@ -143,7 +147,7 @@ def build_overdue_pipeline(overdue, codes):
 # 🚀 UI
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 KPI Dashboard - Advanced Flow Analysis")
+st.title("📊 KPI Dashboard")
 
 data = load_data()
 
@@ -241,48 +245,52 @@ with c4:
     st.markdown(kpi_card("⏳ Up To Date", actual_uptodate, target_uptodate), unsafe_allow_html=True)
 
 # =========================
-# 🌳 SALES FLOW TREE
+# 📊 SALES ANALYTICS
 # =========================
-st.header("🌳 Sales Flow Analysis")
+st.header("📊 Sales Analytics Overview")
 
 df = filtered_sales.copy()
 
-total_sales = df["Sales After Returns"].sum()
-returns = df["Returns Value"].sum() if "Returns Value" in df.columns else 0
-invoice_discounts = df["Invoice Discounts"].sum() if "Invoice Discounts" in df.columns else 0
+total_sales_value = df["Sales After Returns"].sum()
+returns_value = df.get("Returns Value", pd.Series([0])).sum()
+invoice_discounts = df.get("Invoice Discounts", pd.Series([0])).sum()
 extra_discounts = 0
 
 total_discounts = invoice_discounts + extra_discounts
-net_sales = total_sales - returns - total_discounts
-collection = filtered_opening["Sales After Returns"].sum() if "Sales After Returns" in filtered_opening.columns else 0
+net_sales = total_sales_value - total_discounts
 
-def node(label, value, color):
+total_collection = filtered_opening["Sales After Returns"].sum() if "Sales After Returns" in filtered_opening.columns else 0
+
+def card(title, value, color):
     return f"""
     <div style="
-        display:flex;
-        justify-content:space-between;
-        padding:14px;
-        margin:6px 0;
         background:white;
-        border-left:6px solid {color};
-        border-radius:10px;
-        box-shadow:0px 2px 8px rgba(0,0,0,0.06);
-        font-weight:600;
+        padding:18px;
+        border-radius:14px;
+        box-shadow:0px 2px 10px rgba(0,0,0,0.08);
+        text-align:center;
+        border-left:5px solid {color};
     ">
-        <div>{label}</div>
-        <div style="color:{color}">{value:,.0f}</div>
+        <div style="font-size:14px;color:#666">{title}</div>
+        <div style="font-size:24px;font-weight:bold;color:{color}">
+            {value:,.0f}
+        </div>
     </div>
     """
 
-st.markdown(node("💰 Total Sales", total_sales, "#2c3e50"), unsafe_allow_html=True)
-st.markdown("⬇")
-st.markdown(node("↩ Returns", -returns, "#e74c3c"), unsafe_allow_html=True)
-st.markdown("⬇")
-st.markdown(node("🎯 Discounts", -total_discounts, "#f39c12"), unsafe_allow_html=True)
-st.markdown("⬇")
-st.markdown(node("💵 Net Sales", net_sales, "#27ae60"), unsafe_allow_html=True)
-st.markdown("⬇")
-st.markdown(node("🏦 Collection", collection, "#9b59b6"), unsafe_allow_html=True)
+c1, c2, c3, c4 = st.columns(4)
+
+with c1:
+    st.markdown(card("💰 Total Sales", total_sales_value, "#3498db"), unsafe_allow_html=True)
+with c2:
+    st.markdown(card("↩ Returns", returns_value, "#e74c3c"), unsafe_allow_html=True)
+with c3:
+    st.markdown(card("🎯 Discounts", total_discounts, "#f39c12"), unsafe_allow_html=True)
+with c4:
+    st.markdown(card("💵 Net Sales", net_sales, "#2ecc71"), unsafe_allow_html=True)
+
+st.markdown("### 💳 Collection")
+st.markdown(card("🏦 Total Collection", total_collection, "#9b59b6"), unsafe_allow_html=True)
 
 # =========================
 # 📋 TABLES
