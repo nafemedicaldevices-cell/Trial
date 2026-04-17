@@ -143,7 +143,7 @@ def build_overdue_pipeline(overdue, codes):
 # 🚀 UI
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 KPI Dashboard - Advanced Flow Analysis")
+st.title("📊 KPI Dashboard")
 
 data = load_data()
 
@@ -182,116 +182,69 @@ filtered_opening = apply_filter(opening, "rep", col_map[filter_type], selected_v
 filtered_overdue = apply_filter(overdue, "rep", col_map[filter_type], selected_value)
 
 # =========================
-# 🎯 KPI TARGETS
+# 🎯 KPI (SMALL - SIMPLE)
 # =========================
-actual_year = filtered_sales["Sales After Returns"].sum()
+st.subheader("🎯 Performance")
 
-actual_month = actual_year * 0.1
-actual_quarter = actual_year * 0.3
-actual_uptodate = actual_year * 0.7
+actual = filtered_sales["Sales After Returns"].sum()
+target = 1000000
+pct = (actual / target * 100) if target else 0
 
-target_year = 1000000
-target_month = 90000
-target_quarter = 250000
-target_uptodate = 700000
-
-# =========================
-# 🎨 KPI CARD
-# =========================
-def kpi_card(title, actual, target):
-    pct = (actual / target * 100) if target else 0
-    color = "#2ecc71" if pct >= 100 else "#f39c12" if pct >= 70 else "#e74c3c"
-
-    return f"""
-    <div style="
-        background:white;
-        padding:18px;
-        border-radius:14px;
-        box-shadow:0px 2px 10px rgba(0,0,0,0.08);
-        text-align:center;
-        border-left:6px solid {color};
-    ">
-        <div style="font-size:15px;color:#666;font-weight:600">{title}</div>
-        <div style="font-size:26px;font-weight:bold;color:#1f77b4;margin-top:8px">
-            {actual:,.0f}
-        </div>
-        <div style="font-size:13px;color:#999;margin-top:4px">
-            Target: {target:,.0f}
-        </div>
-        <div style="margin-top:8px;font-size:15px;font-weight:bold;color:{color}">
-            {pct:.1f}%
-        </div>
-    </div>
-    """
+st.markdown(f"""
+<div style="
+    font-size:16px;
+    font-weight:600;
+    color:#2c3e50;
+">
+📊 Sales: {actual:,.0f} | 🎯 Target: {target:,.0f} | 📈 {pct:.1f}%
+</div>
+""", unsafe_allow_html=True)
 
 # =========================
-# 📊 KPI SECTION
+# 🌳 MINI FLOW (TREE)
 # =========================
-st.subheader("🎯 Target Performance")
-
-c1, c2, c3, c4 = st.columns(4)
-
-with c1:
-    st.markdown(kpi_card("📅 Year Sales", actual_year, target_year), unsafe_allow_html=True)
-with c2:
-    st.markdown(kpi_card("📆 Month Sales", actual_month, target_month), unsafe_allow_html=True)
-with c3:
-    st.markdown(kpi_card("📊 Quarter Sales", actual_quarter, target_quarter), unsafe_allow_html=True)
-with c4:
-    st.markdown(kpi_card("⏳ Up To Date", actual_uptodate, target_uptodate), unsafe_allow_html=True)
-
-# =========================
-# 🌳 SALES FLOW TREE
-# =========================
-st.header("🌳 Sales Flow Analysis")
+st.header("🌳 Sales Flow")
 
 df = filtered_sales.copy()
 
 total_sales = df["Sales After Returns"].sum()
 returns = df["Returns Value"].sum() if "Returns Value" in df.columns else 0
-invoice_discounts = df["Invoice Discounts"].sum() if "Invoice Discounts" in df.columns else 0
-extra_discounts = 0
+discounts = df["Invoice Discounts"].sum() if "Invoice Discounts" in df.columns else 0
 
-total_discounts = invoice_discounts + extra_discounts
-net_sales = total_sales - returns - total_discounts
+net_sales = total_sales - returns - discounts
 collection = filtered_opening["Sales After Returns"].sum() if "Sales After Returns" in filtered_opening.columns else 0
 
-def node(label, value, color):
-    return f"""
-    <div style="
-        display:flex;
-        justify-content:space-between;
-        padding:14px;
-        margin:6px 0;
-        background:white;
-        border-left:6px solid {color};
-        border-radius:10px;
-        box-shadow:0px 2px 8px rgba(0,0,0,0.06);
-        font-weight:600;
-    ">
-        <div>{label}</div>
-        <div style="color:{color}">{value:,.0f}</div>
-    </div>
-    """
+st.markdown(f"""
+<div style="
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:10px;
+    font-size:15px;
+    font-weight:600;
+">
 
-st.markdown(node("💰 Total Sales", total_sales, "#2c3e50"), unsafe_allow_html=True)
-st.markdown("⬇")
-st.markdown(node("↩ Returns", -returns, "#e74c3c"), unsafe_allow_html=True)
-st.markdown("⬇")
-st.markdown(node("🎯 Discounts", -total_discounts, "#f39c12"), unsafe_allow_html=True)
-st.markdown("⬇")
-st.markdown(node("💵 Net Sales", net_sales, "#27ae60"), unsafe_allow_html=True)
-st.markdown("⬇")
-st.markdown(node("🏦 Collection", collection, "#9b59b6"), unsafe_allow_html=True)
+💰 {total_sales:,.0f}
+➡️
+↩ -{returns:,.0f}
+➡️
+🎯 -{discounts:,.0f}
+➡️
+💵 {net_sales:,.0f}
+➡️
+🏦 {collection:,.0f}
+
+</div>
+""", unsafe_allow_html=True)
 
 # =========================
 # 📋 TABLES
 # =========================
-st.header("💰 SALES DATA")
+st.header("💰 Sales Data")
 st.dataframe(filtered_sales)
 
-st.header("📦 OPENING DATA")
+st.header("📦 Opening Data")
 st.dataframe(filtered_opening)
 
-st.header("⏳ OVERDUE DATA")
+st.header("⏳ Overdue Data")
 st.dataframe(filtered_overdue)
