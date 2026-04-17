@@ -130,7 +130,11 @@ def build_overdue_pipeline(overdue, codes):
 
     overdue['Rep Code'] = overdue['Client Code'].ffill()
 
-    overdue['Overdue Value'] = overdue['120 Days'] + overdue['150 Days'] + overdue['More Than 150 Days']
+    overdue['Overdue Value'] = (
+        overdue['120 Days'] +
+        overdue['150 Days'] +
+        overdue['More Than 150 Days']
+    )
 
     overdue["Rep Code"] = pd.to_numeric(overdue["Rep Code"], errors="coerce")
     overdue = overdue.merge(codes, on='Rep Code', how='left')
@@ -170,9 +174,83 @@ def apply_filter(data, filter_type, value):
 
 
 # =========================
-# 🎨 UI
+# 🎨 UI STYLE (KPI CARDS)
 # =========================
 st.set_page_config(layout="wide")
+
+st.markdown("""
+<style>
+.kpi-card {
+    background: #0f172a;
+    padding: 18px;
+    border-radius: 16px;
+    color: white;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+    text-align: center;
+}
+.kpi-title {
+    font-size: 14px;
+    opacity: 0.8;
+}
+.kpi-value {
+    font-size: 26px;
+    font-weight: bold;
+    margin-top: 5px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# =========================
+# 🎯 KPI CARDS FUNCTION
+# =========================
+def kpi_cards(sales_df):
+
+    total_sales = sales_df["rep"]["Total Sales Value"].sum()
+    returns = sales_df["rep"]["Returns Value"].sum()
+    net_sales = sales_df["rep"]["Sales After Returns"].sum()
+
+    target = total_sales * 1.2  # مثال target (عدله حسب بياناتك)
+    achievement = (net_sales / target) * 100 if target > 0 else 0
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-title">Total Sales</div>
+            <div class="kpi-value">{total_sales:,.0f}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-title">Returns</div>
+            <div class="kpi-value">{returns:,.0f}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-title">Net Sales</div>
+            <div class="kpi-value">{net_sales:,.0f}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col4:
+        st.markdown(f"""
+        <div class="kpi-card">
+            <div class="kpi-title">Target Achievement %</div>
+            <div class="kpi-value">{achievement:.1f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+
+# =========================
+# 🎨 UI
+# =========================
 st.title("📊 KPI Dashboard")
 
 data = load_data()
@@ -197,69 +275,20 @@ selected_value = st.sidebar.selectbox("Select", options)
 
 
 # =========================
-# 📊 KPI CARDS (UI ONLY FIXED)
+# 📊 KPI SECTION (NEW)
 # =========================
 st.header("📌 KPI Summary")
-
-df_sales = apply_filter(sales, filter_type, selected_value)
-df_overdue = apply_filter(overdue, filter_type, selected_value)
-
-total_sales = df_sales["Total Sales Value"].sum() if "Total Sales Value" in df_sales else 0
-net_sales = df_sales["Sales After Returns"].sum() if "Sales After Returns" in df_sales else 0
-overdue_val = df_overdue["Overdue Value"].sum() if "Overdue Value" in df_overdue else 0
-
-col1, col2, col3 = st.columns(3)
-
-card_style = """
-    padding:12px;
-    border-radius:10px;
-    background:white;
-    text-align:center;
-    box-shadow:0 1px 6px rgba(0,0,0,0.08);
-"""
-
-with col1:
-    st.markdown(f"""
-    <div style="{card_style}">
-        <div style="font-size:11px;color:#888;">🎯 Target</div>
-        <div style="font-size:12px;color:#aaa;">Total Sales</div>
-        <div style="font-size:22px;font-weight:600;color:#1f77b4;">
-            {total_sales:,.0f}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col2:
-    st.markdown(f"""
-    <div style="{card_style}">
-        <div style="font-size:11px;color:#888;">📊 Sales</div>
-        <div style="font-size:12px;color:#aaa;">After Returns</div>
-        <div style="font-size:22px;font-weight:600;color:#2ca02c;">
-            {net_sales:,.0f}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col3:
-    st.markdown(f"""
-    <div style="{card_style}">
-        <div style="font-size:11px;color:#888;">⚠️ Risk</div>
-        <div style="font-size:12px;color:#aaa;">Overdue</div>
-        <div style="font-size:22px;font-weight:600;color:#d62728;">
-            {overdue_val:,.0f}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+kpi_cards(sales)
 
 
 # =========================
-# 📊 TABLES
+# 📊 OUTPUT TABLES
 # =========================
 st.header("💰 SALES")
-st.dataframe(df_sales)
+st.dataframe(apply_filter(sales, filter_type, selected_value))
 
 st.header("📦 OPENING")
 st.dataframe(apply_filter(opening, filter_type, selected_value))
 
 st.header("⏳ OVERDUE")
-st.dataframe(df_overdue)
+st.dataframe(apply_filter(overdue, filter_type, selected_value))
