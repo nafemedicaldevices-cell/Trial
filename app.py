@@ -25,13 +25,13 @@ def load_data():
 # 🧠 FIX SALES
 # =========================
 def fix_sales_columns(sales):
-    expected_cols = [
+    cols = [
         'Date','Warehouse Name','Client Code','Client Name','Notes','MF','Mostanad',
         'Rep Code','Sales Unit','Returns Unit',
         'Sales Price','Invoice Discounts','Sales Value'
     ]
-    sales = sales.iloc[:, :len(expected_cols)].copy()
-    sales.columns = expected_cols
+    sales = sales.iloc[:, :len(cols)].copy()
+    sales.columns = cols
     return sales
 
 # =========================
@@ -43,8 +43,8 @@ def build_sales_pipeline(sales, codes):
 
     num_cols = ["Sales Unit","Returns Unit","Sales Price","Invoice Discounts"]
 
-    for col in num_cols:
-        sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
+    for c in num_cols:
+        sales[c] = pd.to_numeric(sales[c], errors="coerce").fillna(0)
 
     sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
     codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
@@ -66,7 +66,7 @@ def build_sales_pipeline(sales, codes):
     }
 
 # =========================
-# 📦 OPENING PIPELINE
+# 📦 OPENING
 # =========================
 def build_opening_pipeline(opening, codes):
 
@@ -90,8 +90,8 @@ def build_opening_pipeline(opening, codes):
         (~opening['Branch'].astype(str).str.contains('كود|اجماليات', na=False))
     ]
 
-    for col in ['Total Sales','Returns','Cash Collection','Collection Checks']:
-        opening[col] = pd.to_numeric(opening[col], errors='coerce').fillna(0)
+    for c in ['Total Sales','Returns','Cash Collection','Collection Checks']:
+        opening[c] = pd.to_numeric(opening[c], errors='coerce').fillna(0)
 
     opening['Total Collection'] = opening['Cash Collection'] + opening['Collection Checks']
     opening["Sales After Returns"] = opening["Total Sales"] - opening['Returns']
@@ -110,7 +110,7 @@ def build_opening_pipeline(opening, codes):
     }
 
 # =========================
-# ⏳ OVERDUE PIPELINE
+# ⏳ OVERDUE
 # =========================
 def build_overdue_pipeline(overdue, codes):
 
@@ -144,7 +144,7 @@ def build_overdue_pipeline(overdue, codes):
 # 🚀 UI
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 KPI Dashboard (Executive View)")
+st.title("📊 KPI Dashboard (Final Version)")
 
 data = load_data()
 
@@ -153,7 +153,7 @@ opening = build_opening_pipeline(data["opening"], data["codes"])
 overdue = build_overdue_pipeline(data["overdue"], data["codes"])
 
 # =========================
-# 🎛️ FILTERS
+# 🎛️ FILTER
 # =========================
 st.sidebar.header("Filters")
 
@@ -170,20 +170,20 @@ col_map = {
 }
 
 options = sales["rep"][col_map[filter_type]].dropna().unique()
-selected_value = st.sidebar.selectbox("Select", options)
+selected = st.sidebar.selectbox("Select", options)
 
-def apply_filter(data, key, col, value):
+def apply_filter(data, key, col, val):
     df = data[key]
     if col in df.columns:
-        return df[df[col] == value]
+        return df[df[col] == val]
     return df
 
-filtered_sales = apply_filter(sales, "rep", col_map[filter_type], selected_value)
-filtered_opening = apply_filter(opening, "rep", col_map[filter_type], selected_value)
-filtered_overdue = apply_filter(overdue, "rep", col_map[filter_type], selected_value)
+filtered_sales = apply_filter(sales, "rep", col_map[filter_type], selected)
+filtered_opening = apply_filter(opening, "rep", col_map[filter_type], selected)
+filtered_overdue = apply_filter(overdue, "rep", col_map[filter_type], selected)
 
 # =========================
-# 🎯 KPI SIMPLE
+# 📊 KPI SIMPLE
 # =========================
 actual = filtered_sales["Sales After Returns"].sum()
 target = 1000000
@@ -194,9 +194,9 @@ st.markdown(f"""
 """)
 
 # =========================
-# 💰 WATERFALL (MAIN FLOW)
+# 💰 WATERFALL
 # =========================
-st.header("💰 Sales Flow (Waterfall)")
+st.header("💰 Sales Flow Analysis")
 
 df = filtered_sales.copy()
 
@@ -208,48 +208,26 @@ net_after_returns = total_sales - returns
 net_sales = net_after_returns - discounts
 
 fig = go.Figure(go.Waterfall(
-    name="Sales Flow",
+    name="Flow",
     orientation="v",
-
-    measure=[
-        "absolute",
-        "relative",
-        "relative",
-        "total"
-    ],
-
-    x=[
-        "Total Sales",
-        "Returns",
-        "Discounts",
-        "Net Sales"
-    ],
-
-    y=[
-        total_sales,
-        -returns,
-        -discounts,
-        net_sales
-    ],
-
-    connector={"line": {"color": "gray"}}
+    measure=["absolute","relative","relative","total"],
+    x=["Total Sales","Returns","Discounts","Net Sales"],
+    y=[total_sales,-returns,-discounts,net_sales],
+    connector={"line":{"color":"gray"}}
 ))
 
-fig.update_layout(
-    title="Sales Flow Analysis",
-    showlegend=False
-)
+fig.update_layout(title="Sales Waterfall", showlegend=False)
 
 st.plotly_chart(fig, use_container_width=True)
 
 # =========================
 # 📋 TABLES
 # =========================
-st.header("💰 Sales Data")
+st.header("💰 Sales")
 st.dataframe(filtered_sales)
 
-st.header("📦 Opening Data")
+st.header("📦 Opening")
 st.dataframe(filtered_opening)
 
-st.header("⏳ Overdue Data")
+st.header("⏳ Overdue")
 st.dataframe(filtered_overdue)
