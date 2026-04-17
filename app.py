@@ -174,83 +174,9 @@ def apply_filter(data, filter_type, value):
 
 
 # =========================
-# 🎨 UI STYLE (KPI CARDS)
+# 🚀 UI SETUP
 # =========================
 st.set_page_config(layout="wide")
-
-st.markdown("""
-<style>
-.kpi-card {
-    background: #0f172a;
-    padding: 18px;
-    border-radius: 16px;
-    color: white;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-    text-align: center;
-}
-.kpi-title {
-    font-size: 14px;
-    opacity: 0.8;
-}
-.kpi-value {
-    font-size: 26px;
-    font-weight: bold;
-    margin-top: 5px;
-}
-</style>
-""", unsafe_allow_html=True)
-
-
-# =========================
-# 🎯 KPI CARDS FUNCTION
-# =========================
-def kpi_cards(sales_df):
-
-    total_sales = sales_df["rep"]["Total Sales Value"].sum()
-    returns = sales_df["rep"]["Returns Value"].sum()
-    net_sales = sales_df["rep"]["Sales After Returns"].sum()
-
-    target = total_sales * 1.2  # مثال target (عدله حسب بياناتك)
-    achievement = (net_sales / target) * 100 if target > 0 else 0
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        st.markdown(f"""
-        <div class="kpi-card">
-            <div class="kpi-title">Total Sales</div>
-            <div class="kpi-value">{total_sales:,.0f}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col2:
-        st.markdown(f"""
-        <div class="kpi-card">
-            <div class="kpi-title">Returns</div>
-            <div class="kpi-value">{returns:,.0f}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col3:
-        st.markdown(f"""
-        <div class="kpi-card">
-            <div class="kpi-title">Net Sales</div>
-            <div class="kpi-value">{net_sales:,.0f}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    with col4:
-        st.markdown(f"""
-        <div class="kpi-card">
-            <div class="kpi-title">Target Achievement %</div>
-            <div class="kpi-value">{achievement:.1f}%</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-
-# =========================
-# 🎨 UI
-# =========================
 st.title("📊 KPI Dashboard")
 
 data = load_data()
@@ -258,6 +184,41 @@ data = load_data()
 sales = build_sales_pipeline(data["sales"], data["codes"])
 opening = build_opening_pipeline(data["opening"], data["codes"])
 overdue = build_overdue_pipeline(data["overdue"], data["codes"])
+
+
+# =========================
+# 🎯 KPI TARGET CARDS
+# =========================
+st.subheader("🎯 Target Performance Overview")
+
+actual_year = sales["rep"]["Sales After Returns"].sum()
+actual_month = actual_year * 0.1
+actual_quarter = actual_year * 0.3
+actual_uptodate = actual_year * 0.7
+
+target_year = 1000000
+target_month = 90000
+target_quarter = 250000
+target_uptodate = 700000
+
+
+def pct(a, t):
+    return (a / t * 100) if t else 0
+
+
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    st.metric("📅 Year", f"{pct(actual_year, target_year):.1f}%", f"{actual_year:,.0f}/{target_year:,.0f}")
+
+with col2:
+    st.metric("📆 Month", f"{pct(actual_month, target_month):.1f}%", f"{actual_month:,.0f}/{target_month:,.0f}")
+
+with col3:
+    st.metric("📊 Quarter", f"{pct(actual_quarter, target_quarter):.1f}%", f"{actual_quarter:,.0f}/{target_quarter:,.0f}")
+
+with col4:
+    st.metric("⏳ Up To Date", f"{pct(actual_uptodate, target_uptodate):.1f}%", f"{actual_uptodate:,.0f}/{target_uptodate:,.0f}")
 
 
 # =========================
@@ -272,13 +233,6 @@ filter_type = st.sidebar.radio(
 
 options = sales[filter_type.lower()][f"{filter_type} Name"].dropna().unique()
 selected_value = st.sidebar.selectbox("Select", options)
-
-
-# =========================
-# 📊 KPI SECTION (NEW)
-# =========================
-st.header("📌 KPI Summary")
-kpi_cards(sales)
 
 
 # =========================
