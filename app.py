@@ -86,15 +86,11 @@ def build_target_pipeline(df, id_name, mapping):
 
     df["Value"] = df["Target (Unit)"] * df["Sales Price"]
 
-    full = df.copy()
-
     def group(d):
         return d.groupby([id_name], as_index=False)["Value"].sum()
 
-    value_table = group(full).rename(columns={"Value": "Full Year 🏆"})
-
     return {
-        "value_table": value_table
+        "value_table": group(df).rename(columns={"Value": "Full Year 🏆"})
     }
 
 
@@ -163,8 +159,11 @@ def build_opening_pipeline(opening, codes):
         (~opening['Branch'].astype(str).str.contains('كود|اجماليات', na=False))
     ]
 
-    for col in ['Opening Balance','Total Sales','Returns','Cash Collection','Collection Checks']:
-        opening[col] = pd.to_numeric(opening[col], errors='coerce').fillna(0)
+    for col in [
+        'Opening Balance','Total Sales','Returns',
+        'Cash Collection','Collection Checks'
+    ]:
+        opening[col] = pd.to_numeric(opening[col], errors="coerce").fillna(0)
 
     opening['Total Collection'] = opening['Cash Collection'] + opening['Collection Checks']
     opening["Sales After Returns"] = opening["Total Sales"] - opening['Returns']
@@ -181,7 +180,7 @@ def build_opening_pipeline(opening, codes):
         "rep": group(opening,"Rep Code"),
         "manager": group(opening,"Manager Code"),
         "area": group(opening,"Area Code"),
-        "supervisor": group(opening,"Supervisor Code"),
+        "supervisor": group(opening,"Supervisor Code")
     }
 
 
@@ -195,12 +194,16 @@ def build_overdue_pipeline(overdue, codes):
         "120 Days","150 Days","More Than 150 Days","Balance"
     ]
 
-    overdue['Rep Code'] = overdue['Client Code'].ffill()
+    overdue["Rep Code"] = overdue["Client Code"].ffill()
     overdue["Rep Code"] = pd.to_numeric(overdue["Rep Code"], errors="coerce")
 
-    overdue['Overdue Value'] = overdue['120 Days'] + overdue['150 Days'] + overdue['More Than 150 Days']
+    overdue["Overdue Value"] = (
+        overdue["120 Days"] +
+        overdue["150 Days"] +
+        overdue["More Than 150 Days"]
+    )
 
-    overdue = overdue.merge(codes, on='Rep Code', how='left')
+    overdue = overdue.merge(codes, on="Rep Code", how="left")
 
     def group(df, col):
         return df.groupby(col, as_index=False)[["Overdue Value"]].sum()
@@ -209,7 +212,7 @@ def build_overdue_pipeline(overdue, codes):
         "rep": group(overdue,"Rep Code"),
         "manager": group(overdue,"Manager Code"),
         "area": group(overdue,"Area Code"),
-        "supervisor": group(overdue,"Supervisor Code"),
+        "supervisor": group(overdue,"Supervisor Code")
     }
 
 
@@ -221,16 +224,18 @@ st.title("📊 Unified KPI System")
 
 data = load_data()
 
+sales = build_sales_pipeline(data["sales"], data["codes"])
+opening = build_opening_pipeline(data["opening"], data["codes"])
+overdue = build_overdue_pipeline(data["overdue"], data["codes"])
+
 target_rep = build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
 target_manager = build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"])
 target_area = build_target_pipeline(data["target_area"], "Area Code", data["mapping"])
 target_supervisor = build_target_pipeline(data["target_supervisor"], "Supervisor Code", data["mapping"])
 
-sales = build_sales_pipeline(data["sales"], data["codes"])
-opening = build_opening_pipeline(data["opening"], data["codes"])
-overdue = build_overdue_pipeline(data["overdue"], data["codes"])
-
 codes = data["codes"].copy()
+codes.columns = codes.columns.str.strip()
+
 
 # =========================
 # 🎛️ FILTER
@@ -261,8 +266,9 @@ selected_code = codes.loc[
     code_map[filter_type]
 ].iloc[0]
 
+
 # =========================
-# 📊 KPI
+# 📊 KPI CALCULATION
 # =========================
 target_dict = {
     "Rep": target_rep,
@@ -285,12 +291,22 @@ total_sales = sales_df.loc[
     "Sales After Returns"
 ].sum()
 
-achievement = (total_sales / total_target * 100) if total_target != 0 else 0
+achievement = (total_sales / total_target * 100) if total_target else 0
 
-col1, col2, col3 = st.columns(3)
-col1.metric("🎯 Target", f"{total_target:,.0f}")
-col2.metric("💰 Sales", f"{total_sales:,.0f}")
-col3.metric("📊 Achievement %", f"{achievement:.1f}%")
+
+# =========================
+# 🧾 KPI CARDS (4 COLUMNS)
+# =========================
+month_factor = current_month / 12
+quarter_factor = current_quarter / 4
+
+col1, col2, col3, col4 = st.columns(4)
+
+col1.metric("🎯 Year", f"{total_sales:,.0f} / {total_target:,.0f}", f"{achievement:.1f}%")
+col2.metric("📊 Quarter", f"{total_sales*quarter_factor:,.0f} / {total_target*quarter_factor:,.0f}")
+col3.metric("📅 Month", f"{total_sales*month_factor:,.0f} / {total_target*month_factor:,.0f}")
+col4.metric("📈 YTD", f"{total_sales*month_factor:,.0f} / {total_target*month_factor:,.0f}")
+
 
 # =========================
 # 📊 TABLES
