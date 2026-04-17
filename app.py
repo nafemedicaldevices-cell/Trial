@@ -197,7 +197,7 @@ selected_value = st.sidebar.selectbox("Select", options)
 
 
 # =========================
-# 📊 KPI CARDS (NEW)
+# 📊 KPI CARDS (UI ONLY FIXED)
 # =========================
 st.header("📌 KPI Summary")
 
@@ -210,12 +210,20 @@ overdue_val = df_overdue["Overdue Value"].sum() if "Overdue Value" in df_overdue
 
 col1, col2, col3 = st.columns(3)
 
+card_style = """
+    padding:12px;
+    border-radius:10px;
+    background:white;
+    text-align:center;
+    box-shadow:0 1px 6px rgba(0,0,0,0.08);
+"""
+
 with col1:
     st.markdown(f"""
-    <div style="padding:15px;border-radius:12px;background:#f5f7ff;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-        <div style="font-size:13px;color:gray;">🎯 Target (Sales)</div>
-        <div style="font-size:12px;color:#777;">Total Sales</div>
-        <div style="font-size:26px;font-weight:bold;color:#1f77b4;">
+    <div style="{card_style}">
+        <div style="font-size:11px;color:#888;">🎯 Target</div>
+        <div style="font-size:12px;color:#aaa;">Total Sales</div>
+        <div style="font-size:22px;font-weight:600;color:#1f77b4;">
             {total_sales:,.0f}
         </div>
     </div>
@@ -223,10 +231,10 @@ with col1:
 
 with col2:
     st.markdown(f"""
-    <div style="padding:15px;border-radius:12px;background:#f0fff4;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-        <div style="font-size:13px;color:gray;">📊 Sales</div>
-        <div style="font-size:12px;color:#777;">After Returns</div>
-        <div style="font-size:26px;font-weight:bold;color:#2ca02c;">
+    <div style="{card_style}">
+        <div style="font-size:11px;color:#888;">📊 Sales</div>
+        <div style="font-size:12px;color:#aaa;">After Returns</div>
+        <div style="font-size:22px;font-weight:600;color:#2ca02c;">
             {net_sales:,.0f}
         </div>
     </div>
@@ -234,10 +242,10 @@ with col2:
 
 with col3:
     st.markdown(f"""
-    <div style="padding:15px;border-radius:12px;background:#fff5f5;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-        <div style="font-size:13px;color:gray;">⚠️ Risk</div>
-        <div style="font-size:12px;color:#777;">Overdue</div>
-        <div style="font-size:26px;font-weight:bold;color:#d62728;">
+    <div style="{card_style}">
+        <div style="font-size:11px;color:#888;">⚠️ Risk</div>
+        <div style="font-size:12px;color:#aaa;">Overdue</div>
+        <div style="font-size:22px;font-weight:600;color:#d62728;">
             {overdue_val:,.0f}
         </div>
     </div>
