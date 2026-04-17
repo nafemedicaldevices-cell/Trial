@@ -220,7 +220,7 @@ def build_overdue_pipeline(overdue, codes):
 # 🎨 UI
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 Unified KPI System")
+st.title("📊 Unified KPI Dashboard")
 
 data = load_data()
 
@@ -270,42 +270,61 @@ selected_code = codes.loc[
 # =========================
 # 📊 KPI CALCULATION
 # =========================
-target_dict = {
-    "Rep": target_rep,
-    "Supervisor": target_supervisor,
-    "Area": target_area,
-    "Manager": target_manager
-}
-
-target_df = target_dict[filter_type]["value_table"]
-
-total_target = target_df.loc[
-    target_df[code_map[filter_type]] == selected_code,
-    "Full Year 🏆"
-].sum()
+target_df = target_rep["value_table"] if filter_type == "Rep" else \
+            target_supervisor["value_table"] if filter_type == "Supervisor" else \
+            target_area["value_table"] if filter_type == "Area" else \
+            target_manager["value_table"]
 
 sales_df = sales[filter_type.lower()]
 
-total_sales = sales_df.loc[
-    sales_df[code_map[filter_type]] == selected_code,
-    "Sales After Returns"
-].sum()
+total_target = target_df["Full Year 🏆"].sum()
+total_sales = sales_df["Sales After Returns"].sum()
 
 achievement = (total_sales / total_target * 100) if total_target else 0
 
-
-# =========================
-# 🧾 KPI CARDS (4 COLUMNS)
-# =========================
 month_factor = current_month / 12
 quarter_factor = current_quarter / 4
 
+
+# =========================
+# 🧾 KPI CARDS (PRO STYLE)
+# =========================
+def kpi_card(title, sales_val, target_val):
+    ach = (sales_val / target_val * 100) if target_val else 0
+
+    st.markdown(f"""
+    <div style="
+        padding:20px;
+        border-radius:15px;
+        background:#0f172a;
+        color:white;
+        text-align:center;
+        box-shadow:0 6px 15px rgba(0,0,0,0.4);
+    ">
+        <h4 style="color:#94a3b8;margin:0;">{title}</h4>
+        <h2 style="color:#22c55e;margin:8px 0;">
+            {sales_val:,.0f} / {target_val:,.0f}
+        </h2>
+        <h3 style="color:#38bdf8;margin:0;">
+            {ach:.1f}%
+        </h3>
+    </div>
+    """, unsafe_allow_html=True)
+
+
 col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("🎯 Year", f"{total_sales:,.0f} / {total_target:,.0f}", f"{achievement:.1f}%")
-col2.metric("📊 Quarter", f"{total_sales*quarter_factor:,.0f} / {total_target*quarter_factor:,.0f}")
-col3.metric("📅 Month", f"{total_sales*month_factor:,.0f} / {total_target*month_factor:,.0f}")
-col4.metric("📈 YTD", f"{total_sales*month_factor:,.0f} / {total_target*month_factor:,.0f}")
+with col1:
+    kpi_card("🎯 YEAR", total_sales, total_target)
+
+with col2:
+    kpi_card("📊 QUARTER", total_sales * quarter_factor, total_target * quarter_factor)
+
+with col3:
+    kpi_card("📅 MONTH", total_sales * month_factor, total_target * month_factor)
+
+with col4:
+    kpi_card("📈 YTD", total_sales * month_factor, total_target * month_factor)
 
 
 # =========================
