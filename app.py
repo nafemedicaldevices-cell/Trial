@@ -15,16 +15,8 @@ current_quarter = (current_month - 1) // 3 + 1
 @st.cache_data
 def load_data():
     return {
-        "target_rep": pd.read_excel("Target Rep.xlsx"),
-        "target_manager": pd.read_excel("Target Manager.xlsx"),
-        "target_area": pd.read_excel("Target Area.xlsx"),
-        "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
-
         "sales": pd.read_excel("Sales.xlsx", header=None),
-
-        "mapping": pd.read_excel("Mapping.xlsx"),
         "codes": pd.read_excel("Code.xlsx"),
-
         "opening": pd.read_excel("Opening.xlsx", header=None),
         "overdue": pd.read_excel("Overdue.xlsx", header=None),
     }
@@ -45,70 +37,15 @@ def fix_sales_columns(sales):
 
 
 # =========================
-# 🚀 TARGET PIPELINE
-# =========================
-def build_target_pipeline(df, id_name, mapping):
-
-    df = df.copy()
-    mapping = mapping.copy()
-
-    df.columns = df.columns.str.strip()
-    mapping.columns = mapping.columns.str.strip()
-
-    if "Product Code" not in df.columns:
-        df["Product Code"] = np.nan
-
-    if "Sales Price" not in df.columns:
-        df["Sales Price"] = 0
-
-    df["Product Code"] = pd.to_numeric(df["Product Code"], errors="coerce")
-    mapping["Product Code"] = pd.to_numeric(mapping["Product Code"], errors="coerce")
-
-    mapping = mapping.drop_duplicates("Product Code")
-
-    fixed_cols = [c for c in ["Year", "Product Code", "Sales Price"] if c in df.columns]
-    dynamic_cols = [c for c in df.columns if c not in fixed_cols]
-
-    df = df.melt(
-        id_vars=fixed_cols,
-        value_vars=dynamic_cols,
-        var_name=id_name,
-        value_name="Target (Unit)"
-    )
-
-    df[id_name] = pd.to_numeric(
-        df[id_name].astype(str).str.replace(r"[^0-9]", "", regex=True),
-        errors="coerce"
-    )
-
-    df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
-    df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
-
-    df["Value"] = df["Target (Unit)"] * df["Sales Price"]
-
-    def group(d):
-        return d.groupby([id_name], as_index=False)["Value"].sum()
-
-    return {
-        "value_table": group(df).rename(columns={"Value": "Full Year 🏆"})
-    }
-
-
-# =========================
-# 🚀 SALES PIPELINE
+# 💰 SALES PIPELINE
 # =========================
 def build_sales_pipeline(sales, codes):
 
     sales = fix_sales_columns(sales)
 
-    sales.columns = sales.columns.str.strip()
-    codes.columns = codes.columns.str.strip()
-
     for col in [
-        "Sales Unit Before Edit",
-        "Returns Unit Before Edit",
-        "Sales Price",
-        "Invoice Discounts"
+        "Sales Unit Before Edit","Returns Unit Before Edit",
+        "Sales Price","Invoice Discounts"
     ]:
         sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
 
@@ -123,19 +60,19 @@ def build_sales_pipeline(sales, codes):
 
     def group(df, col):
         return df.groupby(col, as_index=False)[
-            ["Total Sales Value", "Returns Value", "Sales After Returns"]
+            ["Total Sales Value","Returns Value","Sales After Returns"]
         ].sum()
 
     return {
-        "rep": group(sales, "Rep Code"),
-        "manager": group(sales, "Manager Code"),
-        "area": group(sales, "Area Code"),
-        "supervisor": group(sales, "Supervisor Code")
+        "rep": group(sales,"Rep Name"),
+        "manager": group(sales,"Manager Name"),
+        "area": group(sales,"Area Name"),
+        "supervisor": group(sales,"Supervisor Name"),
     }
 
 
 # =========================
-# 🚀 OPENING PIPELINE
+# 📦 OPENING PIPELINE
 # =========================
 def build_opening_pipeline(opening, codes):
 
@@ -159,11 +96,8 @@ def build_opening_pipeline(opening, codes):
         (~opening['Branch'].astype(str).str.contains('كود|اجماليات', na=False))
     ]
 
-    for col in [
-        'Opening Balance','Total Sales','Returns',
-        'Cash Collection','Collection Checks'
-    ]:
-        opening[col] = pd.to_numeric(opening[col], errors="coerce").fillna(0)
+    for col in ['Opening Balance','Total Sales','Returns','Cash Collection','Collection Checks']:
+        opening[col] = pd.to_numeric(opening[col], errors='coerce').fillna(0)
 
     opening['Total Collection'] = opening['Cash Collection'] + opening['Collection Checks']
     opening["Sales After Returns"] = opening["Total Sales"] - opening['Returns']
@@ -177,15 +111,15 @@ def build_opening_pipeline(opening, codes):
         ].sum()
 
     return {
-        "rep": group(opening,"Rep Code"),
-        "manager": group(opening,"Manager Code"),
-        "area": group(opening,"Area Code"),
-        "supervisor": group(opening,"Supervisor Code")
+        "rep": group(opening,"Rep Name"),
+        "manager": group(opening,"Manager Name"),
+        "area": group(opening,"Area Name"),
+        "supervisor": group(opening,"Supervisor Name"),
     }
 
 
 # =========================
-# 🚀 OVERDUE PIPELINE
+# ⏳ OVERDUE PIPELINE
 # =========================
 def build_overdue_pipeline(overdue, codes):
 
@@ -194,33 +128,52 @@ def build_overdue_pipeline(overdue, codes):
         "120 Days","150 Days","More Than 150 Days","Balance"
     ]
 
-    overdue["Rep Code"] = overdue["Client Code"].ffill()
+    overdue['Rep Code'] = overdue['Client Code'].ffill()
+
+    overdue['Overdue Value'] = overdue['120 Days'] + overdue['150 Days'] + overdue['More Than 150 Days']
+
     overdue["Rep Code"] = pd.to_numeric(overdue["Rep Code"], errors="coerce")
-
-    overdue["Overdue Value"] = (
-        overdue["120 Days"] +
-        overdue["150 Days"] +
-        overdue["More Than 150 Days"]
-    )
-
-    overdue = overdue.merge(codes, on="Rep Code", how="left")
+    overdue = overdue.merge(codes, on='Rep Code', how='left')
 
     def group(df, col):
         return df.groupby(col, as_index=False)[["Overdue Value"]].sum()
 
     return {
-        "rep": group(overdue,"Rep Code"),
-        "manager": group(overdue,"Manager Code"),
-        "area": group(overdue,"Area Code"),
-        "supervisor": group(overdue,"Supervisor Code")
+        "rep": group(overdue,"Rep Name"),
+        "manager": group(overdue,"Manager Name"),
+        "area": group(overdue,"Area Name"),
+        "supervisor": group(overdue,"Supervisor Name"),
     }
+
+
+# =========================
+# 🎛️ FILTER
+# =========================
+def apply_filter(data, filter_type, value):
+
+    key_map = {
+        "Rep": "rep",
+        "Supervisor": "supervisor",
+        "Area": "area",
+        "Manager": "manager"
+    }
+
+    col_map = {
+        "Rep": "Rep Name",
+        "Supervisor": "Supervisor Name",
+        "Area": "Area Name",
+        "Manager": "Manager Name"
+    }
+
+    df = data[key_map[filter_type]]
+    return df[df[col_map[filter_type]] == value]
 
 
 # =========================
 # 🎨 UI
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 Unified KPI Dashboard")
+st.title("📊 KPI Dashboard")
 
 data = load_data()
 
@@ -228,117 +181,77 @@ sales = build_sales_pipeline(data["sales"], data["codes"])
 opening = build_opening_pipeline(data["opening"], data["codes"])
 overdue = build_overdue_pipeline(data["overdue"], data["codes"])
 
-target_rep = build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"])
-target_manager = build_target_pipeline(data["target_manager"], "Manager Code", data["mapping"])
-target_area = build_target_pipeline(data["target_area"], "Area Code", data["mapping"])
-target_supervisor = build_target_pipeline(data["target_supervisor"], "Supervisor Code", data["mapping"])
-
-codes = data["codes"].copy()
-codes.columns = codes.columns.str.strip()
-
 
 # =========================
-# 🎛️ FILTER
+# 🎛️ FILTER UI
 # =========================
 st.sidebar.header("Filters")
 
-filter_type = st.sidebar.radio("Filter By", ["Rep","Supervisor","Area","Manager"])
+filter_type = st.sidebar.radio(
+    "Filter By",
+    ["Rep","Supervisor","Area","Manager"]
+)
 
-name_map = {
-    "Rep": "Rep Name",
-    "Supervisor": "Supervisor Name",
-    "Area": "Area Name",
-    "Manager": "Manager Name"
-}
-
-code_map = {
-    "Rep": "Rep Code",
-    "Supervisor": "Supervisor Code",
-    "Area": "Area Code",
-    "Manager": "Manager Code"
-}
-
-options = codes[name_map[filter_type]].dropna().unique()
-selected_name = st.sidebar.selectbox("Select", options)
-
-selected_code = codes.loc[
-    codes[name_map[filter_type]] == selected_name,
-    code_map[filter_type]
-].iloc[0]
+options = sales[filter_type.lower()][f"{filter_type} Name"].dropna().unique()
+selected_value = st.sidebar.selectbox("Select", options)
 
 
 # =========================
-# 📊 KPI CALCULATION
+# 📊 KPI CARDS (NEW)
 # =========================
-target_df = target_rep["value_table"] if filter_type == "Rep" else \
-            target_supervisor["value_table"] if filter_type == "Supervisor" else \
-            target_area["value_table"] if filter_type == "Area" else \
-            target_manager["value_table"]
+st.header("📌 KPI Summary")
 
-sales_df = sales[filter_type.lower()]
+df_sales = apply_filter(sales, filter_type, selected_value)
+df_overdue = apply_filter(overdue, filter_type, selected_value)
 
-total_target = target_df["Full Year 🏆"].sum()
-total_sales = sales_df["Sales After Returns"].sum()
+total_sales = df_sales["Total Sales Value"].sum() if "Total Sales Value" in df_sales else 0
+net_sales = df_sales["Sales After Returns"].sum() if "Sales After Returns" in df_sales else 0
+overdue_val = df_overdue["Overdue Value"].sum() if "Overdue Value" in df_overdue else 0
 
-achievement = (total_sales / total_target * 100) if total_target else 0
+col1, col2, col3 = st.columns(3)
 
-month_factor = current_month / 12
-quarter_factor = current_quarter / 4
-
-
-# =========================
-# 🧾 KPI CARDS (PRO STYLE)
-# =========================
-def kpi_card(title, sales_val, target_val):
-    ach = (sales_val / target_val * 100) if target_val else 0
-
+with col1:
     st.markdown(f"""
-    <div style="
-        padding:20px;
-        border-radius:15px;
-        background:#0f172a;
-        color:white;
-        text-align:center;
-        box-shadow:0 6px 15px rgba(0,0,0,0.4);
-    ">
-        <h4 style="color:#94a3b8;margin:0;">{title}</h4>
-        <h2 style="color:#22c55e;margin:8px 0;">
-            {sales_val:,.0f} / {target_val:,.0f}
-        </h2>
-        <h3 style="color:#38bdf8;margin:0;">
-            {ach:.1f}%
-        </h3>
+    <div style="padding:15px;border-radius:12px;background:#f5f7ff;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <div style="font-size:13px;color:gray;">🎯 Target (Sales)</div>
+        <div style="font-size:12px;color:#777;">Total Sales</div>
+        <div style="font-size:26px;font-weight:bold;color:#1f77b4;">
+            {total_sales:,.0f}
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    kpi_card("🎯 YEAR", total_sales, total_target)
-
 with col2:
-    kpi_card("📊 QUARTER", total_sales * quarter_factor, total_target * quarter_factor)
+    st.markdown(f"""
+    <div style="padding:15px;border-radius:12px;background:#f0fff4;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <div style="font-size:13px;color:gray;">📊 Sales</div>
+        <div style="font-size:12px;color:#777;">After Returns</div>
+        <div style="font-size:26px;font-weight:bold;color:#2ca02c;">
+            {net_sales:,.0f}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 with col3:
-    kpi_card("📅 MONTH", total_sales * month_factor, total_target * month_factor)
-
-with col4:
-    kpi_card("📈 YTD", total_sales * month_factor, total_target * month_factor)
+    st.markdown(f"""
+    <div style="padding:15px;border-radius:12px;background:#fff5f5;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <div style="font-size:13px;color:gray;">⚠️ Risk</div>
+        <div style="font-size:12px;color:#777;">Overdue</div>
+        <div style="font-size:26px;font-weight:bold;color:#d62728;">
+            {overdue_val:,.0f}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # =========================
 # 📊 TABLES
 # =========================
-def filter_df(df_dict):
-    df = df_dict[filter_type.lower()]
-    return df[df[code_map[filter_type]] == selected_code]
-
 st.header("💰 SALES")
-st.dataframe(filter_df(sales))
+st.dataframe(df_sales)
 
 st.header("📦 OPENING")
-st.dataframe(filter_df(opening))
+st.dataframe(apply_filter(opening, filter_type, selected_value))
 
 st.header("⏳ OVERDUE")
-st.dataframe(filter_df(overdue))
+st.dataframe(df_overdue)
