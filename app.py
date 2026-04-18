@@ -2,46 +2,38 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 
-# =========================
-# 📅 TIME SETTINGS
-# =========================
-current_month = pd.Timestamp.today().month
-current_quarter = (current_month - 1) // 3 + 1
-
+st.set_page_config(layout="wide")
+st.title("📊 KPI Dashboard")
 
 # =========================
-# 📂 LOAD DATA
+# LOAD DATA
 # =========================
+@st.cache_data
 def load_data():
-    return {
-        "sales": pd.read_excel("Sales.xlsx", header=None),
-        "codes": pd.read_excel("Code.xlsx"),
-        "opening": pd.read_excel("Opening.xlsx", header=None),
-    }
+    sales = pd.read_excel("Sales.xlsx", header=None)
+    codes = pd.read_excel("Code.xlsx")
+    opening = pd.read_excel("Opening.xlsx", header=None)
+    return sales, codes, opening
 
 
 # =========================
-# 🧠 FIX SALES
+# FIX SALES
 # =========================
-def fix_sales_columns(sales):
-
+def fix_sales(sales):
     cols = [
-        'Date','Warehouse Name','Client Code','Client Name','Notes','MF','Mostanad',
+        'Date','Warehouse','Client Code','Client Name','Notes','MF','Doc',
         'Rep Code','Sales Unit','Returns Unit','Price','Discount','Value'
     ]
-
     sales = sales.iloc[:, :len(cols)].copy()
     sales.columns = cols
-
     return sales
 
 
 # =========================
-# 🚀 SALES PIPELINE
+# SALES KPI
 # =========================
-def build_sales_pipeline(sales, codes):
-
-    sales = fix_sales_columns(sales)
+def sales_kpi(sales, codes):
+    sales = fix_sales(sales)
 
     for col in ["Sales Unit","Returns Unit","Price"]:
         sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
@@ -60,9 +52,9 @@ def build_sales_pipeline(sales, codes):
 
 
 # =========================
-# 🚀 OPENING PIPELINE
+# OPENING KPI
 # =========================
-def build_opening_pipeline(opening, codes):
+def opening_kpi(opening, codes):
 
     opening.columns = [
         'Branch',"Evak",'Opening Balance','Total Sales',
@@ -81,8 +73,6 @@ def build_opening_pipeline(opening, codes):
 
     opening["Collection"] = opening["Cash"] + opening["Checks"]
     opening["Net Sales"] = opening["Total Sales"] - opening["Returns"]
-
-    # 🔥 KPI
     opening["Opening KPI"] = opening["Net Sales"] + opening["Collection"]
 
     opening["Rep Code"] = pd.to_numeric(opening["Rep Code"], errors="coerce")
@@ -96,19 +86,12 @@ def build_opening_pipeline(opening, codes):
 
 
 # =========================
-# 🎨 UI
+# RUN APP
 # =========================
-st.set_page_config(layout="wide")
-st.title("📊 Simple KPI Dashboard")
+sales_df, codes_df, opening_df = load_data()
 
-data = load_data()
+st.header("💰 Sales KPI")
+st.dataframe(sales_kpi(sales_df, codes_df))
 
-# SALES
-st.header("💰 Sales")
-sales = build_sales_pipeline(data["sales"], data["codes"])
-st.dataframe(sales)
-
-# OPENING
-st.header("📦 Opening")
-opening = build_opening_pipeline(data["opening"], data["codes"])
-st.dataframe(opening)
+st.header("📦 Opening KPI")
+st.dataframe(opening_kpi(opening_df, codes_df))
