@@ -18,8 +18,15 @@ def load_and_process_data():
         df = pd.read_excel(file)
         df.columns = df.columns.str.strip()
 
-        fixed_cols = ["Year", "Product Code", "Old Product Name", "Sales Price"]
+        # الأعمدة الثابتة
+        fixed_cols = [
+            "Year",
+            "Product Code",
+            "Old Product Name",
+            "Sales Price"
+        ]
 
+        # تحويل الأعمدة إلى Long format
         df = df.melt(
             id_vars=fixed_cols,
             var_name="Code",
@@ -28,13 +35,18 @@ def load_and_process_data():
 
         df["Level"] = level
 
+        # تنظيف القيم
         df["Target (Year)"] = pd.to_numeric(df["Target (Year)"], errors="coerce")
 
+        # الحسابات
         df["Target (Unit)"] = df["Target (Year)"] / 12
         df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
 
-        months = ["Jan","Feb","Mar","Apr","May","Jun",
-                   "Jul","Aug","Sep","Oct","Nov","Dec"]
+        # الشهور
+        months = [
+            "Jan","Feb","Mar","Apr","May","Jun",
+            "Jul","Aug","Sep","Oct","Nov","Dec"
+        ]
 
         df_long = df.loc[df.index.repeat(12)].copy()
         df_long["Month"] = np.tile(months, len(df))
