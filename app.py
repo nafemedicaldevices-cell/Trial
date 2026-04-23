@@ -4,7 +4,7 @@ import streamlit as st
 # =========================
 # 📌 TITLE
 # =========================
-st.title("📊 Target Dashboard - Monthly System (Clean Version)")
+st.title("📊 Target Dashboard - Monthly (Long Format)")
 
 # =========================
 # 🧹 CLEAN + TRANSFORM
@@ -18,7 +18,7 @@ def process_df(df):
     for col in df.select_dtypes(include="object").columns:
         df[col] = df[col].astype(str).str.strip()
 
-    # -------- FIND TARGET COLUMN --------
+    # -------- TARGET DETECTION --------
     target_cols = [c for c in df.columns if "target" in c.lower()]
 
     if len(target_cols) == 0:
@@ -28,15 +28,31 @@ def process_df(df):
 
     df[target_col] = pd.to_numeric(df[target_col], errors="coerce")
 
-    # standard name
     df = df.rename(columns={target_col: "Target (Year)"})
 
     # =========================
     # 📅 MONTHLY CALCULATION
     # =========================
-    df["Target (Month)"] = df["Target (Year)"] / 12
+    df["Target (Unit)"] = df["Target (Year)"] / 12
+    df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
 
-    return df
+    # =========================
+    # 📅 LONG FORMAT (MONTH COLUMN)
+    # =========================
+    months = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ]
+
+    df_long = df.loc[df.index.repeat(12)].copy()
+
+    df_long["Month"] = months * len(df)
+
+    df_long["Monthly Target (Unit)"] = df["Target (Unit)"].repeat(12).values
+
+    df_long["Monthly Target (Value)"] = df["Target (Value)"].repeat(12).values / 12
+
+    return df_long
 
 # =========================
 # 📂 LOAD FILES
@@ -79,18 +95,14 @@ for level, df in data.items():
     c1, c2, c3 = st.columns(3)
 
     if "Target (Year)" in df.columns:
-
         c1.metric("Total Year Target", f"{df['Target (Year)'].sum():,.0f}")
-
     else:
         c1.metric("Total Year Target", "N/A")
 
-    if "Target (Month)" in df.columns:
-
-        c2.metric("Monthly Target", f"{df['Target (Month)'].sum():,.0f}")
-
+    if "Monthly Target (Unit)" in df.columns:
+        c2.metric("Monthly Unit Target", f"{df['Monthly Target (Unit)'].sum():,.0f}")
     else:
-        c2.metric("Monthly Target", "N/A")
+        c2.metric("Monthly Unit Target", "N/A")
 
     c3.metric("Rows", len(df))
 
