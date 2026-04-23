@@ -1,19 +1,20 @@
 import pandas as pd
 import streamlit as st
 
-st.title("📊 Target Dashboard - Final Stable Version")
+st.title("📊 Target Dashboard - Stable Monthly Version")
 
 # =========================
-# 🧹 PROCESS
+# 🧹 PROCESS FUNCTION
 # =========================
 def process_df(df):
 
+    # -------- CLEAN --------
     df.columns = df.columns.str.strip()
 
     for col in df.select_dtypes(include="object").columns:
         df[col] = df[col].astype(str).str.strip()
 
-    # -------- TARGET --------
+    # -------- FIND TARGET --------
     target_cols = [c for c in df.columns if "target" in c.lower()]
 
     if len(target_cols) == 0:
@@ -26,23 +27,31 @@ def process_df(df):
     df = df.rename(columns={target_col: "Target (Year)"})
 
     # =========================
-    # 📅 MONTH TABLE (FIXED METHOD)
+    # 📅 SAFE MONTH GENERATION
     # =========================
-    months_df = pd.DataFrame({
-        "Month": [
-            "Jan","Feb","Mar","Apr","May","Jun",
-            "Jul","Aug","Sep","Oct","Nov","Dec"
-        ]
-    })
+    months = [
+        "Jan","Feb","Mar","Apr","May","Jun",
+        "Jul","Aug","Sep","Oct","Nov","Dec"
+    ]
 
-    df["key"] = 1
-    months_df["key"] = 1
+    # 🔥 build list of rows manually (guaranteed working)
+    result = []
 
-    df_long = df.merge(months_df, on="key").drop("key", axis=1)
+    for i in range(len(df)):
 
-    df_long["Monthly Target"] = df_long["Target (Year)"] / 12
+        base_row = df.iloc[i]
 
-    return df_long
+        monthly_value = base_row["Target (Year)"] / 12
+
+        for m in months:
+
+            new_row = base_row.copy()
+            new_row["Month"] = m
+            new_row["Monthly Target"] = monthly_value
+
+            result.append(new_row)
+
+    return pd.DataFrame(result)
 
 # =========================
 # 📂 LOAD FILES
@@ -81,8 +90,9 @@ for level, df in data.items():
 
     st.markdown(f"## 📌 {level}")
 
+    # safety check
     if "Month" not in df.columns:
-        st.error("Month column missing!")
+        st.error("Month column not created")
         st.dataframe(df)
         continue
 
