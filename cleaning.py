@@ -100,27 +100,44 @@ def load_haraka():
 
 
 # =========================
-# 📂 CLIENT HARKA (FIXED)
+# 📂 CLIENT HARKA (FINAL FIX)
 # =========================
 def load_client_haraka():
 
-    # 🔥 الاسم الصحيح
     df = pd.read_excel("Client Harakah.xlsx")
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
     df = df.dropna(how="all")
 
-    first_col = df.columns[0]
-    df[first_col] = df[first_col].astype(str)
+    # =========================
+    # 🏷️ FIX COLUMNS
+    # =========================
+    df.columns = [
+        "Client Code",
+        "Client Name",
+        "Opening Balance",
+        "Sales Value",
+        "Returns Value",
+        "Tasweyat Madinah",
+        "Total Collection",
+        "Madfoaat",
+        "Tasweyat Dainah",
+        "End Balance",
+        "Motalbet El Fatrah"
+    ]
 
     # =========================
-    # ❌ REMOVE BAD ROWS
+    # 🔥 EXTRACT REP FROM SALES VALUE
     # =========================
-    df = df[
-        df[first_col].notna() &
-        (df[first_col].str.strip() != "") &
-        (~df[first_col].str.contains("كود الفرع", na=False)) &
-        (~df[first_col].str.contains("كود العميل", na=False))
-    ]
+    df["Rep Code"] = df["Sales Value"].astype(str).str.extract(r"(\d+)")
+    df["Rep Name"] = df["Sales Value"].astype(str).str.replace(r"\d+", "", regex=True).str.strip()
+
+    # =========================
+    # 🔥 FILL DOWN
+    # =========================
+    df["Rep Code"] = df["Rep Code"].replace("", pd.NA).ffill()
+    df["Rep Name"] = df["Rep Name"].replace("", pd.NA).ffill()
+
+    df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce")
 
     return df
