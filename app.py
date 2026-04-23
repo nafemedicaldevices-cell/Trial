@@ -4,33 +4,34 @@ import streamlit as st
 # =========================
 # 📌 TITLE
 # =========================
-st.title("📊 Target Dashboard - Full System")
+st.title("📊 Target Dashboard - Clean Production Version")
 
 # =========================
-# 🧹 CLEAN + TRANSFORM FUNCTION
+# 🧹 CLEAN + TRANSFORM
 # =========================
 def process_df(df):
 
-    # -------- CLEAN --------
+    # -------- CLEAN COLUMNS --------
     df.columns = df.columns.str.strip()
 
+    # -------- CLEAN TEXT --------
     for col in df.select_dtypes(include="object").columns:
         df[col] = df[col].astype(str).str.strip()
 
-    # -------- DETECT TARGET --------
+    # -------- FIND TARGET COLUMN SAFELY --------
     target_cols = [c for c in df.columns if "target" in c.lower()]
 
     if len(target_cols) == 0:
-        return df
+        return df  # 🚨 no crash
 
     target_col = target_cols[0]
 
     df[target_col] = pd.to_numeric(df[target_col], errors="coerce")
 
-    # rename for standardization
+    # standard name
     df = df.rename(columns={target_col: "Target (Year)"})
 
-    # -------- MONTHLY CALC --------
+    # -------- YEAR / MONTH --------
     df["Target (Month)"] = df["Target (Year)"] / 12
 
     months = [
@@ -74,20 +75,31 @@ def load_data():
 data = load_data()
 
 # =========================
-# 📊 DISPLAY EACH LEVEL
+# 📊 DISPLAY
 # =========================
 for level, df in data.items():
 
     st.markdown(f"## 📌 {level} Target")
 
+    # ================= SAFETY CHECK =================
+    if "Target (Year)" not in df.columns:
+
+        st.warning(f"⚠️ No Target column found in {level}")
+        st.dataframe(df, use_container_width=True)
+        st.divider()
+        continue
+
     # ================= KPI =================
-    if "Target (Year)" in df.columns:
+    c1, c2, c3 = st.columns(3)
 
-        c1, c2, c3 = st.columns(3)
+    c1.metric("Total Year Target", f"{df['Target (Year)'].sum():,.0f}")
 
-        c1.metric("Total Year Target", f"{df['Target (Year)'].sum():,.0f}")
-        c2.metric("Monthly Target", f"{df['Target (Month)'].sum():,.0f}")
-        c3.metric("Rows", len(df))
+    c2.metric(
+        "Monthly Target",
+        f"{df['Target (Month)'].sum():,.0f}" if "Target (Month)" in df.columns else "N/A"
+    )
+
+    c3.metric("Rows", len(df))
 
     # ================= TABLE =================
     st.dataframe(df, use_container_width=True)
