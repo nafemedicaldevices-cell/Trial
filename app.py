@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 
-st.title("📊 KPI Target System - Monthly Only")
+st.title("📊 KPI Target System - Unit & Value")
 
 # =========================
 # 📂 FILES
@@ -18,7 +18,7 @@ files = {
 all_data = []
 
 # =========================
-# 🔄 PROCESS
+# 🔄 PROCESS FILES
 # =========================
 for level, file in files.items():
 
@@ -42,7 +42,13 @@ for level, file in files.items():
     df["Target (Year)"] = pd.to_numeric(df["Target (Year)"], errors="coerce")
 
     # =========================
-    # 📅 MONTH GENERATION
+    # 📊 CALCULATIONS
+    # =========================
+    df["Target Unit"] = df["Target (Year)"] / 12
+    df["Target Value"] = df["Target Unit"] * df["Sales Price"]
+
+    # =========================
+    # 📅 MONTHS
     # =========================
     months = [
         "Jan","Feb","Mar","Apr","May","Jun",
@@ -53,10 +59,9 @@ for level, file in files.items():
 
     df_long["Month"] = np.tile(months, len(df))
 
-    # =========================
-    # 💡 ONLY MONTHLY (NO UNIT/VALUE)
-    # =========================
-    df_long["Monthly"] = df["Target (Year)"].repeat(12).values / 12
+    df_long["Target Unit"] = np.repeat(df["Target Unit"].values, 12)
+
+    df_long["Target Value"] = np.repeat(df["Target Value"].values, 12)
 
     all_data.append(df_long)
 
@@ -71,8 +76,8 @@ final_df = pd.concat(all_data, ignore_index=True)
 c1, c2, c3 = st.columns(3)
 
 c1.metric("Year Target", f"{final_df['Target (Year)'].sum():,.0f}")
-c2.metric("Monthly Target", f"{final_df['Monthly'].sum():,.0f}")
-c3.metric("Rows", len(final_df))
+c2.metric("Total Unit", f"{final_df['Target Unit'].sum():,.0f}")
+c3.metric("Total Value", f"{final_df['Target Value'].sum():,.0f}")
 
 # =========================
 # 📊 FILTER
