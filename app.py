@@ -1,34 +1,55 @@
 import streamlit as st
-from cleaning import load_data
+from cleaning import load_targets, load_haraka
 
 # =========================
 # 📊 TITLE
 # =========================
-st.title("📊 Rep Harakah - Clean Data System")
+st.title("📊 KPI + Harakah Dashboard")
 
 # =========================
 # 📥 LOAD DATA
 # =========================
-df = load_data()
+targets = load_targets()
+haraka = load_haraka()
 
 # =========================
-# 📊 METRICS
+# 📌 TABS (6 TABLES)
 # =========================
-c1, c2, c3 = st.columns(3)
-
-c1.metric("Rows", len(df))
-c2.metric("Sales Value", f"{df['Sales Value'].sum():,.0f}")
-c3.metric("Returns Value", f"{df['Returns Value'].sum():,.0f}")
-
-# =========================
-# 📊 FILTER
-# =========================
-rep = st.selectbox("Select Rep", ["All"] + df["Rep Name"].dropna().unique().tolist())
-
-if rep != "All":
-    df = df[df["Rep Name"] == rep]
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    "Rep Target",
+    "Manager Target",
+    "Area Target",
+    "Supervisor Target",
+    "Evak Target",
+    "Harakah"
+])
 
 # =========================
-# 📊 OUTPUT
+# 📊 FILTERED TARGETS
 # =========================
-st.dataframe(df, use_container_width=True)
+with tab1:
+    st.subheader("Rep Target")
+    st.dataframe(targets[targets["Level"] == "Rep"], use_container_width=True)
+
+with tab2:
+    st.subheader("Manager Target")
+    st.dataframe(targets[targets["Level"] == "Manager"], use_container_width=True)
+
+with tab3:
+    st.subheader("Area Target")
+    st.dataframe(targets[targets["Level"] == "Area"], use_container_width=True)
+
+with tab4:
+    st.subheader("Supervisor Target")
+    st.dataframe(targets[targets["Level"] == "Supervisor"], use_container_width=True)
+
+with tab5:
+    st.subheader("Evak Target")
+    st.dataframe(targets[targets["Level"] == "Evak"], use_container_width=True)
+
+# =========================
+# 📊 HARKA TABLE
+# =========================
+with tab6:
+    st.subheader("Rep Harakah")
+    st.dataframe(haraka, use_container_width=True)
