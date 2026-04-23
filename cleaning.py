@@ -24,7 +24,7 @@ def load_data():
     ]
 
     # =========================
-    # 🏷️ HANDLE DUPLICATES
+    # 🏷️ FIX DUPLICATE COLUMNS
     # =========================
     cols = df.columns.tolist()
     seen = {}
@@ -41,7 +41,7 @@ def load_data():
     df.columns = new_cols
 
     # =========================
-    # ✏️ RENAME COLUMNS
+    # ✏️ RENAME
     # =========================
     df = df.rename(columns={
         df.columns[0]: "Rep Code",
