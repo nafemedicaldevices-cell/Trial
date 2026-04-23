@@ -4,48 +4,44 @@ import streamlit as st
 # =========================
 # 📌 TITLE
 # =========================
-st.title("📊 Target Dashboard - Full ETL")
+st.title("📊 Target Dashboard - Full System")
 
 # =========================
-# 🧹 CLEAN + UNPIVOT FUNCTION
+# 🧹 CLEAN + TRANSFORM FUNCTION
 # =========================
 def process_df(df):
 
-    # -------- CLEANING --------
+    # -------- CLEAN --------
     df.columns = df.columns.str.strip()
 
     for col in df.select_dtypes(include="object").columns:
         df[col] = df[col].astype(str).str.strip()
 
-    # -------- DETECT FIXED COLS --------
-    fixed_cols = [c for c in df.columns if c.lower() in [
-        "year", "product code", "old product name", "sales price"
-    ]]
+    # -------- DETECT TARGET --------
+    target_cols = [c for c in df.columns if "target" in c.lower()]
 
-    # -------- DETECT TARGET COLUMNS (UNPIVOT) --------
-    value_cols = [c for c in df.columns if c not in fixed_cols]
-
-    # لو مفيش حاجة تتعمل لها unpivot
-    if len(value_cols) == 0:
+    if len(target_cols) == 0:
         return df
 
-    df_melted = df.melt(
-        id_vars=fixed_cols,
-        value_vars=value_cols,
-        var_name="Code",
-        value_name="Target (Year)"
-    )
+    target_col = target_cols[0]
 
-    # -------- CLEAN NUMERIC --------
-    df_melted["Target (Year)"] = pd.to_numeric(df_melted["Target (Year)"], errors="coerce")
+    df[target_col] = pd.to_numeric(df[target_col], errors="coerce")
 
-    # -------- CALCULATIONS --------
-    df_melted["Target (Unit)"] = df_melted["Target (Year)"] / 12
+    # rename for standardization
+    df = df.rename(columns={target_col: "Target (Year)"})
 
-    if "Sales Price" in df_melted.columns:
-        df_melted["Target (Value)"] = df_melted["Target (Unit)"] * df_melted["Sales Price"]
+    # -------- MONTHLY CALC --------
+    df["Target (Month)"] = df["Target (Year)"] / 12
 
-    return df_melted
+    months = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ]
+
+    for m in months:
+        df[m] = df["Target (Month)"]
+
+    return df
 
 # =========================
 # 📂 LOAD FILES
@@ -78,23 +74,19 @@ def load_data():
 data = load_data()
 
 # =========================
-# 📊 DISPLAY
+# 📊 DISPLAY EACH LEVEL
 # =========================
 for level, df in data.items():
 
-    st.markdown(f"## 📌 {level}")
+    st.markdown(f"## 📌 {level} Target")
 
     # ================= KPI =================
-    num_cols = df.select_dtypes(include="number").columns
-
-    if len(num_cols) > 0:
-
-        target_col = num_cols[0]
+    if "Target (Year)" in df.columns:
 
         c1, c2, c3 = st.columns(3)
 
-        c1.metric("Total Target", f"{df[target_col].sum():,.0f}")
-        c2.metric("Avg Target", f"{df[target_col].mean():,.0f}")
+        c1.metric("Total Year Target", f"{df['Target (Year)'].sum():,.0f}")
+        c2.metric("Monthly Target", f"{df['Target (Month)'].sum():,.0f}")
         c3.metric("Rows", len(df))
 
     # ================= TABLE =================
