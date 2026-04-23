@@ -30,5 +30,8 @@ if level != "All":
 
 # =========================
 # 📊 OUTPUT
+#---------------------------------------------------------------
+pip install streamlit pandas openpyxl
+streamlit run app.py
 # =========================
 st.dataframe(final_df, use_container_width=True)
