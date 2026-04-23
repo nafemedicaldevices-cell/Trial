@@ -7,7 +7,7 @@ from cleaning import load_targets, load_haraka, load_client_haraka
 st.title("📊 KPI + Harakah System")
 
 # =========================
-# 📥 LOAD DATA
+# 📥 LOAD DATA (SAFE)
 # =========================
 targets = load_targets()
 rep_haraka = load_haraka()
