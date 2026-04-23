@@ -1,10 +1,10 @@
 import pandas as pd
 import streamlit as st
 
-st.title("📊 Target Dashboard - Monthly Split Fixed")
+st.title("📊 Target Dashboard - Final Stable Version")
 
 # =========================
-# 🧹 PROCESS FUNCTION
+# 🧹 PROCESS
 # =========================
 def process_df(df):
 
@@ -26,22 +26,21 @@ def process_df(df):
     df = df.rename(columns={target_col: "Target (Year)"})
 
     # =========================
-    # 📅 BUILD MONTHLY DATA (SAFE METHOD)
+    # 📅 MONTH TABLE (FIXED METHOD)
     # =========================
-    months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+    months_df = pd.DataFrame({
+        "Month": [
+            "Jan","Feb","Mar","Apr","May","Jun",
+            "Jul","Aug","Sep","Oct","Nov","Dec"
+        ]
+    })
 
-    df["Monthly Target"] = df["Target (Year)"] / 12
+    df["key"] = 1
+    months_df["key"] = 1
 
-    # 🔥 create empty list to store rows
-    rows = []
+    df_long = df.merge(months_df, on="key").drop("key", axis=1)
 
-    for _, row in df.iterrows():
-        for m in months:
-            new_row = row.copy()
-            new_row["Month"] = m
-            rows.append(new_row)
-
-    df_long = pd.DataFrame(rows)
+    df_long["Monthly Target"] = df_long["Target (Year)"] / 12
 
     return df_long
 
@@ -82,18 +81,17 @@ for level, df in data.items():
 
     st.markdown(f"## 📌 {level}")
 
-    # CHECK
     if "Month" not in df.columns:
-        st.error(f"Month column not created in {level}")
+        st.error("Month column missing!")
         st.dataframe(df)
         continue
 
     # KPI
     c1, c2, c3 = st.columns(3)
 
-    c1.metric("Year Target", f"{df['Target (Year)'].sum():,.0f}" if "Target (Year)" in df.columns else "N/A")
+    c1.metric("Year Target", f"{df['Target (Year)'].sum():,.0f}")
 
-    c2.metric("Monthly Target", f"{df['Monthly Target'].sum():,.0f}" if "Monthly Target" in df.columns else "N/A")
+    c2.metric("Monthly Target", f"{df['Monthly Target'].sum():,.0f}")
 
     c3.metric("Rows", len(df))
 
