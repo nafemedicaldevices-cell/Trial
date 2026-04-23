@@ -14,7 +14,7 @@ rep_haraka = load_haraka()
 client_haraka = load_client_haraka()
 
 # =========================
-# 📌 TABS (7)
+# 📌 TABS
 # =========================
 tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "Rep Target",
@@ -23,7 +23,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "Supervisor Target",
     "Evak Target",
     "Rep Harakah",
-    "Client Harakah"
+    "Clients Harakah"
 ])
 
 # =========================
@@ -52,8 +52,8 @@ with tab6:
     st.dataframe(rep_haraka, use_container_width=True)
 
 # =========================
-# 📊 CLIENT HARKA
+# 📊 CLIENTS HARKA
 # =========================
 with tab7:
-    st.subheader("Client Harakah (with Rep mapping)")
+    st.subheader("Clients Harakah")
     st.dataframe(client_haraka, use_container_width=True)
