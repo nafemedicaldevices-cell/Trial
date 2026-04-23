@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-st.title("📊 Rep Harakah - Strong Clean Data")
+st.title("📊 Rep Harakah - Clean Data")
 
 @st.cache_data
 def load_data():
@@ -13,25 +13,25 @@ def load_data():
     df = df.replace(r'^\s*$', pd.NA, regex=True)
 
     # =========================
-    # 🧹 REMOVE FULLY EMPTY ROWS (STRONG)
-    # =========================
-    df = df.dropna(how="all")
-
-    # =========================
-    # 🧹 CLEAN FIRST COLUMN
+    # 🎯 TARGET FIRST COLUMN ONLY
     # =========================
     first_col = df.columns[0]
+
     df[first_col] = df[first_col].astype(str)
 
+    # =========================
+    # ❌ REMOVE BAD ROWS BASED ON FIRST COLUMN ONLY
+    # =========================
     df = df[
-        ~df[first_col].str.contains("كود الفرع", na=False)
-        & ~df[first_col].str.contains("كود المندوب", na=False)
-        & (df[first_col].str.strip() != "")
-        & (df[first_col] != "nan")
+        df[first_col].notna() &
+        (df[first_col].str.strip() != "") &
+        (~df[first_col].str.contains("كود الفرع", na=False)) &
+        (~df[first_col].str.contains("كود المندوب", na=False)) &
+        (~df[first_col].str.contains("nan", na=False))
     ]
 
     # =========================
-    # 🏷️ FIX DUPLICATE COLUMNS
+    # 🏷️ HANDLE DUPLICATE COLUMNS
     # =========================
     cols = df.columns.tolist()
 
@@ -70,7 +70,6 @@ def load_data():
 
 df = load_data()
 
-st.subheader("📌 Clean Data")
 st.dataframe(df)
 
-st.write("Rows after cleaning:", len(df))
+st.write("Rows after clean:", len(df))
