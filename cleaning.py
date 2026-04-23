@@ -99,22 +99,24 @@ def load_haraka():
 
 
 # =========================
-# 📂 CLIENTS HARKA
+# 📂 CLIENTS HARKA (FIXED SAFE)
 # =========================
 def load_client_haraka():
 
-    # ⚠️ مهم: الاسم الصحيح
-    df = pd.read_excel("Clients Harakah.xlsx")
+    # 🔴 مهم جدًا: تأكد الاسم في المشروع
+    try:
+        df = pd.read_excel("Clients Harakah.xlsx")
+    except FileNotFoundError:
+        return pd.DataFrame({"Error": ["Clients Harakah.xlsx not found"]})
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
 
     first_col = df.columns[0]
     df[first_col] = df[first_col].astype(str)
 
-    # تنظيف بسيط
     df = df[df[first_col].notna() & (df[first_col].str.strip() != "")]
 
-    # fix duplicates
+    # fix duplicate columns
     cols = df.columns.tolist()
     seen = {}
     new_cols = []
@@ -132,7 +134,7 @@ def load_client_haraka():
     # =========================
     # 🔥 EXTRACT REP CODE
     # =========================
-    rep_col = df.columns[3]  # مندوب المبيعات
+    rep_col = df.columns[3]  # عمود مندوب المبيعات
 
     df["Rep Code"] = df[rep_col].astype(str).str.extract(r"(\d+)")
     df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce")
