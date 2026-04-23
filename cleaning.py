@@ -88,5 +88,59 @@ def load_and_process_data():
             "Target (Value)"
         ]
     ]
+    #-------------------------------------------------------------------------------------------------------------------------------------
+    import pandas as pd
+import streamlit as st
+
+st.title("📊 Rep Harakah Data Cleaner")
+
+# =========================
+# 📂 Upload File
+# =========================
+uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
+
+if uploaded_file:
+
+    # =========================
+    # 📥 Load Data
+    # =========================
+    df = pd.read_excel(uploaded_file, sheet_name="Rep Harakah")
+
+    st.subheader("📌 Raw Data Preview")
+    st.dataframe(df.head())
+
+    # =========================
+    # 🧹 Cleaning Steps
+    # =========================
+
+    # حذف أول صفّين
+    df = df.iloc[2:].reset_index(drop=True)
+
+    # حذف الصفوف الفاضية
+    df = df.dropna(how="all")
+
+    # تنظيف أسماء الأعمدة
+    df.columns = df.columns.str.strip()
+
+    # حذف الصفوف بدون Rep Code
+    if "Rep Code" in df.columns:
+        df = df[df["Rep Code"].notna()]
+
+    # =========================
+    # 📊 Result
+    # =========================
+    st.subheader("✅ Cleaned Data")
+    st.dataframe(df)
+
+    # =========================
+    # ⬇️ Download
+    # =========================
+    csv = df.to_csv(index=False).encode("utf-8")
+    st.download_button(
+        "⬇️ Download Clean CSV",
+        data=csv,
+        file_name="clean_rep_data.csv",
+        mime="text/csv"
+    )
 
     return final_df
