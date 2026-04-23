@@ -1,21 +1,26 @@
 import pandas as pd
 import numpy as np
-import streamlit as st
-
-st.title("📊 Pivot to Long - Target System")
 
 # =========================
-# 📂 UPLOAD FILE
+# 📂 FILES (ALL SHEETS)
 # =========================
-file = st.file_uploader("Upload Excel File", type=["xlsx"])
+files = {
+    "Rep": "Target Rep.xlsx",
+    "Manager": "Target Manager.xlsx",
+    "Area": "Target Area.xlsx",
+    "Supervisor": "Target Supervisor.xlsx",
+    "Evak": "Target Evak.xlsx",
+}
 
-if file:
+all_data = []
+
+# =========================
+# 🔄 PROCESS EACH FILE
+# =========================
+for level, file in files.items():
 
     df = pd.read_excel(file)
     df.columns = df.columns.str.strip()
-
-    st.subheader("📌 Original Data")
-    st.dataframe(df)
 
     # =========================
     # 📌 FIXED COLUMNS
@@ -28,52 +33,54 @@ if file:
     ]
 
     # =========================
-    # 🔄 UNPIVOT (PIVOT → LONG)
+    # 🔄 UNPIVOT (WIDE → LONG)
     # =========================
-    df_long = df.melt(
+    df = df.melt(
         id_vars=fixed_cols,
         var_name="Code",
         value_name="Target (Year)"
     )
 
+    df["Level"] = level
+
     # =========================
     # 🧹 CLEAN
     # =========================
-    df_long["Target (Year)"] = pd.to_numeric(df_long["Target (Year)"], errors="coerce")
+    df["Target (Year)"] = pd.to_numeric(df["Target (Year)"], errors="coerce")
 
     # =========================
-    # 📅 CALCULATIONS
+    # 📅 CALC
     # =========================
-    df_long["Target (Unit)"] = df_long["Target (Year)"] / 12
-    df_long["Target (Value)"] = df_long["Target (Unit)"] * df_long["Sales Price"]
+    df["Target (Unit)"] = df["Target (Year)"] / 12
+    df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
 
     # =========================
-    # 📅 MONTH GENERATION
+    # 📅 MONTH EXPANSION
     # =========================
     months = [
         "Jan","Feb","Mar","Apr","May","Jun",
         "Jul","Aug","Sep","Oct","Nov","Dec"
     ]
 
-    df_final = df_long.loc[df_long.index.repeat(12)].copy()
+    df_long = df.loc[df.index.repeat(12)].copy()
 
-    df_final["Month"] = np.tile(months, len(df_long))
+    df_long["Month"] = np.tile(months, len(df))
 
-    df_final["Monthly Target (Unit)"] = np.repeat(df_long["Target (Unit)"].values, 12)
+    df_long["Monthly Target (Unit)"] = np.repeat(df["Target (Unit)"].values, 12)
 
-    df_final["Monthly Target (Value)"] = np.repeat(df_long["Target (Value)"].values, 12) / 12
+    df_long["Monthly Target (Value)"] = np.repeat(df["Target (Value)"].values, 12) / 12
 
-    # =========================
-    # 📊 OUTPUT
-    # =========================
-    st.subheader("📌 Final Transformed Data")
-    st.dataframe(df_final, use_container_width=True)
+    all_data.append(df_long)
 
-    # =========================
-    # 📊 KPI
-    # =========================
-    c1, c2, c3 = st.columns(3)
+# =========================
+# 📊 COMBINE ALL SHEETS
+# =========================
+final_df = pd.concat(all_data, ignore_index=True)
 
-    c1.metric("Year Target", f"{df_final['Target (Year)'].sum():,.0f}")
-    c2.metric("Monthly Target", f"{df_final['Monthly Target (Unit)'].sum():,.0f}")
-    c3.metric("Rows", len(df_final))
+# =========================
+# 💾 SAVE NEW FILE
+# =========================
+output_file = "Clean_Target_Output.xlsx"
+final_df.to_excel(output_file, index=False)
+
+print("Done ✅ File saved:", output_file)
