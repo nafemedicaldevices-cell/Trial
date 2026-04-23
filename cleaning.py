@@ -56,6 +56,7 @@ def load_haraka():
     df = pd.read_excel("Rep Harakah.xlsx")
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
+    df = df.dropna(how="all")
 
     first_col = df.columns[0]
     df[first_col] = df[first_col].astype(str)
@@ -99,53 +100,26 @@ def load_haraka():
 
 
 # =========================
-# 📂 CLIENTS HARKA (FIXED SAFE)
+# 📂 CLIENTS HARKA (CLEAN FIXED)
 # =========================
 def load_client_haraka():
 
-    # 🔴 مهم جدًا: تأكد الاسم في المشروع
-    try:
-        df = pd.read_excel("Clients Harakah.xlsx")
-    except FileNotFoundError:
-        return pd.DataFrame({"Error": ["Clients Harakah.xlsx not found"]})
+    df = pd.read_excel("Clients Harakah.xlsx")
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
+    df = df.dropna(how="all")
 
     first_col = df.columns[0]
     df[first_col] = df[first_col].astype(str)
 
-    df = df[df[first_col].notna() & (df[first_col].str.strip() != "")]
-
-    # fix duplicate columns
-    cols = df.columns.tolist()
-    seen = {}
-    new_cols = []
-
-    for c in cols:
-        if c in seen:
-            seen[c] += 1
-            new_cols.append(f"{c}_{seen[c]}")
-        else:
-            seen[c] = 0
-            new_cols.append(c)
-
-    df.columns = new_cols
-
     # =========================
-    # 🔥 EXTRACT REP CODE
+    # ❌ CLEAN BAD ROWS
     # =========================
-    rep_col = df.columns[3]  # عمود مندوب المبيعات
-
-    df["Rep Code"] = df[rep_col].astype(str).str.extract(r"(\d+)")
-    df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce")
-
-    # =========================
-    # 🔗 JOIN REP NAME
-    # =========================
-    rep_master = pd.read_excel("Rep Harakah.xlsx")[["Rep Code", "Rep Name"]].drop_duplicates()
-
-    df = df.merge(rep_master, on="Rep Code", how="left")
-
-    df["Rep Name"] = df["Rep Name"].fillna("Unknown")
+    df = df[
+        df[first_col].notna() &
+        (df[first_col].str.strip() != "") &
+        (~df[first_col].str.contains("كود الفرع", na=False)) &
+        (~df[first_col].str.contains("كود العميل", na=False))
+    ]
 
     return df
