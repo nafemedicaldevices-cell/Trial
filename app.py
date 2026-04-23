@@ -4,40 +4,74 @@ import streamlit as st
 # =========================
 # 📌 TITLE
 # =========================
-st.title("📊 Target Dashboard - Cleaned Data")
+st.title("📊 Target Dashboard - Full ETL")
 
 # =========================
-# 🧹 CLEANING FUNCTION
+# 🧹 CLEAN + UNPIVOT FUNCTION
 # =========================
-def clean_df(df):
+def process_df(df):
 
-    # إزالة مسافات من أسماء الأعمدة
+    # -------- CLEANING --------
     df.columns = df.columns.str.strip()
 
-    # تنظيف النصوص
     for col in df.select_dtypes(include="object").columns:
         df[col] = df[col].astype(str).str.strip()
 
-    # تحويل أي Target لأرقام
-    for col in df.columns:
-        if "target" in col.lower():
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+    # -------- DETECT FIXED COLS --------
+    fixed_cols = [c for c in df.columns if c.lower() in [
+        "year", "product code", "old product name", "sales price"
+    ]]
 
-    return df
+    # -------- DETECT TARGET COLUMNS (UNPIVOT) --------
+    value_cols = [c for c in df.columns if c not in fixed_cols]
+
+    # لو مفيش حاجة تتعمل لها unpivot
+    if len(value_cols) == 0:
+        return df
+
+    df_melted = df.melt(
+        id_vars=fixed_cols,
+        value_vars=value_cols,
+        var_name="Code",
+        value_name="Target (Year)"
+    )
+
+    # -------- CLEAN NUMERIC --------
+    df_melted["Target (Year)"] = pd.to_numeric(df_melted["Target (Year)"], errors="coerce")
+
+    # -------- CALCULATIONS --------
+    df_melted["Target (Unit)"] = df_melted["Target (Year)"] / 12
+
+    if "Sales Price" in df_melted.columns:
+        df_melted["Target (Value)"] = df_melted["Target (Unit)"] * df_melted["Sales Price"]
+
+    return df_melted
 
 # =========================
-# 📂 LOAD DATA
+# 📂 LOAD FILES
 # =========================
 @st.cache_data
 def load_data():
 
-    data = {
-        "Rep": clean_df(pd.read_excel("Target Rep.xlsx")),
-        "Manager": clean_df(pd.read_excel("Target Manager.xlsx")),
-        "Area": clean_df(pd.read_excel("Target Area.xlsx")),
-        "Supervisor": clean_df(pd.read_excel("Target Supervisor.xlsx")),
-        "Evak": clean_df(pd.read_excel("Target Evak.xlsx")),
+    files = {
+        "Rep": "Target Rep.xlsx",
+        "Manager": "Target Manager.xlsx",
+        "Area": "Target Area.xlsx",
+        "Supervisor": "Target Supervisor.xlsx",
+        "Evak": "Target Evak.xlsx",
     }
+
+    data = {}
+
+    for name, file in files.items():
+
+        df = pd.read_excel(file)
+
+        df = process_df(df)
+
+        df["Level"] = name
+
+        data[name] = df
 
     return data
 
@@ -50,23 +84,20 @@ for level, df in data.items():
 
     st.markdown(f"## 📌 {level}")
 
-    # =========================
-    # 📊 KPI
-    # =========================
-    target_cols = [c for c in df.columns if "target" in c.lower()]
+    # ================= KPI =================
+    num_cols = df.select_dtypes(include="number").columns
 
-    if target_cols:
-        col = target_cols[0]
+    if len(num_cols) > 0:
+
+        target_col = num_cols[0]
 
         c1, c2, c3 = st.columns(3)
 
-        c1.metric("Total Target", f"{df[col].sum():,.0f}")
-        c2.metric("Avg Target", f"{df[col].mean():,.0f}")
+        c1.metric("Total Target", f"{df[target_col].sum():,.0f}")
+        c2.metric("Avg Target", f"{df[target_col].mean():,.0f}")
         c3.metric("Rows", len(df))
 
-    # =========================
-    # 📋 TABLE
-    # =========================
+    # ================= TABLE =================
     st.dataframe(df, use_container_width=True)
 
     st.divider()
