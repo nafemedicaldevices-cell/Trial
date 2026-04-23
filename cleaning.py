@@ -80,7 +80,7 @@ def load_haraka():
 
 
 # =========================
-# 📂 CLIENT HARKA (FINAL - FROM SALES VALUE ROW)
+# 📂 CLIENT HARKA (FINAL FIX - FILL DOWN)
 # =========================
 def load_client_haraka():
 
@@ -89,21 +89,21 @@ def load_client_haraka():
     df = df.replace(r'^\s*$', pd.NA, regex=True)
     df = df.dropna(how="all")
 
-    # ❌ حذف الهيدر داخل الداتا
+    # ❌ حذف الهيدر الداخلي
     df = df[~df.astype(str).apply(
         lambda x: x.str.contains(
-            "رصيد افتتاحى|صافى مبيعات|صافى مرتجع مبيعات",
+            "رصيد افتتاحى|صافى مبيعات|صافى مرتجع مبيعات|مندوب المبيعات",
             na=False
         )
     ).any(axis=1)]
 
     # =========================
-    # 🏷️ أعمدة مؤقتة
+    # 🏷️ أعمدة عامة
     # =========================
     df.columns = [f"Col{i}" for i in range(df.shape[1])]
 
     # =========================
-    # 👤 استخراج Rep من صف "مندوب المبيعات"
+    # 👤 استخراج Rep من صف المندوب
     # =========================
     rep_row = df[df.astype(str).apply(
         lambda x: x.str.contains("مندوب المبيعات", na=False)
@@ -117,9 +117,9 @@ def load_client_haraka():
         df["Rep Name"] = pd.NA
 
     # =========================
-    # 🔁 Fill Down (المهم)
+    # 🔁 Fill Down (مهم جدًا)
     # =========================
     df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce").ffill()
     df["Rep Name"] = df["Rep Name"].ffill()
 
-    return dfس
+    return df
