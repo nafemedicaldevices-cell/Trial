@@ -1,21 +1,19 @@
 import pandas as pd
-import numpy as np
 import streamlit as st
 
-st.title("📊 Target Dashboard - Monthly Fixed Version")
+st.title("📊 Target Monthly Split (Year ÷ 12)")
 
 # =========================
-# 🧹 CLEAN + TRANSFORM
+# 🧹 PROCESS FUNCTION
 # =========================
 def process_df(df):
 
-    # -------- CLEAN --------
     df.columns = df.columns.str.strip()
 
     for col in df.select_dtypes(include="object").columns:
         df[col] = df[col].astype(str).str.strip()
 
-    # -------- TARGET DETECTION --------
+    # -------- FIND TARGET --------
     target_cols = [c for c in df.columns if "target" in c.lower()]
 
     if len(target_cols) == 0:
@@ -27,13 +25,11 @@ def process_df(df):
 
     df = df.rename(columns={target_col: "Target (Year)"})
 
-    # -------- CALC --------
-    df["Target (Unit)"] = df["Target (Year)"] / 12
-    df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
+    # =========================
+    # 📅 MONTH LOGIC (CORE IDEA)
+    # =========================
+    df["Monthly Target"] = df["Target (Year)"] / 12
 
-    # =========================
-    # 📅 MONTH CREATION (FIXED)
-    # =========================
     months = [
         "Jan","Feb","Mar","Apr","May","Jun",
         "Jul","Aug","Sep","Oct","Nov","Dec"
@@ -41,18 +37,16 @@ def process_df(df):
 
     n = len(df)
 
-    if n == 0:
-        return df
+    # repeat rows 12 times
+    df_long = pd.concat([df] * 12, ignore_index=True)
 
-    # 🔥 SAFE LONG FORMAT BUILD
-    df_expanded = pd.concat([df] * 12, ignore_index=True)
+    # assign months correctly
+    df_long["Month"] = months * n
 
-    df_expanded["Month"] = months * n
+    # نفس المبلغ لكل شهر (لأنها ÷12)
+    df_long["Monthly Target"] = df_long["Target (Year)"] / 12
 
-    df_expanded["Monthly Target (Unit)"] = df_expanded["Target (Unit)"] / 12
-    df_expanded["Monthly Target (Value)"] = df_expanded["Target (Value)"] / 12
-
-    return df_expanded
+    return df_long
 
 # =========================
 # 📂 LOAD FILES
@@ -91,22 +85,23 @@ for level, df in data.items():
 
     st.markdown(f"## 📌 {level}")
 
-    # ================= SAFE CHECK =================
+    # CHECK
     if "Month" not in df.columns:
-        st.error(f"Month column not created in {level}")
+        st.error("Month column missing!")
         st.dataframe(df)
         continue
 
-    # ================= KPI =================
+    # KPI
     c1, c2, c3 = st.columns(3)
 
-    c1.metric("Year Target", f"{df['Target (Year)'].sum():,.0f}" if "Target (Year)" in df.columns else "N/A")
+    c1.metric("Year Target", f"{df['Target (Year)'].sum():,.0f}")
 
-    c2.metric("Monthly Total", f"{df['Monthly Target (Unit)'].sum():,.0f}" if "Monthly Target (Unit)" in df.columns else "N/A")
+    c2.metric("Monthly Target", f"{df['Monthly Target'].sum():,.0f}")
 
     c3.metric("Rows", len(df))
 
-    # ================= TABLE =================
+    # TABLE
     st.dataframe(df, use_container_width=True)
 
-    st.divider()
+    st.divider()s
+    
