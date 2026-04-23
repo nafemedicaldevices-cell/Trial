@@ -1,16 +1,18 @@
-# app.py
 import streamlit as st
-from clean_data import load_and_process_data
+from cleaning import load_and_process_data
 
+# =========================
+# 📊 TITLE
+# =========================
 st.title("📊 KPI Target System - Final Clean Structure")
 
 # =========================
-# 📂 LOAD DATA
+# 📥 LOAD DATA
 # =========================
 final_df = load_and_process_data()
 
 # =========================
-# 📊 KPI
+# 📊 KPI METRICS
 # =========================
 c1, c2, c3 = st.columns(3)
 
@@ -21,7 +23,7 @@ c3.metric("Total Value", f"{final_df['Target (Value)'].sum():,.0f}")
 # =========================
 # 📊 FILTER
 # =========================
-level = st.selectbox("Select Level", ["All"] + sorted(final_df["Level"].unique()))
+level = st.selectbox("Select Level", ["All"] + final_df["Level"].unique().tolist())
 
 if level != "All":
     final_df = final_df[final_df["Level"] == level]
