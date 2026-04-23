@@ -1,8 +1,14 @@
 import pandas as pd
 import numpy as np
+import streamlit as st
 
 # =========================
-# 📂 FILES (ALL SHEETS)
+# 📌 TITLE
+# =========================
+st.title("📊 KPI Target System - Full Dashboard")
+
+# =========================
+# 📂 FILES
 # =========================
 files = {
     "Rep": "Target Rep.xlsx",
@@ -19,24 +25,27 @@ all_data = []
 # =========================
 for level, file in files.items():
 
-    df = pd.read_excel(file)
+    try:
+        df = pd.read_excel(file)
+    except:
+        st.error(f"❌ File not found: {file}")
+        continue
+
     df.columns = df.columns.str.strip()
 
     # =========================
     # 📌 FIXED COLUMNS
     # =========================
-    fixed_cols = [
-        "Year",
-        "Product Code",
-        "Old Product Name",
-        "Sales Price"
-    ]
+    fixed_cols = ["Year", "Product Code", "Old Product Name", "Sales Price"]
+
+    value_cols = [c for c in df.columns if c not in fixed_cols]
 
     # =========================
-    # 🔄 UNPIVOT (WIDE → LONG)
+    # 🔄 UNPIVOT
     # =========================
     df = df.melt(
         id_vars=fixed_cols,
+        value_vars=value_cols,
         var_name="Code",
         value_name="Target (Year)"
     )
@@ -49,13 +58,13 @@ for level, file in files.items():
     df["Target (Year)"] = pd.to_numeric(df["Target (Year)"], errors="coerce")
 
     # =========================
-    # 📅 CALC
+    # 📅 CALCULATIONS
     # =========================
     df["Target (Unit)"] = df["Target (Year)"] / 12
     df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
 
     # =========================
-    # 📅 MONTH EXPANSION
+    # 📅 MONTH GENERATION
     # =========================
     months = [
         "Jan","Feb","Mar","Apr","May","Jun",
@@ -73,14 +82,33 @@ for level, file in files.items():
     all_data.append(df_long)
 
 # =========================
-# 📊 COMBINE ALL SHEETS
+# 📊 FINAL DATA
 # =========================
-final_df = pd.concat(all_data, ignore_index=True)
+if len(all_data) > 0:
 
-# =========================
-# 💾 SAVE NEW FILE
-# =========================
-output_file = "Clean_Target_Output.xlsx"
-final_df.to_excel(output_file, index=False)
+    final_df = pd.concat(all_data, ignore_index=True)
 
-print("Done ✅ File saved:", output_file)
+    # =========================
+    # 📊 KPI
+    # =========================
+    c1, c2, c3 = st.columns(3)
+
+    c1.metric("Year Target", f"{final_df['Target (Year)'].sum():,.0f}")
+    c2.metric("Monthly Target", f"{final_df['Monthly Target (Unit)'].sum():,.0f}")
+    c3.metric("Rows", len(final_df))
+
+    # =========================
+    # 📊 FILTERS
+    # =========================
+    level_filter = st.selectbox("Select Level", ["All"] + list(files.keys()))
+
+    if level_filter != "All":
+        final_df = final_df[final_df["Level"] == level_filter]
+
+    # =========================
+    # 📊 TABLE
+    # =========================
+    st.dataframe(final_df, use_container_width=True)
+
+else:
+    st.warning("No data loaded ⚠️")
