@@ -4,20 +4,39 @@ import streamlit as st
 # =========================
 # 📌 TITLE
 # =========================
-st.title("📊 Target Dashboard - Multi Files")
+st.title("📊 Target Dashboard - Cleaned Data")
 
 # =========================
-# 📂 LOAD DATA (5 FILES)
+# 🧹 CLEANING FUNCTION
+# =========================
+def clean_df(df):
+
+    # إزالة مسافات من أسماء الأعمدة
+    df.columns = df.columns.str.strip()
+
+    # تنظيف النصوص
+    for col in df.select_dtypes(include="object").columns:
+        df[col] = df[col].astype(str).str.strip()
+
+    # تحويل أي Target لأرقام
+    for col in df.columns:
+        if "target" in col.lower():
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    return df
+
+# =========================
+# 📂 LOAD DATA
 # =========================
 @st.cache_data
 def load_data():
 
     data = {
-        "Rep": pd.read_excel("Target Rep.xlsx"),
-        "Manager": pd.read_excel("Target Manager.xlsx"),
-        "Area": pd.read_excel("Target Area.xlsx"),
-        "Supervisor": pd.read_excel("Target Supervisor.xlsx"),
-        "Evak": pd.read_excel("Target Evak.xlsx"),
+        "Rep": clean_df(pd.read_excel("Target Rep.xlsx")),
+        "Manager": clean_df(pd.read_excel("Target Manager.xlsx")),
+        "Area": clean_df(pd.read_excel("Target Area.xlsx")),
+        "Supervisor": clean_df(pd.read_excel("Target Supervisor.xlsx")),
+        "Evak": clean_df(pd.read_excel("Target Evak.xlsx")),
     }
 
     return data
@@ -25,33 +44,29 @@ def load_data():
 data = load_data()
 
 # =========================
-# 🔍 SHOW LOADED FILES
-# =========================
-st.success(f"Loaded {len(data)} Files")
-
-# =========================
-# 📊 DISPLAY EACH FILE
+# 📊 DISPLAY
 # =========================
 for level, df in data.items():
 
     st.markdown(f"## 📌 {level}")
 
-    st.dataframe(df, use_container_width=True)
-
     # =========================
-    # 📊 SIMPLE KPI (لو فيه Target column)
+    # 📊 KPI
     # =========================
     target_cols = [c for c in df.columns if "target" in c.lower()]
 
     if target_cols:
         col = target_cols[0]
 
-        df[col] = pd.to_numeric(df[col], errors="coerce")
-
         c1, c2, c3 = st.columns(3)
 
-        c1.metric("Total", f"{df[col].sum():,.0f}")
-        c2.metric("Average", f"{df[col].mean():,.0f}")
+        c1.metric("Total Target", f"{df[col].sum():,.0f}")
+        c2.metric("Avg Target", f"{df[col].mean():,.0f}")
         c3.metric("Rows", len(df))
+
+    # =========================
+    # 📋 TABLE
+    # =========================
+    st.dataframe(df, use_container_width=True)
 
     st.divider()
