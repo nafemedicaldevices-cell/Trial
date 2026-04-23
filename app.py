@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-st.title("📊 Target Monthly Split (Year ÷ 12)")
+st.title("📊 Target Dashboard - Monthly Split Fixed")
 
 # =========================
 # 🧹 PROCESS FUNCTION
@@ -13,7 +13,7 @@ def process_df(df):
     for col in df.select_dtypes(include="object").columns:
         df[col] = df[col].astype(str).str.strip()
 
-    # -------- FIND TARGET --------
+    # -------- TARGET --------
     target_cols = [c for c in df.columns if "target" in c.lower()]
 
     if len(target_cols) == 0:
@@ -26,25 +26,22 @@ def process_df(df):
     df = df.rename(columns={target_col: "Target (Year)"})
 
     # =========================
-    # 📅 MONTH LOGIC (CORE IDEA)
+    # 📅 BUILD MONTHLY DATA (SAFE METHOD)
     # =========================
+    months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+
     df["Monthly Target"] = df["Target (Year)"] / 12
 
-    months = [
-        "Jan","Feb","Mar","Apr","May","Jun",
-        "Jul","Aug","Sep","Oct","Nov","Dec"
-    ]
+    # 🔥 create empty list to store rows
+    rows = []
 
-    n = len(df)
+    for _, row in df.iterrows():
+        for m in months:
+            new_row = row.copy()
+            new_row["Month"] = m
+            rows.append(new_row)
 
-    # repeat rows 12 times
-    df_long = pd.concat([df] * 12, ignore_index=True)
-
-    # assign months correctly
-    df_long["Month"] = months * n
-
-    # نفس المبلغ لكل شهر (لأنها ÷12)
-    df_long["Monthly Target"] = df_long["Target (Year)"] / 12
+    df_long = pd.DataFrame(rows)
 
     return df_long
 
@@ -87,16 +84,16 @@ for level, df in data.items():
 
     # CHECK
     if "Month" not in df.columns:
-        st.error("Month column missing!")
+        st.error(f"Month column not created in {level}")
         st.dataframe(df)
         continue
 
     # KPI
     c1, c2, c3 = st.columns(3)
 
-    c1.metric("Year Target", f"{df['Target (Year)'].sum():,.0f}")
+    c1.metric("Year Target", f"{df['Target (Year)'].sum():,.0f}" if "Target (Year)" in df.columns else "N/A")
 
-    c2.metric("Monthly Target", f"{df['Monthly Target'].sum():,.0f}")
+    c2.metric("Monthly Target", f"{df['Monthly Target'].sum():,.0f}" if "Monthly Target" in df.columns else "N/A")
 
     c3.metric("Rows", len(df))
 
@@ -104,4 +101,3 @@ for level, df in data.items():
     st.dataframe(df, use_container_width=True)
 
     st.divider()
-    
