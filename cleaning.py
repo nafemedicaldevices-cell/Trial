@@ -18,9 +18,6 @@ def load_and_clean():
         df = pd.read_excel(file)
         df.columns = df.columns.str.strip()
 
-        # =========================
-        # 📌 FIXED COLUMNS
-        # =========================
         fixed_cols = [
             "Year",
             "Product Code",
@@ -28,11 +25,6 @@ def load_and_clean():
             "Sales Price"
         ]
 
-        value_cols = [c for c in df.columns if c not in fixed_cols]
-
-        # =========================
-        # 🔄 UNPIVOT
-        # =========================
         df = df.melt(
             id_vars=fixed_cols,
             var_name="Code",
@@ -41,9 +33,6 @@ def load_and_clean():
 
         df["Level"] = level
 
-        # =========================
-        # 🧹 CLEAN
-        # =========================
         df["Target Year"] = pd.to_numeric(df["Target Year"], errors="coerce")
 
         # =========================
@@ -69,6 +58,4 @@ def load_and_clean():
 
         all_data.append(df_long)
 
-    final_df = pd.concat(all_data, ignore_index=True)
-
-    return final_df
+    return pd.concat(all_data, ignore_index=True)
