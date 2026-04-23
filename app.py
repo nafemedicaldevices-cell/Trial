@@ -4,10 +4,10 @@ import streamlit as st
 # =========================
 # 📌 TITLE
 # =========================
-st.title("📊 Target Dashboard - Full Monthly Distribution")
+st.title("📊 Target Dashboard - Full Clean Monthly System")
 
 # =========================
-# 🧹 CLEAN + TRANSFORM FUNCTION
+# 🧹 CLEAN + TRANSFORM
 # =========================
 def process_df(df):
 
@@ -26,10 +26,9 @@ def process_df(df):
 
     target_col = target_cols[0]
 
-    # convert to numeric
     df[target_col] = pd.to_numeric(df[target_col], errors="coerce")
 
-    # standard name
+    # rename standard
     df = df.rename(columns={target_col: "Target (Year)"})
 
     # =========================
@@ -78,30 +77,31 @@ def load_data():
 data = load_data()
 
 # =========================
-# 📊 DISPLAY ALL LEVELS
+# 📊 DISPLAY
 # =========================
 for level, df in data.items():
 
     st.markdown(f"## 📌 {level} Target")
 
-    # ================= SAFE CHECK =================
-    if "Target (Year)" not in df.columns:
-
-        st.warning(f"⚠️ No Target column in {level}")
-        st.dataframe(df, use_container_width=True)
-        st.divider()
-        continue
-
-    # ================= KPI =================
+    # ================= SAFE KPI =================
     c1, c2, c3 = st.columns(3)
 
-    c1.metric("Total Year Target", f"{df['Target (Year)'].sum():,.0f}")
+    # Year Target
+    c1.metric(
+        "Total Year Target",
+        f"{df['Target (Year)'].sum():,.0f}" if "Target (Year)" in df.columns else "N/A"
+    )
 
-    c2.metric("Monthly Target", f"{df['Target (Month)'].sum():,.0f}")
+    # Monthly Target
+    c2.metric(
+        "Monthly Target",
+        f"{df['Target (Month)'].sum():,.0f}" if "Target (Month)" in df.columns else "N/A"
+    )
 
+    # Rows
     c3.metric("Rows", len(df))
 
-    # ================= SHOW TABLE =================
+    # ================= TABLE =================
     st.dataframe(df, use_container_width=True)
 
     st.divider()
