@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 
-st.title("📊 KPI Target System - Final Version")
+st.title("📊 KPI Target System - Final Clean Structure")
 
 # =========================
 # 📂 FILES
@@ -18,7 +18,7 @@ files = {
 all_data = []
 
 # =========================
-# 🔄 PROCESS EACH FILE
+# 🔄 PROCESS FILES
 # =========================
 for level, file in files.items():
 
@@ -56,11 +56,11 @@ for level, file in files.items():
     # =========================
     # 📊 CALCULATIONS
     # =========================
-    df["Target Unit"] = df["Target (Year)"] / 12
-    df["Target Value"] = df["Target Unit"] * df["Sales Price"]
+    df["Target (Unit)"] = df["Target (Year)"] / 12
+    df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
 
     # =========================
-    # 📅 MONTH GENERATION
+    # 📅 MONTHS
     # =========================
     months = [
         "Jan","Feb","Mar","Apr","May","Jun",
@@ -71,31 +71,31 @@ for level, file in files.items():
 
     df_long["Month"] = np.tile(months, len(df))
 
-    df_long["Target Unit"] = np.repeat(df["Target Unit"].values, 12)
-    df_long["Target Value"] = np.repeat(df["Target Value"].values, 12)
+    df_long["Target (Unit)"] = np.repeat(df["Target (Unit)"].values, 12)
+    df_long["Target (Value)"] = np.repeat(df["Target (Value)"].values, 12)
 
     all_data.append(df_long)
 
 # =========================
-# 📊 COMBINE
+# 📊 FINAL DATA
 # =========================
 final_df = pd.concat(all_data, ignore_index=True)
 
 # =========================
-# 📌 COLUMN ORDER (AS REQUESTED)
+# 📌 COLUMN ORDER (UPDATED)
 # =========================
 final_df = final_df[
     [
         "Level",
+        "Code",
         "Year",
         "Month",
         "Product Code",
         "Old Product Name",
         "Sales Price",
-        "Code",
         "Target (Year)",
-        "Target Unit",
-        "Target Value"
+        "Target (Unit)",
+        "Target (Value)"
     ]
 ]
 
@@ -105,8 +105,8 @@ final_df = final_df[
 c1, c2, c3 = st.columns(3)
 
 c1.metric("Year Target", f"{final_df['Target (Year)'].sum():,.0f}")
-c2.metric("Total Unit", f"{final_df['Target Unit'].sum():,.0f}")
-c3.metric("Total Value", f"{final_df['Target Value'].sum():,.0f}")
+c2.metric("Total Unit", f"{final_df['Target (Unit)'].sum():,.0f}")
+c3.metric("Total Value", f"{final_df['Target (Value)'].sum():,.0f}")
 
 # =========================
 # 📊 FILTER
