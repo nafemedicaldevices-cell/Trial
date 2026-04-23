@@ -3,6 +3,13 @@ import numpy as np
 import streamlit as st
 
 # =========================
+# 📅 TIME SETTINGS
+# =========================
+current_month = pd.Timestamp.today().month
+current_quarter = (current_month - 1) // 3 + 1
+
+
+# =========================
 # 📂 LOAD DATA
 # =========================
 def load_data():
@@ -11,6 +18,7 @@ def load_data():
         "target_manager": pd.read_excel("Target Manager.xlsx"),
         "target_area": pd.read_excel("Target Area.xlsx"),
         "target_supervisor": pd.read_excel("Target Supervisor.xlsx"),
+        "target_evak": pd.read_excel("Target Evak.xlsx"),
 
         "sales": pd.read_excel("Sales.xlsx", header=None),
 
@@ -40,9 +48,9 @@ def fix_sales_columns(sales):
 
 
 # =========================
-# 🧼 CLEAN TARGET
+# 🚀 TARGET PIPELINE
 # =========================
-def clean_target(df, mapping, id_name):
+def build_target_pipeline(df, id_name, mapping):
 
     df = df.copy()
     mapping = mapping.copy()
@@ -50,16 +58,10 @@ def clean_target(df, mapping, id_name):
     df.columns = df.columns.str.strip()
     mapping.columns = mapping.columns.str.strip()
 
-    if "Product Code" not in df.columns:
-        df["Product Code"] = np.nan
-
     if "Sales Price" not in df.columns:
         df["Sales Price"] = 0
 
-    df["Product Code"] = pd.to_numeric(df["Product Code"], errors="coerce")
-    mapping["Product Code"] = pd.to_numeric(mapping["Product Code"], errors="coerce")
-
-    mapping = mapping.drop_duplicates("Product Code")
+    df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
 
     fixed_cols = [c for c in ["Year", "Product Code", "Sales Price"] if c in df.columns]
     dynamic_cols = [c for c in df.columns if c not in fixed_cols]
@@ -76,15 +78,7 @@ def clean_target(df, mapping, id_name):
         errors="coerce"
     )
 
-    if "Product Name" in mapping.columns:
-        df = df.merge(
-            mapping[["Product Code", "Product Name"]],
-            on="Product Code",
-            how="left"
-        )
-
     df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
-    df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
 
     df["Value"] = df["Target (Unit)"] * df["Sales Price"]
 
@@ -92,9 +86,9 @@ def clean_target(df, mapping, id_name):
 
 
 # =========================
-# 🧼 CLEAN SALES
+# 🚀 SALES PIPELINE (FIXED)
 # =========================
-def clean_sales(sales, codes):
+def build_sales_pipeline(sales, codes):
 
     sales = fix_sales_columns(sales)
 
@@ -107,24 +101,39 @@ def clean_sales(sales, codes):
         "Sales Price",
         "Invoice Discounts"
     ]:
-        sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
+        if col in sales.columns:
+            sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
 
     sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
     codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
 
+    # 🔥 FIX: بدل inner -> left عشان مايضيعش داتا
     sales = sales.merge(codes, on="Rep Code", how="left")
 
     sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
     sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
     sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
 
-    return sales
+    def group(df, col):
+        if col not in df.columns:
+            return pd.DataFrame()
+
+        return df.groupby(col, as_index=False)[
+            ["Total Sales Value", "Returns Value", "Sales After Returns"]
+        ].sum()
+
+    return {
+        "rep": group(sales, "Rep Code"),
+        "manager": group(sales, "Manager Code"),
+        "area": group(sales, "Area Code"),
+        "supervisor": group(sales, "Supervisor Code")
+    }
 
 
 # =========================
-# 🧼 CLEAN OPENING
+# 🚀 OPENING PIPELINE
 # =========================
-def clean_opening(opening, codes):
+def build_opening_pipeline(opening, codes):
 
     opening.columns = [
         'Branch',"Evak",'Opening Balance','Total Sales',
@@ -140,11 +149,6 @@ def clean_opening(opening, codes):
     opening.loc[mask, 'Rep Code'] = opening.loc[mask, 'Opening Balance']
 
     opening['Rep Code'] = opening['Rep Code'].ffill()
-
-    opening = opening[
-        opening['Branch'].notna() &
-        (~opening['Branch'].astype(str).str.contains('كود|اجماليات', na=False))
-    ]
 
     num_cols = [
         'Opening Balance','Total Sales','Returns',
@@ -162,32 +166,41 @@ def clean_opening(opening, codes):
 
     opening = opening.merge(codes, on='Rep Code', how='left')
 
-    return opening
+    def group(df, col):
+        if col not in df.columns:
+            return pd.DataFrame()
+
+        return df.groupby(col, as_index=False)[
+            ["Total Sales", "Returns", "Sales After Returns", "Total Collection"]
+        ].sum()
+
+    return {
+        "rep": group(opening, "Rep Code"),
+        "manager": group(opening, "Manager Code"),
+        "area": group(opening, "Area Code"),
+        "supervisor": group(opening, "Supervisor Code")
+    }
 
 
 # =========================
-# 🧼 CLEAN OVERDUE
+# 🚀 OVERDUE PIPELINE (FIXED)
 # =========================
-def clean_overdue(overdue, codes):
+def build_overdue_pipeline(overdue, codes):
+
+    overdue = overdue.copy()
+    codes = codes.copy()
 
     overdue.columns = [
         "Client Name", "Client Code", "30 Days", "60 Days", "90 Days", "120 Days",
         "150 Days", "More Than 150 Days", "Balance"
     ]
 
-    overdue['Rep Code'] = None
+    overdue["Rep Code"] = np.nan
 
-    mask = overdue['Client Name'].astype(str).str.strip() == "كود المندوب"
-    overdue.loc[mask, 'Rep Code'] = overdue.loc[mask, 'Client Code']
+    mask = overdue["Client Name"].astype(str).str.strip() == "كود المندوب"
 
-    overdue['Rep Code'] = overdue['Rep Code'].ffill()
-
-    overdue = overdue[
-        overdue['Client Name'].notna() &
-        (~overdue['Client Name'].astype(str).str.contains(
-            'اجمال|كود|اسم العميل', na=False
-        ))
-    ]
+    overdue.loc[mask, "Rep Code"] = overdue.loc[mask, "Client Code"]
+    overdue["Rep Code"] = overdue["Rep Code"].ffill()
 
     num_cols = [
         '30 Days','60 Days','90 Days','120 Days',
@@ -195,43 +208,58 @@ def clean_overdue(overdue, codes):
     ]
 
     for col in num_cols:
-        overdue[col] = pd.to_numeric(overdue[col], errors='coerce').fillna(0)
+        overdue[col] = pd.to_numeric(overdue[col], errors="coerce").fillna(0)
 
     overdue["Rep Code"] = pd.to_numeric(overdue["Rep Code"], errors="coerce")
 
-    overdue['Overdue Value'] = (
-        overdue['120 Days'] +
-        overdue['150 Days'] +
-        overdue['More Than 150 Days']
-    )
+    overdue["Overdue Value"] = overdue["120 Days"] + overdue["150 Days"] + overdue["More Than 150 Days"]
 
-    overdue['Total Balance'] = overdue[num_cols].sum(axis=1)
+    overdue["Total Balance"] = overdue[num_cols].sum(axis=1)
 
-    overdue = overdue.merge(codes, on='Rep Code', how='left')
+    overdue = overdue.merge(codes, on="Rep Code", how="left")
 
-    return overdue
+    def group(df, col):
+        if col not in df.columns:
+            return pd.DataFrame()
+
+        return df.groupby(col, as_index=False)[
+            ["Overdue Value", "Total Balance"]
+        ].sum()
+
+    return {
+        "rep": group(overdue, "Rep Code"),
+        "manager": group(overdue, "Manager Code"),
+        "area": group(overdue, "Area Code"),
+        "supervisor": group(overdue, "Supervisor Code")
+    }
 
 
 # =========================
 # 🎨 STREAMLIT UI
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 Cleaning Data Only")
+st.title("📊 Unified KPI System (Fixed)")
 
 data = load_data()
 
 # TARGET
-st.header("🎯 Clean Target")
-st.dataframe(clean_target(data["target_rep"], data["mapping"], "Rep Code"))
+st.header("🎯 TARGET")
+st.dataframe(build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"]))
 
 # SALES
-st.header("💰 Clean Sales")
-st.dataframe(clean_sales(data["sales"], data["codes"]))
+st.header("💰 SALES")
+sales = build_sales_pipeline(data["sales"], data["codes"])
+st.dataframe(sales["rep"])
+st.dataframe(sales["manager"])
+st.dataframe(sales["area"])
+st.dataframe(sales["supervisor"])
 
 # OPENING
-st.header("📦 Clean Opening")
-st.dataframe(clean_opening(data["opening"], data["codes"]))
+st.header("📦 OPENING")
+opening = build_opening_pipeline(data["opening"], data["codes"])
+st.dataframe(opening["rep"])
 
 # OVERDUE
-st.header("⏳ Clean Overdue")
-st.dataframe(clean_overdue(data["overdue"], data["codes"]))
+st.header("⏳ OVERDUE")
+overdue = build_overdue_pipeline(data["overdue"], data["codes"])
+st.dataframe(overdue["rep"])
