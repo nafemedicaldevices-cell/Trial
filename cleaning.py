@@ -100,11 +100,12 @@ def load_haraka():
 
 
 # =========================
-# 📂 CLIENTS HARKA (CLEAN FIXED)
+# 📂 CLIENT HARKA (FIXED)
 # =========================
 def load_client_haraka():
 
-    df = pd.read_excel("Clients Harakah.xlsx")
+    # 🔥 الاسم الصحيح
+    df = pd.read_excel("Client Harakah.xlsx")
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
     df = df.dropna(how="all")
@@ -113,7 +114,7 @@ def load_client_haraka():
     df[first_col] = df[first_col].astype(str)
 
     # =========================
-    # ❌ CLEAN BAD ROWS
+    # ❌ REMOVE BAD ROWS
     # =========================
     df = df[
         df[first_col].notna() &
