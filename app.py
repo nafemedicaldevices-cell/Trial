@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-st.title("📊 Rep Harakah - Clean Data")
+st.title("📊 Rep Harakah - Clean & KPI Ready")
 
 # =========================
 # 📂 LOAD DATA
@@ -11,23 +11,25 @@ def load_data():
     df = pd.read_excel("Rep Harakah.xlsx")
 
     # =========================
-    # 🧹 REMOVE FULLY EMPTY ROWS
+    # 🧹 REMOVE EMPTY ROWS
     # =========================
     df = df.dropna(how="all")
 
     # =========================
-    # 🧹 CLEAN FIRST COLUMN ONLY
+    # 🧹 CLEAN FIRST COLUMN (Remove unwanted rows)
     # =========================
-    first_col = df.columns[0].astype(str)
+    first_col = df.columns[0]
+    df[first_col] = df[first_col].astype(str)
 
     df = df[
         ~df[first_col].str.contains("كود الفرع", na=False)
         & ~df[first_col].str.contains("كود المندوب", na=False)
-        & (df[first_col].notna())
+        & (df[first_col].str.strip() != "")
+        & (df[first_col] != "nan")
     ]
 
     # =========================
-    # 🏷️ FIX DUPLICATE COLUMN NAMES (Tasweyat Madinah)
+    # 🏷️ HANDLE DUPLICATE COLUMN NAMES
     # =========================
     cols = df.columns.tolist()
 
@@ -65,12 +67,20 @@ def load_data():
 
 
 # =========================
-# 🚀 RUN
+# 🚀 RUN APP
 # =========================
 df = load_data()
 
 st.subheader("📌 Clean Data")
 st.dataframe(df)
 
+# =========================
+# 📊 BASIC KPI
+# =========================
 st.subheader("📊 Summary")
-st.write(df.describe(include="all"))
+
+st.write("Rows:", len(df))
+st.write("Columns:", len(df.columns))
+
+st.subheader("📊 Numeric Summary")
+st.write(df.describe())
