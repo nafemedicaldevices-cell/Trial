@@ -10,6 +10,30 @@ current_quarter = (current_month - 1) // 3 + 1
 
 
 # =========================
+# 🧹 CLEAN DATA FUNCTION
+# =========================
+def clean_dataframe(df, rename_map=None, add_columns=None):
+
+    df = df.copy()
+
+    # 1️⃣ Rename columns
+    if rename_map:
+        df.rename(columns=rename_map, inplace=True)
+
+    # 2️⃣ Add columns
+    if add_columns:
+        for col, val in add_columns.items():
+            if col not in df.columns:
+                df[col] = val
+
+    # 3️⃣ Remove empty rows
+    df.replace(r'^\s*$', np.nan, regex=True, inplace=True)
+    df.dropna(how="all", inplace=True)
+
+    return df
+
+
+# =========================
 # 📂 LOAD DATA
 # =========================
 def load_data():
@@ -48,17 +72,31 @@ def fix_sales_columns(sales):
 
 
 # =========================
-# 🧼 CLEAN TARGET ONLY
+# 🚀 TARGET PIPELINE
 # =========================
-def clean_target(df, id_name):
+def build_target_pipeline(df, id_name, mapping):
 
     df = df.copy()
+    mapping = mapping.copy()
+
     df.columns = df.columns.str.strip()
+    mapping.columns = mapping.columns.str.strip()
+
+    if "Product Code" not in df.columns:
+        df["Product Code"] = np.nan
+
+    if "Product Name" not in df.columns:
+        df["Product Name"] = np.nan
 
     if "Sales Price" not in df.columns:
         df["Sales Price"] = 0
 
-    fixed_cols = [c for c in ["Year", "Product Code", "Sales Price"] if c in df.columns]
+    df["Product Code"] = pd.to_numeric(df["Product Code"], errors="coerce")
+    mapping["Product Code"] = pd.to_numeric(mapping["Product Code"], errors="coerce")
+
+    mapping = mapping.drop_duplicates("Product Code")
+
+    fixed_cols = [c for c in ["Year", "Product Code", "Old Product Name", "Sales Price"] if c in df.columns]
     dynamic_cols = [c for c in df.columns if c not in fixed_cols]
 
     df = df.melt(
@@ -73,143 +111,97 @@ def clean_target(df, id_name):
         errors="coerce"
     )
 
-    df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce")
+    if "Product Name" in mapping.columns:
+        df = df.merge(
+            mapping[["Product Code", "Product Name"]],
+            on="Product Code",
+            how="left"
+        )
 
-    return df
+    df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
+    df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
 
+    df["Value"] = df["Target (Unit)"] * df["Sales Price"]
 
-# =========================
-# 🧼 CLEAN SALES ONLY
-# =========================
-def clean_sales(sales, codes):
+    def group(d):
+        return d.groupby([id_name], as_index=False)["Value"].sum()
 
-    sales = fix_sales_columns(sales)
+    value_table = group(df).rename(columns={"Value": "Full Year 🏆"})
 
-    sales.columns = sales.columns.str.strip()
-    codes.columns = codes.columns.str.strip()
-
-    sales = sales.dropna(how="all")
-
-    # text cleaning
-    text_cols = ["Warehouse Name", "Client Name", "Notes", "MF", "Mostanad"]
-    for col in text_cols:
-        if col in sales.columns:
-            sales[col] = sales[col].astype(str).str.strip()
-
-    # date only
-    sales["Date"] = pd.to_datetime(sales["Date"], errors="coerce")
-
-    # numeric only
-    num_cols = [
-        "Sales Unit Before Edit",
-        "Returns Unit Before Edit",
-        "Sales Price",
-        "Invoice Discounts"
-    ]
-
-    for col in num_cols:
-        sales[col] = pd.to_numeric(sales[col], errors="coerce")
-
-    # codes only merge
-    sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
-    codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
-
-    sales = sales.merge(codes, on="Rep Code", how="left")
-
-    return sales
+    return {
+        "value_table": value_table,
+        "products_full": df.groupby(
+            [id_name, "Product Code", "Product Name"],
+            as_index=False
+        ).agg(
+            Units=("Target (Unit)", "sum"),
+            Value=("Value", "sum")
+        )
+    }
 
 
 # =========================
-# 🧼 CLEAN OPENING ONLY
-# =========================
-def clean_opening(opening, codes):
-
-    opening.columns = [
-        'Branch',"Evak",'Opening Balance','Total Sales',
-        'Returns','Sales Value Before Extra Discounts',
-        'Cash Collection','Collection Checks',
-        'Returned Chick','Collection Returned Chick',
-        "Madinah",'Daienah','End Balance'
-    ]
-
-    opening['Rep Code'] = None
-
-    mask = opening['Branch'].astype(str).str.strip() == "كود المندوب"
-    opening.loc[mask, 'Rep Code'] = opening.loc[mask, 'Opening Balance']
-
-    opening['Rep Code'] = opening['Rep Code'].ffill()
-
-    num_cols = [
-        'Opening Balance','Total Sales','Returns',
-        'Cash Collection','Collection Checks','End Balance'
-    ]
-
-    for col in num_cols:
-        opening[col] = pd.to_numeric(opening[col], errors="coerce")
-
-    opening["Rep Code"] = pd.to_numeric(opening["Rep Code"], errors="coerce")
-    codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
-
-    opening = opening.merge(codes, on="Rep Code", how="left")
-
-    return opening
-
-
-# =========================
-# 🧼 CLEAN OVERDUE ONLY
-# =========================
-def clean_overdue(overdue, codes):
-
-    overdue.columns = [
-        "Client Name", "Client Code", "30 Days", "60 Days", "90 Days", "120 Days",
-        "150 Days", "More Than 150 Days", "Balance"
-    ]
-
-    overdue["Rep Code"] = None
-
-    mask = overdue['Client Name'].astype(str).str.strip() == "كود المندوب"
-    overdue.loc[mask, "Rep Code"] = overdue.loc[mask, "Client Code"]
-
-    overdue["Rep Code"] = overdue["Rep Code"].ffill()
-
-    num_cols = [
-        '30 Days','60 Days','90 Days','120 Days',
-        '150 Days','More Than 150 Days'
-    ]
-
-    for col in num_cols:
-        overdue[col] = pd.to_numeric(overdue[col], errors="coerce")
-
-    overdue["Rep Code"] = pd.to_numeric(overdue["Rep Code"], errors="coerce")
-
-    overdue = overdue.merge(codes, on="Rep Code", how="left")
-
-    return overdue
-
-
-# =========================
-# 🎨 STREAMLIT UI
+# 🚀 STREAMLIT UI
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 CLEANING LAYER ONLY")
+st.title("📊 Unified KPI System")
 
 data = load_data()
 
-# TARGET
-st.header("🎯 TARGET CLEAN")
-st.dataframe(clean_target(data["target_rep"], "Rep Code"))
-st.dataframe(clean_target(data["target_manager"], "Manager Code"))
-st.dataframe(clean_target(data["target_area"], "Area Code"))
-st.dataframe(clean_target(data["target_supervisor"], "Supervisor Code"))
+# =========================
+# 🧹 CLEAN TARGET DATA (NEW LAYER)
+# =========================
+target_rep_raw = clean_dataframe(data["target_rep"])
+target_manager_raw = clean_dataframe(data["target_manager"])
+target_area_raw = clean_dataframe(data["target_area"])
+target_supervisor_raw = clean_dataframe(data["target_supervisor"])
 
-# SALES
-st.header("💰 SALES CLEAN")
-st.dataframe(clean_sales(data["sales"], data["codes"]))
+# =========================
+# 🎯 TARGET KPI
+# =========================
+st.header("🎯 TARGET KPI")
 
-# OPENING
-st.header("📦 OPENING CLEAN")
-st.dataframe(clean_opening(data["opening"], data["codes"]))
+target_rep = build_target_pipeline(target_rep_raw, "Rep Code", data["mapping"])
+target_manager = build_target_pipeline(target_manager_raw, "Manager Code", data["mapping"])
+target_area = build_target_pipeline(target_area_raw, "Area Code", data["mapping"])
+target_supervisor = build_target_pipeline(target_supervisor_raw, "Supervisor Code", data["mapping"])
 
-# OVERDUE
-st.header("⏳ OVERDUE CLEAN")
-st.dataframe(clean_overdue(data["overdue"], data["codes"]))
+st.dataframe(target_rep["value_table"])
+st.dataframe(target_manager["value_table"])
+st.dataframe(target_area["value_table"])
+st.dataframe(target_supervisor["value_table"])
+
+
+# =========================
+# 📦 PRODUCTS
+# =========================
+st.header("📦 PRODUCTS")
+
+st.dataframe(target_rep["products_full"])
+st.dataframe(target_manager["products_full"])
+st.dataframe(target_area["products_full"])
+st.dataframe(target_supervisor["products_full"])
+
+
+# =========================
+# 💰 SALES
+# =========================
+st.header("💰 SALES KPI")
+
+sales = fix_sales_columns(data["sales"])
+
+st.dataframe(sales)
+
+
+# =========================
+# 📦 OPENING
+# =========================
+st.header("📦 OPENING KPI")
+st.dataframe(data["opening"])
+
+
+# =========================
+# ⏳ OVERDUE
+# =========================
+st.header("⏳ OVERDUE KPI")
+st.dataframe(data["overdue"])
