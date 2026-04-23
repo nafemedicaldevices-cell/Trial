@@ -3,6 +3,13 @@ import numpy as np
 import streamlit as st
 
 # =========================
+# 📅 TIME SETTINGS
+# =========================
+current_month = pd.Timestamp.today().month
+current_quarter = (current_month - 1) // 3 + 1
+
+
+# =========================
 # 📂 LOAD DATA
 # =========================
 def load_data():
@@ -41,15 +48,12 @@ def fix_sales_columns(sales):
 
 
 # =========================
-# 🧼 CLEAN TARGET (NO KPI)
+# 🧼 CLEAN TARGET ONLY
 # =========================
-def clean_target(df, mapping, id_name):
+def clean_target(df, id_name):
 
     df = df.copy()
-    mapping = mapping.copy()
-
     df.columns = df.columns.str.strip()
-    mapping.columns = mapping.columns.str.strip()
 
     if "Sales Price" not in df.columns:
         df["Sales Price"] = 0
@@ -71,13 +75,11 @@ def clean_target(df, mapping, id_name):
 
     df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce")
 
-    # 🔥 CLEAN ONLY (no calculations)
-
     return df
 
 
 # =========================
-# 🧼 CLEAN SALES (NO KPI)
+# 🧼 CLEAN SALES ONLY
 # =========================
 def clean_sales(sales, codes):
 
@@ -88,16 +90,16 @@ def clean_sales(sales, codes):
 
     sales = sales.dropna(how="all")
 
-    # Text cleaning
+    # text cleaning
     text_cols = ["Warehouse Name", "Client Name", "Notes", "MF", "Mostanad"]
     for col in text_cols:
         if col in sales.columns:
             sales[col] = sales[col].astype(str).str.strip()
 
-    # Date only
+    # date only
     sales["Date"] = pd.to_datetime(sales["Date"], errors="coerce")
 
-    # Numeric only
+    # numeric only
     num_cols = [
         "Sales Unit Before Edit",
         "Returns Unit Before Edit",
@@ -108,18 +110,17 @@ def clean_sales(sales, codes):
     for col in num_cols:
         sales[col] = pd.to_numeric(sales[col], errors="coerce")
 
-    # Codes
+    # codes only merge
     sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
     codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
 
-    # Merge only
     sales = sales.merge(codes, on="Rep Code", how="left")
 
     return sales
 
 
 # =========================
-# 🧼 CLEAN OPENING (NO KPI)
+# 🧼 CLEAN OPENING ONLY
 # =========================
 def clean_opening(opening, codes):
 
@@ -144,18 +145,18 @@ def clean_opening(opening, codes):
     ]
 
     for col in num_cols:
-        opening[col] = pd.to_numeric(opening[col], errors='coerce')
+        opening[col] = pd.to_numeric(opening[col], errors="coerce")
 
     opening["Rep Code"] = pd.to_numeric(opening["Rep Code"], errors="coerce")
     codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
 
-    opening = opening.merge(codes, on='Rep Code', how='left')
+    opening = opening.merge(codes, on="Rep Code", how="left")
 
     return opening
 
 
 # =========================
-# 🧼 CLEAN OVERDUE (NO KPI)
+# 🧼 CLEAN OVERDUE ONLY
 # =========================
 def clean_overdue(overdue, codes):
 
@@ -194,14 +195,21 @@ st.title("📊 CLEANING LAYER ONLY")
 
 data = load_data()
 
+# TARGET
 st.header("🎯 TARGET CLEAN")
-st.dataframe(clean_target(data["target_rep"], data["mapping"], "Rep Code"))
+st.dataframe(clean_target(data["target_rep"], "Rep Code"))
+st.dataframe(clean_target(data["target_manager"], "Manager Code"))
+st.dataframe(clean_target(data["target_area"], "Area Code"))
+st.dataframe(clean_target(data["target_supervisor"], "Supervisor Code"))
 
+# SALES
 st.header("💰 SALES CLEAN")
 st.dataframe(clean_sales(data["sales"], data["codes"]))
 
+# OPENING
 st.header("📦 OPENING CLEAN")
 st.dataframe(clean_opening(data["opening"], data["codes"]))
 
+# OVERDUE
 st.header("⏳ OVERDUE CLEAN")
 st.dataframe(clean_overdue(data["overdue"], data["codes"]))
