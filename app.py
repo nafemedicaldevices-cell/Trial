@@ -3,13 +3,6 @@ import numpy as np
 import streamlit as st
 
 # =========================
-# 📅 TIME SETTINGS
-# =========================
-current_month = pd.Timestamp.today().month
-current_quarter = (current_month - 1) // 3 + 1
-
-
-# =========================
 # 📂 LOAD DATA
 # =========================
 def load_data():
@@ -48,9 +41,9 @@ def fix_sales_columns(sales):
 
 
 # =========================
-# 🚀 TARGET PIPELINE
+# 🧼 CLEAN TARGET (NO KPI)
 # =========================
-def build_target_pipeline(df, id_name, mapping):
+def clean_target(df, mapping, id_name):
 
     df = df.copy()
     mapping = mapping.copy()
@@ -60,8 +53,6 @@ def build_target_pipeline(df, id_name, mapping):
 
     if "Sales Price" not in df.columns:
         df["Sales Price"] = 0
-
-    df["Sales Price"] = pd.to_numeric(df["Sales Price"], errors="coerce").fillna(0)
 
     fixed_cols = [c for c in ["Year", "Product Code", "Sales Price"] if c in df.columns]
     dynamic_cols = [c for c in df.columns if c not in fixed_cols]
@@ -78,62 +69,59 @@ def build_target_pipeline(df, id_name, mapping):
         errors="coerce"
     )
 
-    df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce").fillna(0)
+    df["Target (Unit)"] = pd.to_numeric(df["Target (Unit)"], errors="coerce")
 
-    df["Value"] = df["Target (Unit)"] * df["Sales Price"]
+    # 🔥 CLEAN ONLY (no calculations)
 
     return df
 
 
 # =========================
-# 🚀 SALES PIPELINE (FIXED)
+# 🧼 CLEAN SALES (NO KPI)
 # =========================
-def build_sales_pipeline(sales, codes):
+def clean_sales(sales, codes):
 
     sales = fix_sales_columns(sales)
 
     sales.columns = sales.columns.str.strip()
     codes.columns = codes.columns.str.strip()
 
-    for col in [
+    sales = sales.dropna(how="all")
+
+    # Text cleaning
+    text_cols = ["Warehouse Name", "Client Name", "Notes", "MF", "Mostanad"]
+    for col in text_cols:
+        if col in sales.columns:
+            sales[col] = sales[col].astype(str).str.strip()
+
+    # Date only
+    sales["Date"] = pd.to_datetime(sales["Date"], errors="coerce")
+
+    # Numeric only
+    num_cols = [
         "Sales Unit Before Edit",
         "Returns Unit Before Edit",
         "Sales Price",
         "Invoice Discounts"
-    ]:
-        if col in sales.columns:
-            sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
+    ]
 
+    for col in num_cols:
+        sales[col] = pd.to_numeric(sales[col], errors="coerce")
+
+    # Codes
     sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
     codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
 
-    # 🔥 FIX: بدل inner -> left عشان مايضيعش داتا
+    # Merge only
     sales = sales.merge(codes, on="Rep Code", how="left")
 
-    sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
-    sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
-    sales["Sales After Returns"] = sales["Total Sales Value"] - sales["Returns Value"]
-
-    def group(df, col):
-        if col not in df.columns:
-            return pd.DataFrame()
-
-        return df.groupby(col, as_index=False)[
-            ["Total Sales Value", "Returns Value", "Sales After Returns"]
-        ].sum()
-
-    return {
-        "rep": group(sales, "Rep Code"),
-        "manager": group(sales, "Manager Code"),
-        "area": group(sales, "Area Code"),
-        "supervisor": group(sales, "Supervisor Code")
-    }
+    return sales
 
 
 # =========================
-# 🚀 OPENING PIPELINE
+# 🧼 CLEAN OPENING (NO KPI)
 # =========================
-def build_opening_pipeline(opening, codes):
+def clean_opening(opening, codes):
 
     opening.columns = [
         'Branch',"Evak",'Opening Balance','Total Sales',
@@ -156,50 +144,31 @@ def build_opening_pipeline(opening, codes):
     ]
 
     for col in num_cols:
-        opening[col] = pd.to_numeric(opening[col], errors='coerce').fillna(0)
-
-    opening['Total Collection'] = opening['Cash Collection'] + opening['Collection Checks']
-    opening["Sales After Returns"] = opening["Total Sales"] - opening['Returns']
+        opening[col] = pd.to_numeric(opening[col], errors='coerce')
 
     opening["Rep Code"] = pd.to_numeric(opening["Rep Code"], errors="coerce")
     codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
 
     opening = opening.merge(codes, on='Rep Code', how='left')
 
-    def group(df, col):
-        if col not in df.columns:
-            return pd.DataFrame()
-
-        return df.groupby(col, as_index=False)[
-            ["Total Sales", "Returns", "Sales After Returns", "Total Collection"]
-        ].sum()
-
-    return {
-        "rep": group(opening, "Rep Code"),
-        "manager": group(opening, "Manager Code"),
-        "area": group(opening, "Area Code"),
-        "supervisor": group(opening, "Supervisor Code")
-    }
+    return opening
 
 
 # =========================
-# 🚀 OVERDUE PIPELINE (FIXED)
+# 🧼 CLEAN OVERDUE (NO KPI)
 # =========================
-def build_overdue_pipeline(overdue, codes):
-
-    overdue = overdue.copy()
-    codes = codes.copy()
+def clean_overdue(overdue, codes):
 
     overdue.columns = [
         "Client Name", "Client Code", "30 Days", "60 Days", "90 Days", "120 Days",
         "150 Days", "More Than 150 Days", "Balance"
     ]
 
-    overdue["Rep Code"] = np.nan
+    overdue["Rep Code"] = None
 
-    mask = overdue["Client Name"].astype(str).str.strip() == "كود المندوب"
-
+    mask = overdue['Client Name'].astype(str).str.strip() == "كود المندوب"
     overdue.loc[mask, "Rep Code"] = overdue.loc[mask, "Client Code"]
+
     overdue["Rep Code"] = overdue["Rep Code"].ffill()
 
     num_cols = [
@@ -208,58 +177,31 @@ def build_overdue_pipeline(overdue, codes):
     ]
 
     for col in num_cols:
-        overdue[col] = pd.to_numeric(overdue[col], errors="coerce").fillna(0)
+        overdue[col] = pd.to_numeric(overdue[col], errors="coerce")
 
     overdue["Rep Code"] = pd.to_numeric(overdue["Rep Code"], errors="coerce")
 
-    overdue["Overdue Value"] = overdue["120 Days"] + overdue["150 Days"] + overdue["More Than 150 Days"]
-
-    overdue["Total Balance"] = overdue[num_cols].sum(axis=1)
-
     overdue = overdue.merge(codes, on="Rep Code", how="left")
 
-    def group(df, col):
-        if col not in df.columns:
-            return pd.DataFrame()
-
-        return df.groupby(col, as_index=False)[
-            ["Overdue Value", "Total Balance"]
-        ].sum()
-
-    return {
-        "rep": group(overdue, "Rep Code"),
-        "manager": group(overdue, "Manager Code"),
-        "area": group(overdue, "Area Code"),
-        "supervisor": group(overdue, "Supervisor Code")
-    }
+    return overdue
 
 
 # =========================
 # 🎨 STREAMLIT UI
 # =========================
 st.set_page_config(layout="wide")
-st.title("📊 Unified KPI System (Fixed)")
+st.title("📊 CLEANING LAYER ONLY")
 
 data = load_data()
 
-# TARGET
-st.header("🎯 TARGET")
-st.dataframe(build_target_pipeline(data["target_rep"], "Rep Code", data["mapping"]))
+st.header("🎯 TARGET CLEAN")
+st.dataframe(clean_target(data["target_rep"], data["mapping"], "Rep Code"))
 
-# SALES
-st.header("💰 SALES")
-sales = build_sales_pipeline(data["sales"], data["codes"])
-st.dataframe(sales["rep"])
-st.dataframe(sales["manager"])
-st.dataframe(sales["area"])
-st.dataframe(sales["supervisor"])
+st.header("💰 SALES CLEAN")
+st.dataframe(clean_sales(data["sales"], data["codes"]))
 
-# OPENING
-st.header("📦 OPENING")
-opening = build_opening_pipeline(data["opening"], data["codes"])
-st.dataframe(opening["rep"])
+st.header("📦 OPENING CLEAN")
+st.dataframe(clean_opening(data["opening"], data["codes"]))
 
-# OVERDUE
-st.header("⏳ OVERDUE")
-overdue = build_overdue_pipeline(data["overdue"], data["codes"])
-st.dataframe(overdue["rep"])
+st.header("⏳ OVERDUE CLEAN")
+st.dataframe(clean_overdue(data["overdue"], data["codes"]))
