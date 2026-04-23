@@ -4,10 +4,10 @@ import streamlit as st
 # =========================
 # 📌 TITLE
 # =========================
-st.title("📊 Target Dashboard - Full Monthly System")
+st.title("📊 Target Dashboard - Full Monthly Distribution")
 
 # =========================
-# 🧹 CLEAN + TRANSFORM
+# 🧹 CLEAN + TRANSFORM FUNCTION
 # =========================
 def process_df(df):
 
@@ -26,14 +26,17 @@ def process_df(df):
 
     target_col = target_cols[0]
 
+    # convert to numeric
     df[target_col] = pd.to_numeric(df[target_col], errors="coerce")
 
+    # standard name
     df = df.rename(columns={target_col: "Target (Year)"})
 
-    # -------- MONTHLY CALC --------
+    # =========================
+    # 📅 MONTHLY DISTRIBUTION
+    # =========================
     df["Target (Month)"] = df["Target (Year)"] / 12
 
-    # -------- MONTH COLUMNS --------
     months = [
         "Jan", "Feb", "Mar", "Apr", "May", "Jun",
         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
@@ -75,13 +78,13 @@ def load_data():
 data = load_data()
 
 # =========================
-# 📊 DISPLAY EACH LEVEL
+# 📊 DISPLAY ALL LEVELS
 # =========================
 for level, df in data.items():
 
     st.markdown(f"## 📌 {level} Target")
 
-    # ================= SAFETY CHECK =================
+    # ================= SAFE CHECK =================
     if "Target (Year)" not in df.columns:
 
         st.warning(f"⚠️ No Target column in {level}")
@@ -94,22 +97,11 @@ for level, df in data.items():
 
     c1.metric("Total Year Target", f"{df['Target (Year)'].sum():,.0f}")
 
-    c2.metric(
-        "Monthly Target",
-        f"{df['Target (Month)'].sum():,.0f}" if "Target (Month)" in df.columns else "N/A"
-    )
+    c2.metric("Monthly Target", f"{df['Target (Month)'].sum():,.0f}")
 
     c3.metric("Rows", len(df))
 
-    # ================= SHOW MONTHS CHECK =================
-    months = [
-        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-    ]
-
-    # عرض جزء من الداتا مع الشهور
-    show_cols = [c for c in df.columns if c in months or c in ["Target (Year)", "Target (Month)"]]
-
-    st.dataframe(df[show_cols + [c for c in df.columns if c not in show_cols]], use_container_width=True)
+    # ================= SHOW TABLE =================
+    st.dataframe(df, use_container_width=True)
 
     st.divider()
