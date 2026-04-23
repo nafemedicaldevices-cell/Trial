@@ -23,7 +23,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
     "Supervisor Target",
     "Evak Target",
     "Rep Harakah",
-    "Clients Harakah"
+    "Client Harakah"
 ])
 
 # =========================
@@ -52,8 +52,8 @@ with tab6:
     st.dataframe(rep_haraka, use_container_width=True)
 
 # =========================
-# 📊 CLIENTS HARKA
+# 📊 CLIENT HARKA
 # =========================
 with tab7:
-    st.subheader("Clients Harakah")
+    st.subheader("Client Harakah")
     st.dataframe(client_haraka, use_container_width=True)
