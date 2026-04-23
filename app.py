@@ -1,24 +1,18 @@
 import pandas as pd
 import streamlit as st
 
-# =========================
-# 📌 TITLE
-# =========================
-st.title("📊 Target Dashboard - Full Clean Monthly System")
+st.title("📊 Target Dashboard - Monthly Column Format")
 
 # =========================
 # 🧹 CLEAN + TRANSFORM
 # =========================
 def process_df(df):
 
-    # -------- CLEAN COLUMNS --------
     df.columns = df.columns.str.strip()
 
-    # -------- CLEAN TEXT --------
     for col in df.select_dtypes(include="object").columns:
         df[col] = df[col].astype(str).str.strip()
 
-    # -------- FIND TARGET COLUMN --------
     target_cols = [c for c in df.columns if "target" in c.lower()]
 
     if len(target_cols) == 0:
@@ -28,23 +22,26 @@ def process_df(df):
 
     df[target_col] = pd.to_numeric(df[target_col], errors="coerce")
 
-    # rename standard
     df = df.rename(columns={target_col: "Target (Year)"})
 
     # =========================
-    # 📅 MONTHLY DISTRIBUTION
+    # 📅 MONTHLY (LONG FORMAT)
     # =========================
-    df["Target (Month)"] = df["Target (Year)"] / 12
-
     months = [
         "Jan", "Feb", "Mar", "Apr", "May", "Jun",
         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
     ]
 
-    for m in months:
-        df[m] = df["Target (Month)"]
+    df["Target (Month)"] = df["Target (Year)"] / 12
 
-    return df
+    # 🔥 تحويل من أعمدة إلى صفوف
+    df_monthly = df.loc[df.index.repeat(12)].copy()
+
+    df_monthly["Month"] = months * len(df)
+
+    df_monthly["Monthly Target"] = df["Target (Month)"].repeat(12).values
+
+    return df_monthly
 
 # =========================
 # 📂 LOAD FILES
@@ -81,27 +78,16 @@ data = load_data()
 # =========================
 for level, df in data.items():
 
-    st.markdown(f"## 📌 {level} Target")
+    st.markdown(f"## 📌 {level} Monthly Target")
 
-    # ================= SAFE KPI =================
-    c1, c2, c3 = st.columns(3)
+    # KPI
+    c1, c2 = st.columns(2)
 
-    # Year Target
-    c1.metric(
-        "Total Year Target",
-        f"{df['Target (Year)'].sum():,.0f}" if "Target (Year)" in df.columns else "N/A"
-    )
+    c1.metric("Total Year Target", f"{df['Monthly Target'].sum() * 12:,.0f}")
+    c2.metric("Monthly Target Total", f"{df['Monthly Target'].sum():,.0f}")
 
-    # Monthly Target
-    c2.metric(
-        "Monthly Target",
-        f"{df['Target (Month)'].sum():,.0f}" if "Target (Month)" in df.columns else "N/A"
-    )
-
-    # Rows
-    c3.metric("Rows", len(df))
-
-    # ================= TABLE =================
+    # TABLE
     st.dataframe(df, use_container_width=True)
 
     st.divider()
+    
