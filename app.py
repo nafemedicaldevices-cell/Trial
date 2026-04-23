@@ -1,10 +1,13 @@
 import streamlit as st
 from clean_data import load_and_clean
 
-st.title("📊 KPI Dashboard")
+# =========================
+# 📌 TITLE
+# =========================
+st.title("📊 KPI Target Dashboard")
 
 # =========================
-# 📂 LOAD CLEAN DATA
+# 📂 LOAD DATA
 # =========================
 df = load_and_clean()
 
@@ -13,12 +16,12 @@ df = load_and_clean()
 # =========================
 c1, c2, c3 = st.columns(3)
 
-c1.metric("Year Target", f"{df['Target (Year)'].sum():,.0f}")
-c2.metric("Unit Target", f"{df['Target (Unit')].sum():,.0f}")
-c3.metric("Value Target", f"{df['Target (Value')].sum():,.0f}")
+c1.metric("Year Target", f"{df['Target Year'].sum():,.0f}")
+c2.metric("Unit Target", f"{df['Target Unit'].sum():,.0f}")
+c3.metric("Value Target", f"{df['Target Value'].sum():,.0f}")
 
 # =========================
-# 📌 FILTERS
+# 📌 FILTER
 # =========================
 level = st.selectbox("Select Level", ["All"] + list(df["Level"].unique()))
 
