@@ -1,22 +1,24 @@
 import pandas as pd
 import streamlit as st
 
-st.title("📊 Rep Harakah - Clean & KPI Ready")
+st.title("📊 Rep Harakah - Strong Clean Data")
 
-# =========================
-# 📂 LOAD DATA
-# =========================
 @st.cache_data
 def load_data():
     df = pd.read_excel("Rep Harakah.xlsx")
 
     # =========================
-    # 🧹 REMOVE EMPTY ROWS
+    # 🧹 CLEAN SPACES
+    # =========================
+    df = df.replace(r'^\s*$', pd.NA, regex=True)
+
+    # =========================
+    # 🧹 REMOVE FULLY EMPTY ROWS (STRONG)
     # =========================
     df = df.dropna(how="all")
 
     # =========================
-    # 🧹 CLEAN FIRST COLUMN (Remove unwanted rows)
+    # 🧹 CLEAN FIRST COLUMN
     # =========================
     first_col = df.columns[0]
     df[first_col] = df[first_col].astype(str)
@@ -29,7 +31,7 @@ def load_data():
     ]
 
     # =========================
-    # 🏷️ HANDLE DUPLICATE COLUMN NAMES
+    # 🏷️ FIX DUPLICATE COLUMNS
     # =========================
     cols = df.columns.tolist()
 
@@ -47,7 +49,7 @@ def load_data():
     df.columns = new_cols
 
     # =========================
-    # ✏️ RENAME COLUMNS CLEAN
+    # ✏️ RENAME COLUMNS
     # =========================
     df = df.rename(columns={
         df.columns[0]: "Rep Code",
@@ -66,21 +68,9 @@ def load_data():
     return df
 
 
-# =========================
-# 🚀 RUN APP
-# =========================
 df = load_data()
 
 st.subheader("📌 Clean Data")
 st.dataframe(df)
 
-# =========================
-# 📊 BASIC KPI
-# =========================
-st.subheader("📊 Summary")
-
-st.write("Rows:", len(df))
-st.write("Columns:", len(df.columns))
-
-st.subheader("📊 Numeric Summary")
-st.write(df.describe())
+st.write("Rows after cleaning:", len(df))
