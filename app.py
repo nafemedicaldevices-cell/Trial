@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 
-st.title("📊 KPI Target System - Unit & Value")
+st.title("📊 KPI Target System - Final Version")
 
 # =========================
 # 📂 FILES
@@ -18,18 +18,28 @@ files = {
 all_data = []
 
 # =========================
-# 🔄 PROCESS FILES
+# 🔄 PROCESS EACH FILE
 # =========================
 for level, file in files.items():
 
     df = pd.read_excel(file)
     df.columns = df.columns.str.strip()
 
-    fixed_cols = ["Year", "Product Code", "Old Product Name", "Sales Price"]
+    # =========================
+    # 📌 FIXED COLUMNS
+    # =========================
+    fixed_cols = [
+        "Year",
+        "Product Code",
+        "Old Product Name",
+        "Sales Price"
+    ]
 
     value_cols = [c for c in df.columns if c not in fixed_cols]
 
+    # =========================
     # 🔄 UNPIVOT
+    # =========================
     df = df.melt(
         id_vars=fixed_cols,
         var_name="Code",
@@ -38,7 +48,9 @@ for level, file in files.items():
 
     df["Level"] = level
 
+    # =========================
     # 🧹 CLEAN
+    # =========================
     df["Target (Year)"] = pd.to_numeric(df["Target (Year)"], errors="coerce")
 
     # =========================
@@ -48,7 +60,7 @@ for level, file in files.items():
     df["Target Value"] = df["Target Unit"] * df["Sales Price"]
 
     # =========================
-    # 📅 MONTHS
+    # 📅 MONTH GENERATION
     # =========================
     months = [
         "Jan","Feb","Mar","Apr","May","Jun",
@@ -60,15 +72,32 @@ for level, file in files.items():
     df_long["Month"] = np.tile(months, len(df))
 
     df_long["Target Unit"] = np.repeat(df["Target Unit"].values, 12)
-
     df_long["Target Value"] = np.repeat(df["Target Value"].values, 12)
 
     all_data.append(df_long)
 
 # =========================
-# 📊 FINAL DATA
+# 📊 COMBINE
 # =========================
 final_df = pd.concat(all_data, ignore_index=True)
+
+# =========================
+# 📌 COLUMN ORDER (AS REQUESTED)
+# =========================
+final_df = final_df[
+    [
+        "Level",
+        "Year",
+        "Month",
+        "Product Code",
+        "Old Product Name",
+        "Sales Price",
+        "Code",
+        "Target (Year)",
+        "Target Unit",
+        "Target Value"
+    ]
+]
 
 # =========================
 # 📊 KPI
@@ -88,6 +117,6 @@ if level != "All":
     final_df = final_df[final_df["Level"] == level]
 
 # =========================
-# 📊 TABLE
+# 📊 OUTPUT
 # =========================
 st.dataframe(final_df, use_container_width=True)
