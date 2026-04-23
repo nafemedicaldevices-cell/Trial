@@ -103,5 +103,5 @@ for level, df in data.items():
     # TABLE
     st.dataframe(df, use_container_width=True)
 
-    st.divider()s
+    st.divider()
     
