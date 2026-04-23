@@ -1,5 +1,5 @@
 import streamlit as st
-from clean_data import load_data
+from cleaning import load_data
 
 # =========================
 # 📊 TITLE
@@ -21,7 +21,7 @@ c2.metric("Sales Value", f"{df['Sales Value'].sum():,.0f}")
 c3.metric("Returns Value", f"{df['Returns Value'].sum():,.0f}")
 
 # =========================
-# 📊 FILTER (OPTIONAL)
+# 📊 FILTER
 # =========================
 rep = st.selectbox("Select Rep", ["All"] + df["Rep Name"].dropna().unique().tolist())
 
