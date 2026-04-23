@@ -1,116 +1,64 @@
 import pandas as pd
 import streamlit as st
 
-# =========================
-# 🟢 TITLE
-# =========================
-st.title("📊 KPI Dashboard - Target System")
+st.title("📊 Target Dashboard (Multi Sheets)")
 
 # =========================
-# 📂 LOAD ALL SHEETS
+# 📂 LOAD EXCEL SHEETS
 # =========================
 @st.cache_data
 def load_data():
     file = pd.ExcelFile("Target Rep.xlsx")
 
-    df_list = []
+    sheets_data = {}
 
     for sheet in file.sheet_names:
         df = pd.read_excel(file, sheet_name=sheet)
-        df["Source Sheet"] = sheet
-        df_list.append(df)
+        df["Level"] = sheet   # اسم الشيت = المستوى
+        sheets_data[sheet] = df
 
-    return pd.concat(df_list, ignore_index=True)
+    return sheets_data
 
-df = load_data()
-
-# =========================
-# 📌 FIXED COLUMNS
-# =========================
-fixed_cols = ["Year", "Product Code", "Old Product Name", "Sales Price", "Source Sheet"]
-level_cols = [col for col in df.columns if col not in fixed_cols]
+data = load_data()
 
 # =========================
-# 🔄 UNPIVOT
+# 🎛️ SELECT SHEET
 # =========================
-df_melted = df.melt(
-    id_vars=fixed_cols,
-    value_vars=level_cols,
-    var_name="Code",
-    value_name="Target (Year)"
-)
+sheet_choice = st.sidebar.selectbox("Select Level", list(data.keys()))
+
+df = data[sheet_choice]
 
 # =========================
-# 🏷️ LEVEL
+# 📊 SHOW RAW DATA
 # =========================
-df_melted["Level"] = df_melted["Source Sheet"]
-
-# =========================
-# 🧮 CLEAN + CALCULATIONS
-# =========================
-df_melted["Target (Year)"] = pd.to_numeric(df_melted["Target (Year)"], errors="coerce")
-
-df_melted["Target (Unit)"] = df_melted["Target (Year)"] / 12
-df_melted["Target (Value)"] = df_melted["Target (Unit)"] * df_melted["Sales Price"]
+st.subheader(f"📌 Data - {sheet_choice}")
+st.dataframe(df, use_container_width=True)
 
 # =========================
-# 🧹 FINAL TABLE
+# 🧮 BASIC CALCULATIONS (لو عندك Target Year)
 # =========================
-df_final = df_melted[
-    [
-        "Year",
-        "Product Code",
-        "Old Product Name",
-        "Sales Price",
-        "Level",
-        "Code",
-        "Target (Year)",
-        "Target (Unit)",
-        "Target (Value)"
-    ]
-]
+if "Target" in df.columns or "Total" in df.columns:
 
-# =========================
-# 🎛️ FILTERS
-# =========================
-st.sidebar.header("🔎 Filters")
+    # حاول نلقط العمود الصح تلقائيًا
+    target_col = [col for col in df.columns if "target" in col.lower()][0]
 
-year_filter = st.sidebar.multiselect("Year", df_final["Year"].dropna().unique())
-level_filter = st.sidebar.multiselect("Level", df_final["Level"].dropna().unique())
+    df[target_col] = pd.to_numeric(df[target_col], errors="coerce")
 
-filtered_df = df_final.copy()
+    st.subheader("📊 KPI")
 
-if year_filter:
-    filtered_df = filtered_df[filtered_df["Year"].isin(year_filter)]
+    col1, col2 = st.columns(2)
 
-if level_filter:
-    filtered_df = filtered_df[filtered_df["Level"].isin(level_filter)]
-
-# =========================
-# 📊 KPIs
-# =========================
-st.subheader("📌 KPI Summary")
-
-col1, col2, col3 = st.columns(3)
-
-col1.metric("Total Target (Year)", f"{filtered_df['Target (Year)'].sum():,.0f}")
-col2.metric("Total Target (Unit)", f"{filtered_df['Target (Unit)'].sum():,.0f}")
-col3.metric("Total Value", f"{filtered_df['Target (Value)'].sum():,.0f}")
-
-# =========================
-# 📋 TABLE
-# =========================
-st.subheader("📋 Detailed Data")
-st.dataframe(filtered_df, use_container_width=True)
+    col1.metric("Total Target", f"{df[target_col].sum():,.0f}")
+    col2.metric("Avg Target", f"{df[target_col].mean():,.0f}")
 
 # =========================
 # 💾 DOWNLOAD
 # =========================
-csv = filtered_df.to_csv(index=False).encode("utf-8")
+csv = df.to_csv(index=False).encode("utf-8")
 
 st.download_button(
-    "⬇️ Download Data",
+    "⬇️ Download Sheet Data",
     csv,
-    "kpi_output.csv",
+    f"{sheet_choice}_data.csv",
     "text/csv"
 )
