@@ -4,7 +4,7 @@ import streamlit as st
 # =========================
 # 📌 TITLE
 # =========================
-st.title("📊 Target Dashboard - Clean Production Version")
+st.title("📊 Target Dashboard - Full Monthly System")
 
 # =========================
 # 🧹 CLEAN + TRANSFORM
@@ -18,22 +18,22 @@ def process_df(df):
     for col in df.select_dtypes(include="object").columns:
         df[col] = df[col].astype(str).str.strip()
 
-    # -------- FIND TARGET COLUMN SAFELY --------
+    # -------- FIND TARGET COLUMN --------
     target_cols = [c for c in df.columns if "target" in c.lower()]
 
     if len(target_cols) == 0:
-        return df  # 🚨 no crash
+        return df
 
     target_col = target_cols[0]
 
     df[target_col] = pd.to_numeric(df[target_col], errors="coerce")
 
-    # standard name
     df = df.rename(columns={target_col: "Target (Year)"})
 
-    # -------- YEAR / MONTH --------
+    # -------- MONTHLY CALC --------
     df["Target (Month)"] = df["Target (Year)"] / 12
 
+    # -------- MONTH COLUMNS --------
     months = [
         "Jan", "Feb", "Mar", "Apr", "May", "Jun",
         "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
@@ -75,7 +75,7 @@ def load_data():
 data = load_data()
 
 # =========================
-# 📊 DISPLAY
+# 📊 DISPLAY EACH LEVEL
 # =========================
 for level, df in data.items():
 
@@ -84,7 +84,7 @@ for level, df in data.items():
     # ================= SAFETY CHECK =================
     if "Target (Year)" not in df.columns:
 
-        st.warning(f"⚠️ No Target column found in {level}")
+        st.warning(f"⚠️ No Target column in {level}")
         st.dataframe(df, use_container_width=True)
         st.divider()
         continue
@@ -101,7 +101,15 @@ for level, df in data.items():
 
     c3.metric("Rows", len(df))
 
-    # ================= TABLE =================
-    st.dataframe(df, use_container_width=True)
+    # ================= SHOW MONTHS CHECK =================
+    months = [
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ]
+
+    # عرض جزء من الداتا مع الشهور
+    show_cols = [c for c in df.columns if c in months or c in ["Target (Year)", "Target (Month)"]]
+
+    st.dataframe(df[show_cols + [c for c in df.columns if c not in show_cols]], use_container_width=True)
 
     st.divider()
