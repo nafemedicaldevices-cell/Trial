@@ -1,7 +1,7 @@
 import pandas as pd
 import streamlit as st
 
-st.title("📊 Target Dashboard - All Levels")
+st.title("📊 Target System - 5 Levels")
 
 # =========================
 # 📂 LOAD ALL SHEETS
@@ -10,37 +10,47 @@ st.title("📊 Target Dashboard - All Levels")
 def load_data():
     file = pd.ExcelFile("Target Rep.xlsx")
 
-    df_list = []
+    sheets = {}
 
     for sheet in file.sheet_names:
         df = pd.read_excel(file, sheet_name=sheet)
 
-        # تنظيف اسم الشيت (مهم جدًا)
+        # تنظيف اسم الشيت
         level = sheet.strip().title()
 
         df["Level"] = level
 
-        df_list.append(df)
+        sheets[level] = df   # 👈 كل شيت لوحده
 
-    return pd.concat(df_list, ignore_index=True)
+    return sheets
 
-df = load_data()
-
-# =========================
-# 🔍 CHECK LEVELS
-# =========================
-st.write("📌 Levels Found:")
-st.write(df["Level"].value_counts())
+data = load_data()
 
 # =========================
-# 🎛️ FILTERS
+# 🧭 TABS لكل Level
 # =========================
-levels = st.multiselect("Select Level", df["Level"].unique(), default=df["Level"].unique())
+tabs = st.tabs(list(data.keys()))
 
-filtered_df = df[df["Level"].isin(levels)]
+for i, level in enumerate(data.keys()):
+    with tabs[i]:
 
-# =========================
-# 📊 SHOW TABLE
-# =========================
-st.subheader("📋 Full Data (All Levels)")
-st.dataframe(filtered_df, use_container_width=True)
+        df = data[level]
+
+        st.subheader(f"📌 {level} Target Data")
+
+        st.dataframe(df, use_container_width=True)
+
+        # =========================
+        # 📊 KPI لو فيه عمود Target
+        # =========================
+        target_cols = [c for c in df.columns if "target" in c.lower()]
+
+        if target_cols:
+            col = target_cols[0]
+
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+            c1, c2 = st.columns(2)
+
+            c1.metric("Total Target", f"{df[col].sum():,.0f}")
+            c2.metric("Average Target", f"{df[col].mean():,.0f}")
