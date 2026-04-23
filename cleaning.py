@@ -80,7 +80,7 @@ def load_haraka():
 
 
 # =========================
-# 📂 CLIENT HARKA (FINAL FIX - FILL DOWN ONLY)
+# 📂 CLIENT HARKA (FINAL - FROM SALES VALUE ROW)
 # =========================
 def load_client_haraka():
 
@@ -89,43 +89,37 @@ def load_client_haraka():
     df = df.replace(r'^\s*$', pd.NA, regex=True)
     df = df.dropna(how="all")
 
-    # ❌ حذف الهيدر الداخلي
+    # ❌ حذف الهيدر داخل الداتا
     df = df[~df.astype(str).apply(
         lambda x: x.str.contains(
-            "رصيد افتتاحى|صافى مبيعات|صافى مرتجع مبيعات|مندوب المبيعات",
+            "رصيد افتتاحى|صافى مبيعات|صافى مرتجع مبيعات",
             na=False
         )
     ).any(axis=1)]
 
     # =========================
-    # 🏷️ الأعمدة
+    # 🏷️ أعمدة مؤقتة
     # =========================
-    df.columns = [
-        "Client Code",
-        "Client Name",
-        "Opening Balance",
-        "Sales Value",
-        "Returns Value",
-        "Tasweyat Madinah",
-        "Total Collection",
-        "Madfoaat",
-        "Tasweyat Dainah",
-        "End Balance",
-        "Motalbet El Fatrah"
-    ]
+    df.columns = [f"Col{i}" for i in range(df.shape[1])]
 
     # =========================
-    # 👤 FILL DOWN ONLY (اسم المندوب)
+    # 👤 استخراج Rep من صف "مندوب المبيعات"
     # =========================
-    df["Rep Name"] = df["Tasweyat Madinah"].astype(str)
+    rep_row = df[df.astype(str).apply(
+        lambda x: x.str.contains("مندوب المبيعات", na=False)
+    ).any(axis=1)]
 
-    # نخلي "تسويات مدينة" فاضي
-    df.loc[
-        df["Rep Name"].str.contains("تسويات مدينة", na=False),
-        "Rep Name"
-    ] = pd.NA
+    if not rep_row.empty:
+        df["Rep Code"] = rep_row.iloc[:, 2].values[0]
+        df["Rep Name"] = rep_row.iloc[:, 3].values[0]
+    else:
+        df["Rep Code"] = pd.NA
+        df["Rep Name"] = pd.NA
 
-    # 🔁 أهم خطوة
+    # =========================
+    # 🔁 Fill Down (المهم)
+    # =========================
+    df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce").ffill()
     df["Rep Name"] = df["Rep Name"].ffill()
 
-    return df
+    return dfس
