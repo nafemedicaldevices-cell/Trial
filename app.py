@@ -59,7 +59,7 @@ def load_data():
         df.columns[4]: "Returns Value",
         df.columns[5]: "Tasweyat Madinah (Credit)",
         df.columns[6]: "Total Collection",
-        df.columns[7]: "Tasweyat Dainah",
+        df.columns[7]: "Madfoaat",
         df.columns[8]: "Tasweyat Madinah (Debit)",
         df.columns[9]: "End Balance",
         df.columns[10]: "Motalbet El Fatrah",
