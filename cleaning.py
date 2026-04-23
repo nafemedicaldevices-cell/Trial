@@ -99,22 +99,20 @@ def load_haraka():
 
 
 # =========================
-# 📂 CLIENT HARKA (NEW)
+# 📂 CLIENTS HARKA
 # =========================
 def load_client_haraka():
 
-    df = pd.read_excel("Client Harakah.xlsx")
+    # ⚠️ مهم: الاسم الصحيح
+    df = pd.read_excel("Clients Harakah.xlsx")
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
 
     first_col = df.columns[0]
     df[first_col] = df[first_col].astype(str)
 
-    df = df[
-        df[first_col].notna() &
-        (df[first_col].str.strip() != "") &
-        (~df[first_col].str.contains("كود العميل", na=False))
-    ]
+    # تنظيف بسيط
+    df = df[df[first_col].notna() & (df[first_col].str.strip() != "")]
 
     # fix duplicates
     cols = df.columns.tolist()
