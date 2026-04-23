@@ -80,7 +80,7 @@ def load_haraka():
 
 
 # =========================
-# 📂 CLIENT HARKA (FINAL)
+# 📂 CLIENT HARKA (FINAL FIX)
 # =========================
 def load_client_haraka():
 
@@ -89,35 +89,43 @@ def load_client_haraka():
     df = df.replace(r'^\s*$', pd.NA, regex=True)
     df = df.dropna(how="all")
 
-    # ❌ حذف الصفوف النصية
+    # ❌ حذف الهيدر العربي داخل الداتا
     df = df[~df.astype(str).apply(
-        lambda x: x.str.contains("مندوب المبيعات|صافى مبيعات|تسويات مدينة", na=False)
+        lambda x: x.str.contains(
+            "رصيد افتتاحى|صافى مبيعات|صافى مرتجع مبيعات|تسويات مدينة",
+            na=False
+        )
     ).any(axis=1)]
 
+    # =========================
+    # 🏷️ تثبيت الأعمدة
+    # =========================
     df.columns = [
-        "Client Code",
-        "Client Name",
+        "Branch",
+        "Rep Info",
+        "Rep Code Raw",
+        "Rep Name Raw",
         "Opening Balance",
         "Sales Value",
         "Returns Value",
         "Tasweyat Madinah",
         "Total Collection",
         "Madfoaat",
-        "Tasweyat Dainah",
-        "End Balance",
-        "Motalbet El Fatrah"
+        "End Balance"
     ]
 
     # =========================
-    # 👤 REP FROM Returns Value (حسب كلامك)
+    # 👤 استخراج Rep Code + Name
     # =========================
-    rep_source = df["Returns Value"].astype(str)
+    df["Rep Code"] = df["Rep Code Raw"].astype(str).str.extract(r"(\d+)")
+    df["Rep Name"] = df["Rep Name Raw"].astype(str).str.strip()
 
-    df["Rep Code"] = rep_source.str.extract(r"(\d+)")
-    df["Rep Name"] = rep_source.str.replace(r"\d+", "", regex=True).str.strip()
-    df["Rep Name"] = df["Rep Name"].str.replace("تسويات مدينة", "", regex=True).str.strip()
+    # تنظيف الاسم
+    df["Rep Name"] = df["Rep Name"].str.replace("باسم", "", regex=True).str.strip()
 
+    # =========================
     # 🔁 Fill Down
+    # =========================
     df["Rep Code"] = df["Rep Code"].ffill()
     df["Rep Name"] = df["Rep Name"].ffill()
 
