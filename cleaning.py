@@ -58,49 +58,29 @@ def load_haraka():
     df = df.replace(r'^\s*$', pd.NA, regex=True)
     df = df.dropna(how="all")
 
-    first_col = df.columns[0]
-    df[first_col] = df[first_col].astype(str)
+    df = df[~df.astype(str).apply(
+        lambda x: x.str.contains("مندوب المبيعات|صافى مبيعات", na=False)
+    ).any(axis=1)]
 
-    df = df[
-        df[first_col].notna() &
-        (df[first_col].str.strip() != "") &
-        (~df[first_col].str.contains("كود الفرع", na=False)) &
-        (~df[first_col].str.contains("كود المندوب", na=False))
+    df.columns = [
+        "Rep Code",
+        "Rep Name",
+        "Opening Balance",
+        "Sales Value",
+        "Returns Value",
+        "Credit",
+        "Total Collection",
+        "Madfoaat",
+        "Debit",
+        "End Balance",
+        "Motalbet El Fatrah"
     ]
-
-    cols = df.columns.tolist()
-    seen = {}
-    new_cols = []
-
-    for c in cols:
-        if c in seen:
-            seen[c] += 1
-            new_cols.append(f"{c}_{seen[c]}")
-        else:
-            seen[c] = 0
-            new_cols.append(c)
-
-    df.columns = new_cols
-
-    df = df.rename(columns={
-        df.columns[0]: "Rep Code",
-        df.columns[1]: "Rep Name",
-        df.columns[2]: "Opening Balance",
-        df.columns[3]: "Sales Value",
-        df.columns[4]: "Returns Value",
-        df.columns[5]: "Credit",
-        df.columns[6]: "Total Collection",
-        df.columns[7]: "Madfoaat",
-        df.columns[8]: "Debit",
-        df.columns[9]: "End Balance",
-        df.columns[10]: "Motalbet El Fatrah",
-    })
 
     return df
 
 
 # =========================
-# 📂 CLIENT HARKA (FINAL FIX)
+# 📂 CLIENT HARKA (FINAL)
 # =========================
 def load_client_haraka():
 
@@ -109,9 +89,11 @@ def load_client_haraka():
     df = df.replace(r'^\s*$', pd.NA, regex=True)
     df = df.dropna(how="all")
 
-    # =========================
-    # 🏷️ FIX COLUMNS
-    # =========================
+    # ❌ حذف الصفوف النصية
+    df = df[~df.astype(str).apply(
+        lambda x: x.str.contains("مندوب المبيعات|صافى مبيعات|تسويات مدينة", na=False)
+    ).any(axis=1)]
+
     df.columns = [
         "Client Code",
         "Client Name",
@@ -127,16 +109,17 @@ def load_client_haraka():
     ]
 
     # =========================
-    # 🔥 EXTRACT REP FROM SALES VALUE
+    # 👤 REP FROM Returns Value (حسب كلامك)
     # =========================
-    df["Rep Code"] = df["Sales Value"].astype(str).str.extract(r"(\d+)")
-    df["Rep Name"] = df["Sales Value"].astype(str).str.replace(r"\d+", "", regex=True).str.strip()
+    rep_source = df["Returns Value"].astype(str)
 
-    # =========================
-    # 🔥 FILL DOWN
-    # =========================
-    df["Rep Code"] = df["Rep Code"].replace("", pd.NA).ffill()
-    df["Rep Name"] = df["Rep Name"].replace("", pd.NA).ffill()
+    df["Rep Code"] = rep_source.str.extract(r"(\d+)")
+    df["Rep Name"] = rep_source.str.replace(r"\d+", "", regex=True).str.strip()
+    df["Rep Name"] = df["Rep Name"].str.replace("تسويات مدينة", "", regex=True).str.strip()
+
+    # 🔁 Fill Down
+    df["Rep Code"] = df["Rep Code"].ffill()
+    df["Rep Name"] = df["Rep Name"].ffill()
 
     df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce")
 
