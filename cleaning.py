@@ -15,34 +15,60 @@ def load_and_process_data():
 
     for level, file in FILES.items():
 
-        df = pd.read_excel(file)
+        df = pd.read_excel(file, sheet_name=0)
         df.columns = df.columns.str.strip()
 
-        # الأعمدة الثابتة
-        fixed_cols = [
-            "Year",
-            "Product Code",
-            "Old Product Name",
-            "Sales Price"
-        ]
+        # =========================
+        # 🔥 CASE 1: Rep (Rep Harakah مختلف)
+        # =========================
+        if level == "Rep":
 
-        # تحويل الأعمدة إلى Long format
-        df = df.melt(
-            id_vars=fixed_cols,
-            var_name="Code",
-            value_name="Target (Year)"
-        )
+            df = df.iloc[2:].reset_index(drop=True)
+            df = df.dropna(how="all")
 
-        df["Level"] = level
+            if "Rep Code" in df.columns:
+                df = df[df["Rep Code"].notna()]
 
-        # تنظيف القيم
+            df["Level"] = level
+
+            # لازم يكون فيه Target (Year)
+            if "Target (Year)" not in df.columns:
+                continue
+
+        # =========================
+        # 🔥 CASE 2: باقي الملفات
+        # =========================
+        else:
+
+            fixed_cols = [
+                "Year",
+                "Product Code",
+                "Old Product Name",
+                "Sales Price"
+            ]
+
+            df = df.melt(
+                id_vars=fixed_cols,
+                var_name="Code",
+                value_name="Target (Year)"
+            )
+
+            df["Level"] = level
+
+        # =========================
+        # 🧹 CLEAN
+        # =========================
         df["Target (Year)"] = pd.to_numeric(df["Target (Year)"], errors="coerce")
 
-        # الحسابات
+        # =========================
+        # 📊 CALCULATIONS
+        # =========================
         df["Target (Unit)"] = df["Target (Year)"] / 12
         df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
 
-        # الشهور
+        # =========================
+        # 📅 MONTHS
+        # =========================
         months = [
             "Jan","Feb","Mar","Apr","May","Jun",
             "Jul","Aug","Sep","Oct","Nov","Dec"
@@ -56,6 +82,4 @@ def load_and_process_data():
 
         all_data.append(df_long)
 
-    final_df = pd.concat(all_data, ignore_index=True)
-
-    return final_df
+    return pd.concat(all_data, ignore_index=True)
