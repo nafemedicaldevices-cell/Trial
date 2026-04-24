@@ -3,13 +3,13 @@ import pandas as pd
 import numpy as np
 import os
 
-from cleaning import load_targets, load_haraka
+from cleaning import load_targets, load_haraka, load_overdue
 
 st.set_page_config(page_title="Sales Dashboard", layout="wide")
 st.title("📊 Sales + KPI Dashboard")
 
 # =========================
-# 📁 SAFE LOADER
+# 📁 FILE LOADER
 # =========================
 def load_file(path):
     if not os.path.exists(path):
@@ -27,7 +27,7 @@ def load_data():
 sales, mapping, codes = load_data()
 
 # =========================
-# 🧹 CLEAN SALES
+# 🧹 SALES CLEANING
 # =========================
 sales.columns = sales.columns.str.strip()
 
@@ -92,28 +92,28 @@ sales['Returns Value'] = sales['Returns Unit Before Edit'] * sales['Sales Price'
 sales['Sales After Returns'] = sales['Total Sales Value'] - sales['Returns Value']
 
 # =========================
-# 📥 LOAD NEW MODULES
+# 📥 LOAD EXTRA MODULES
 # =========================
 targets = load_targets()
 haraka = load_haraka()
+overdue = load_overdue("Overdue.xlsx", codes)
 
 # =========================
 # 📌 TABS
 # =========================
-tab1, tab2, tab3 = st.tabs([
-    "📊 Sales Dashboard",
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📊 Sales",
     "🎯 Targets",
-    "📈 Harakah"
+    "📈 Harakah",
+    "⏳ Overdue"
 ])
 
 # =========================
-# SALES TAB
+# SALES
 # =========================
 with tab1:
-    st.subheader("📋 Sales Data")
+    st.subheader("📊 Sales Data")
     st.dataframe(sales, use_container_width=True)
-
-    st.subheader("📊 KPIs")
 
     c1, c2, c3 = st.columns(3)
     c1.metric("Total Sales", f"{sales['Total Sales Value'].sum():,.0f}")
@@ -121,20 +121,26 @@ with tab1:
     c3.metric("Net Sales", f"{sales['Sales After Returns'].sum():,.0f}")
 
 # =========================
-# TARGETS TAB
+# TARGETS
 # =========================
 with tab2:
     st.subheader("🎯 Targets")
-
-    st.dataframe(targets[targets["Level"] == "Rep"], use_container_width=True)
-    st.dataframe(targets[targets["Level"] == "Manager"], use_container_width=True)
-    st.dataframe(targets[targets["Level"] == "Area"], use_container_width=True)
-    st.dataframe(targets[targets["Level"] == "Supervisor"], use_container_width=True)
-    st.dataframe(targets[targets["Level"] == "Evak"], use_container_width=True)
+    st.dataframe(targets, use_container_width=True)
 
 # =========================
-# HARKAH TAB
+# HARKAH
 # =========================
 with tab3:
-    st.subheader("📈 Harakah Data")
+    st.subheader("📈 Harakah")
     st.dataframe(haraka, use_container_width=True)
+
+# =========================
+# OVERDUE
+# =========================
+with tab4:
+    st.subheader("⏳ Overdue")
+
+    st.dataframe(overdue, use_container_width=True)
+
+    st.subheader("📊 KPIs")
+    st.metric("Total Overdue", f"{overdue['Overdue'].sum():,.0f}")
