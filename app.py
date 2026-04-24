@@ -1,6 +1,3 @@
-import streamlit as st
-from data_loader import load_all
+from cleaning import load_clean_sales
 
-model = load_all()
-
-sales = model["sales"]
+sales = load_clean_sales()
