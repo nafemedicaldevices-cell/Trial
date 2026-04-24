@@ -7,7 +7,7 @@ st.set_page_config(page_title="Client Harakah", layout="wide")
 st.title("👤 Client Harakah Dashboard")
 
 # =========================
-# 📂 LOAD CLIENT HARKAH
+# 📂 LOAD DATA
 # =========================
 def load_client_haraka():
 
@@ -55,18 +55,20 @@ def load_client_haraka():
     df.columns = expected_cols[:df.shape[1]]
 
     # =========================
-    # 🧠 EXTRACT REP
+    # 🧠 MARKER LOGIC (LIKE opening_detail)
     # =========================
-    marker = df["Sales Value"].astype(str).str.contains("مندوب المبيعات", na=False)
+    df["Rep Code"] = None
+    df["Rep Name"] = None
 
-    df["Rep Code"] = np.where(marker, df["Returns Value"], np.nan)
-    df["Rep Name"] = np.where(marker, df["Tasweyat Madinah (Credit)"], np.nan)
+    mask = df["Client Name"].astype(str).str.strip().str.contains("مندوب المبيعات", na=False)
 
-    df["Rep Code"] = df["Rep Code"].ffill()
-    df["Rep Name"] = df["Rep Name"].ffill()
+    df.loc[mask, "Rep Code"] = df.loc[mask, "Returns Value"]
+    df.loc[mask, "Rep Name"] = df.loc[mask, "Tasweyat Madinah (Credit)"]
+
+    df[["Rep Code", "Rep Name"]] = df[["Rep Code", "Rep Name"]].ffill()
 
     # =========================
-    # 🔢 NUMERIC FIX
+    # 🔢 NUMERIC CLEAN
     # =========================
     num_cols = [
         "Opening Balance",
@@ -88,24 +90,23 @@ def load_client_haraka():
 
 
 # =========================
-# 📥 LOAD DATA
+# 📥 RUN
 # =========================
-client_haraka = load_client_haraka()
+df = load_client_haraka()
 
 # =========================
 # 📊 DISPLAY
 # =========================
-st.subheader("📋 Data Preview")
-
-if client_haraka.empty:
+if df.empty:
     st.warning("No data loaded")
 else:
-    st.dataframe(client_haraka, use_container_width=True)
+    st.subheader("📋 Client Harakah Data")
+    st.dataframe(df, use_container_width=True)
 
     st.subheader("📊 KPIs")
 
     c1, c2, c3 = st.columns(3)
 
-    c1.metric("Sales Value", f"{client_haraka['Sales Value'].sum():,.0f}")
-    c2.metric("Returns", f"{client_haraka['Returns Value'].sum():,.0f}")
-    c3.metric("Net", f"{(client_haraka['Sales Value'].sum() - client_haraka['Returns Value'].sum()):,.0f}")
+    c1.metric("Sales", f"{df['Sales Value'].sum():,.0f}")
+    c2.metric("Returns", f"{df['Returns Value'].sum():,.0f}")
+    c3.metric("Net", f"{df['Sales Value'].sum() - df['Returns Value'].sum():,.0f}")
