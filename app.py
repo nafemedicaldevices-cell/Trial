@@ -1,31 +1,27 @@
+import streamlit as st
 import pandas as pd
 import numpy as np
 import os
 
+st.set_page_config(page_title="Client Harakah", layout="wide")
+st.title("👤 Client Harakah Dashboard")
+
+# =========================
+# 📂 LOAD CLIENT HARKAH
+# =========================
 def load_client_haraka():
 
     file_path = "Client Harakah.xlsx"
 
-    # =========================
-    # 📂 SAFE FILE CHECK
-    # =========================
     if not os.path.exists(file_path):
-        return pd.DataFrame({"Error": [f"File not found: {file_path}"]})
+        st.error("❌ File not found: Client Harakah.xlsx")
+        return pd.DataFrame()
+
+    df = pd.read_excel(file_path)
 
     # =========================
-    # 📥 LOAD
+    # 🧹 CLEAN FIRST COLUMN
     # =========================
-    try:
-        df = pd.read_excel(file_path)
-    except Exception as e:
-        return pd.DataFrame({"Error": [str(e)]})
-
-    # =========================
-    # 🧹 BASIC CLEAN
-    # =========================
-    if df.empty:
-        return pd.DataFrame({"Error": ["Empty Excel file"]})
-
     first_col = df.columns[0]
     df[first_col] = df[first_col].astype(str)
 
@@ -39,7 +35,7 @@ def load_client_haraka():
     df = df.reset_index(drop=True)
 
     # =========================
-    # 🧾 SAFE RENAME (NO CRASH)
+    # 🧾 SAFE RENAME
     # =========================
     expected_cols = [
         "Client Code",
@@ -55,28 +51,22 @@ def load_client_haraka():
         "Motalbet El Fatrah"
     ]
 
-    col_count = min(len(expected_cols), df.shape[1])
-    df = df.iloc[:, :col_count]
-    df.columns = expected_cols[:col_count]
+    df = df.iloc[:, :len(expected_cols)]
+    df.columns = expected_cols[:df.shape[1]]
 
     # =========================
-    # 🧠 REP EXTRACTION (SAFE)
+    # 🧠 EXTRACT REP
     # =========================
-    if "Sales Value" in df.columns:
+    marker = df["Sales Value"].astype(str).str.contains("مندوب المبيعات", na=False)
 
-        marker = df["Sales Value"].astype(str).str.contains("مندوب المبيعات", na=False)
+    df["Rep Code"] = np.where(marker, df["Returns Value"], np.nan)
+    df["Rep Name"] = np.where(marker, df["Tasweyat Madinah (Credit)"], np.nan)
 
-        if "Returns Value" in df.columns:
-            df["Rep Code"] = np.where(marker, df["Returns Value"], np.nan)
-
-        if "Tasweyat Madinah (Credit)" in df.columns:
-            df["Rep Name"] = np.where(marker, df["Tasweyat Madinah (Credit)"], np.nan)
-
-        df["Rep Code"] = df["Rep Code"].ffill() if "Rep Code" in df.columns else None
-        df["Rep Name"] = df["Rep Name"].ffill() if "Rep Name" in df.columns else None
+    df["Rep Code"] = df["Rep Code"].ffill()
+    df["Rep Name"] = df["Rep Name"].ffill()
 
     # =========================
-    # 🔢 NUMERIC CLEAN
+    # 🔢 NUMERIC FIX
     # =========================
     num_cols = [
         "Opening Balance",
@@ -94,4 +84,28 @@ def load_client_haraka():
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    return dfس
+    return df
+
+
+# =========================
+# 📥 LOAD DATA
+# =========================
+client_haraka = load_client_haraka()
+
+# =========================
+# 📊 DISPLAY
+# =========================
+st.subheader("📋 Data Preview")
+
+if client_haraka.empty:
+    st.warning("No data loaded")
+else:
+    st.dataframe(client_haraka, use_container_width=True)
+
+    st.subheader("📊 KPIs")
+
+    c1, c2, c3 = st.columns(3)
+
+    c1.metric("Sales Value", f"{client_haraka['Sales Value'].sum():,.0f}")
+    c2.metric("Returns", f"{client_haraka['Returns Value'].sum():,.0f}")
+    c3.metric("Net", f"{(client_haraka['Sales Value'].sum() - client_haraka['Returns Value'].sum()):,.0f}")
