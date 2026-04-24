@@ -11,7 +11,7 @@ st.title("📊 KPI Dashboard")
 # =========================
 targets = load_targets()
 haraka = load_haraka()
-sales = load_sales()   # 👈 دلوقتي زي باقي الشيتات
+sales = load_sales()
 
 # =========================
 # TABS
@@ -19,17 +19,20 @@ sales = load_sales()   # 👈 دلوقتي زي باقي الشيتات
 tab1, tab2, tab3 = st.tabs(["Targets", "Harakah", "Sales"])
 
 # =========================
-# TARGETS
+# TARGETS (5 LEVELS)
 # =========================
 with tab1:
     st.subheader("Targets")
 
-    for lvl in ["Rep","Manager","Area","Supervisor","Evak"]:
-        st.markdown(f"### 📌 {lvl}")
-        st.dataframe(
-            targets[targets["Level"] == lvl],
-            use_container_width=True
-        )
+    if targets.empty:
+        st.error("❌ No Targets Loaded")
+    else:
+        for lvl in ["Rep","Manager","Area","Supervisor","Evak"]:
+            st.markdown(f"### 📌 {lvl}")
+            st.dataframe(
+                targets[targets["Level"] == lvl],
+                use_container_width=True
+            )
 
 # =========================
 # HARKA
