@@ -1,38 +1,48 @@
+import streamlit as st
 import pandas as pd
 
-def export_all_excel(targets, haraka, sales, file_name="KPI_FULL_REPORT.xlsx"):
+from cleaning_all import load_targets, load_haraka, load_sales
 
-    with pd.ExcelWriter(file_name, engine="openpyxl") as writer:
+st.set_page_config(layout="wide")
 
-        # =========================
-        # TARGETS
-        # =========================
-        targets.to_excel(writer, sheet_name="Targets", index=False)
+st.title("📊 KPI Dashboard")
 
-        # =========================
-        # HARKA
-        # =========================
-        haraka.to_excel(writer, sheet_name="Harakah", index=False)
+# =========================
+# LOAD DATA
+# =========================
+targets = load_targets()
+haraka = load_haraka()
 
-        # =========================
-        # SALES
-        # =========================
-        sales.to_excel(writer, sheet_name="Sales", index=False)
+# ⚠️ لازم يكون عندك sales DataFrame جاهز
+# مثال:
+# sales = pd.read_excel("Sales.xlsx")
+# sales = load_sales(sales)
 
-        # =========================
-        # COMBINED VIEW
-        # =========================
-        targets_c = targets.copy()
-        targets_c["Source"] = "Targets"
+# =========================
+# TABS
+# =========================
+tab1, tab2, tab3 = st.tabs(["Targets", "Harakah", "Sales"])
 
-        haraka_c = haraka.copy()
-        haraka_c["Source"] = "Harakah"
+# =========================
+# TARGETS
+# =========================
+with tab1:
+    st.subheader("Targets Data")
+    st.dataframe(targets, use_container_width=True)
 
-        sales_c = sales.copy()
-        sales_c["Source"] = "Sales"
+# =========================
+# HARKA
+# =========================
+with tab2:
+    st.subheader("Harakah Data")
+    st.dataframe(haraka, use_container_width=True)
 
-        combined = pd.concat([targets_c, haraka_c, sales_c], ignore_index=True, sort=False)
-
-        combined.to_excel(writer, sheet_name="Combined", index=False)
-
-    return file_name
+# =========================
+# SALES
+# =========================
+with tab3:
+    st.subheader("Sales Data")
+    
+    # ⚠️ مهم: لازم تسلّم sales هنا
+    # st.dataframe(sales, use_container_width=True)
+    st.warning("⚠️ اربط ملف Sales هنا في الكود")
