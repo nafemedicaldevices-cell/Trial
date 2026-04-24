@@ -18,12 +18,12 @@ def load_client_haraka():
         return pd.DataFrame()
 
     # =========================
-    # 1️⃣ READ RAW (NO HEADERS)
+    # 1️⃣ READ RAW FILE (IMPORTANT)
     # =========================
     df = pd.read_excel(file_path, header=None)
 
     # =========================
-    # 2️⃣ EXTRACT REP FIRST
+    # 2️⃣ EXTRACT REP FIRST (BEFORE ANY CLEANING)
     # =========================
     rep_mask = df.astype(str).apply(
         lambda row: row.str.contains("مندوب المبيعات", na=False)
@@ -57,7 +57,7 @@ def load_client_haraka():
     ]
 
     # =========================
-    # 5️⃣ 🧹 REMOVE "كود العميل" FROM ANY COLUMN
+    # 5️⃣ REMOVE "كود العميل" FROM ANY COLUMN
     # =========================
     df = df[
         ~df.astype(str).apply(
@@ -65,16 +65,15 @@ def load_client_haraka():
         ).any(axis=1)
     ].copy()
 
-    df = df.reset_index(drop=True)
-
     # =========================
-    # 6️⃣ REMOVE EMPTY / NONE ROWS (FIRST COLUMN)
+    # 6️⃣ REMOVE EMPTY / NONE ROWS (FIRST COLUMN CLEAN)
     # =========================
     first_col = df.columns[0]
 
     df[first_col] = df[first_col].astype(str)
 
     df = df[
+        (df[first_col].notna()) &
         (df[first_col].str.strip() != "") &
         (~df[first_col].str.lower().isin(["none", "nan"]))
     ].copy()
