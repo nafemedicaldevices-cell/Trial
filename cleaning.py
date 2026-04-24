@@ -59,11 +59,12 @@ def load_targets():
 
 
 # =========================
-# 📂 HARKA
+# 📂 HARKA (WITH MERGE FIX)
 # =========================
 def load_haraka():
 
     df = pd.read_excel("Rep Harakah.xlsx")
+
     df = df.replace(r'^\s*$', pd.NA, regex=True)
 
     first_col = df.columns[0]
@@ -103,6 +104,28 @@ def load_haraka():
         df.columns[9]: "End Balance",
         df.columns[10]: "Motalbet El Fatrah",
     })
+
+    num_cols = df.columns[2:]
+
+    for col in num_cols:
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+    # =========================
+    # 🔗 MERGE WITH CODE.xlsx
+    # =========================
+    code_path = "Code.xlsx"
+
+    if os.path.exists(code_path):
+
+        codes = pd.read_excel(code_path)
+        codes.columns = codes.columns.str.strip()
+
+        df["Rep Code"] = df["Rep Code"].astype(str).str.strip()
+        codes["Rep Code"] = codes["Rep Code"].astype(str).str.strip()
+
+        codes = codes.drop_duplicates(subset=["Rep Code"])
+
+        df = df.merge(codes, on="Rep Code", how="left")
 
     return df
 
