@@ -9,26 +9,27 @@ from linking import build_model
 model = build_model()
 sales = model["sales"].copy()
 
+# =========================
+# 🧹 ENSURE CODE DATA EXISTS
+# =========================
+
 codes = pd.read_excel("Code.xlsx")
 codes.columns = codes.columns.str.strip()
 
-# ندمج codes لو مش متعمل merge في linking
 if "Manager" not in sales.columns:
     sales = sales.merge(codes, on="Rep Code", how="left")
 
 
 # =========================
-# 🎛 STREAMLIT
+# 🎛 STREAMLIT SETUP
 # =========================
 
-st.set_page_config(page_title="Dashboard", layout="wide")
+st.set_page_config(page_title="Sales Dashboard", layout="wide")
 st.title("📊 Sales Dashboard")
 
-st.sidebar.header("🎛 Filters")
-
 
 # =========================
-# 🧠 SAFE FUNCTION
+# 🧠 SAFE OPTIONS FUNCTION
 # =========================
 
 def options(col):
@@ -38,33 +39,16 @@ def options(col):
 
 
 # =========================
-# 🎛 FILTERS FROM CODE
+# 🎛 FILTERS
 # =========================
 
-manager = st.sidebar.selectbox(
-    "Manager",
-    options("Manager")
-)
+st.sidebar.header("🎛 Filters")
 
-area = st.sidebar.selectbox(
-    "Area",
-    options("Area")
-)
-
-supervisor = st.sidebar.selectbox(
-    "Supervisor",
-    options("Supervisor")
-)
-
-company = st.sidebar.selectbox(
-    "Company",
-    options("Company")
-)
-
-rep = st.sidebar.selectbox(
-    "Rep Name",
-    options("Old Rep Name")
-)
+manager = st.sidebar.selectbox("Manager", options("Manager"))
+area = st.sidebar.selectbox("Area", options("Area"))
+supervisor = st.sidebar.selectbox("Supervisor", options("Supervisor"))
+company = st.sidebar.selectbox("Company", options("Company"))
+rep = st.sidebar.selectbox("Rep Name", options("Old Rep Name"))
 
 
 # =========================
