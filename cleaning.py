@@ -49,7 +49,7 @@ def load_targets():
 
 
 # =========================
-# 📂 REP HARKA
+# 📂 REP HARKA (FIXED FINAL)
 # =========================
 def load_haraka():
 
@@ -57,13 +57,13 @@ def load_haraka():
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
 
-    # 🔥 FIX STRONG: first column only
+    # 🔥 FIX FINAL: handle None / nan / empty
     first_col = df.columns[0]
-    df[first_col] = df[first_col].astype(str)
+
+    df[first_col] = df[first_col].astype(str).str.strip().str.lower()
 
     df = df[
-        df[first_col].str.strip().ne("") &
-        df[first_col].str.lower().ne("nan")
+        ~df[first_col].isin(["", "nan", "none"])
     ]
 
     df.columns = [
@@ -84,7 +84,7 @@ def load_haraka():
 
 
 # =========================
-# 📂 CLIENT HARKA
+# 📂 CLIENT HARKA (FIXED FINAL)
 # =========================
 def load_client_haraka():
 
@@ -92,13 +92,13 @@ def load_client_haraka():
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
 
-    # 🔥 FIX STRONG: first column only
+    # 🔥 FIX FINAL: handle None / nan / empty
     first_col = df.columns[0]
-    df[first_col] = df[first_col].astype(str)
+
+    df[first_col] = df[first_col].astype(str).str.strip().str.lower()
 
     df = df[
-        df[first_col].str.strip().ne("") &
-        df[first_col].str.lower().ne("nan")
+        ~df[first_col].isin(["", "nan", "none"])
     ]
 
     df.columns = [f"Col{i}" for i in range(df.shape[1])]
