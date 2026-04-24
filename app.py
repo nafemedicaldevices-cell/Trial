@@ -29,65 +29,10 @@ def load_data():
 sales, mapping, codes = load_data()
 
 # =========================
-# SALES CLEANING (FULL RESTORE)
+# SALES KPI
 # =========================
 sales.columns = sales.columns.str.strip()
 
-sales.columns = [
-    'Date','Warehouse Name','Client Code','Client Name','Notes','MF','Mostanad',
-    'Rep Code','Sales Unit Before Edit','Returns Unit Before Edit',
-    'Sales Price','Invoice Discounts','Sales Value'
-]
-
-for col in ['Old Product Code', 'Old Product Name']:
-    if col not in sales.columns:
-        sales[col] = None
-
-mask = sales['Date'].astype(str).str.strip() == "كود الصنف"
-
-sales.loc[mask, 'Old Product Code'] = sales.loc[mask, 'Warehouse Name']
-sales.loc[mask, 'Old Product Name'] = sales.loc[mask, 'Client Code']
-
-sales[['Old Product Code','Old Product Name']] = sales[['Old Product Code','Old Product Name']].ffill()
-
-sales = sales[
-    sales['Date'].notna() &
-    (sales['Date'].astype(str).str.strip() != '') &
-    (~sales['Date'].astype(str).str.contains('المندوب|كود الفرع|تاريخ|كود الصنف', na=False))
-].copy()
-
-num_cols = [
-    'Sales Unit Before Edit',
-    'Returns Unit Before Edit',
-    'Sales Price',
-    'Invoice Discounts',
-    'Sales Value'
-]
-
-sales[num_cols] = sales[num_cols].apply(pd.to_numeric, errors='coerce').fillna(0)
-
-sales['Rep Code'] = pd.to_numeric(sales['Rep Code'], errors='coerce').astype('Int64')
-codes['Rep Code'] = pd.to_numeric(codes['Rep Code'], errors='coerce').astype('Int64')
-
-# =========================
-# MERGE
-# =========================
-sales = sales.merge(
-    mapping[
-        ['Old Product Code','4 Classification','Product Name',
-         'Product Code','Category','Next Factor','2 Classification']
-    ],
-    on='Old Product Code',
-    how='left'
-)
-
-sales['Next Factor'] = sales.get('Next Factor', 1).fillna(1)
-
-sales = sales.merge(codes, on='Rep Code', how='left')
-
-# =========================
-# KPI
-# =========================
 sales['Total Sales Value'] = sales['Sales Unit Before Edit'] * sales['Sales Price']
 sales['Returns Value'] = sales['Returns Unit Before Edit'] * sales['Sales Price']
 sales['Net Sales'] = sales['Total Sales Value'] - sales['Returns Value']
