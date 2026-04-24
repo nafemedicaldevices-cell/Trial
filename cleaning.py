@@ -1,7 +1,7 @@
 import pandas as pd
 
 # =========================
-# 📊 TARGET FILES
+# 📊 TARGETS
 # =========================
 FILES = {
     "Rep": "Target Rep.xlsx",
@@ -12,7 +12,6 @@ FILES = {
 }
 
 def load_targets():
-
     all_data = []
 
     for level, file in FILES.items():
@@ -20,18 +19,7 @@ def load_targets():
         df = pd.read_excel(file)
         df.columns = df.columns.str.strip()
 
-        # =========================
-        # DEBUG (يعرفك كل ملف اشتغل ولا لأ)
-        # =========================
-        print(f"✅ Loading {level} -> shape: {df.shape}")
-
         required_cols = ["Year", "Product Code", "Old Product Name", "Sales Price"]
-
-        # لو فيه نقص في الأعمدة
-        missing = [c for c in required_cols if c not in df.columns]
-        if missing:
-            print(f"❌ Missing columns in {level}: {missing}")
-            continue
 
         df = df.melt(
             id_vars=required_cols,
@@ -55,9 +43,6 @@ def load_targets():
         df_long["Target (Value)"] = df["Target (Value)"].repeat(12).values
 
         all_data.append(df_long)
-
-    if len(all_data) == 0:
-        return pd.DataFrame()
 
     return pd.concat(all_data, ignore_index=True)
 
@@ -97,9 +82,11 @@ def load_haraka():
 
 
 # =========================
-# 📊 SALES
+# 📊 SALES (FROM FILE - NOT UPLOAD)
 # =========================
-def load_sales(sales):
+def load_sales():
+
+    sales = pd.read_excel("Sales.xlsx")  # 👈 نفس فكرة باقي الشيتات
 
     sales.columns = sales.columns.str.strip()
 
