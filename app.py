@@ -17,25 +17,13 @@ def load_client_haraka():
         st.error("❌ File not found: Client Harakah.xlsx")
         return pd.DataFrame()
 
+    # =========================
+    # 1️⃣ LOAD RAW (IMPORTANT)
+    # =========================
     df = pd.read_excel(file_path)
 
     # =========================
-    # 🧹 CLEAN FIRST COLUMN
-    # =========================
-    first_col = df.columns[0]
-    df[first_col] = df[first_col].astype(str)
-
-    df = df[
-        df[first_col].notna() &
-        (df[first_col].str.strip() != "") &
-        (~df[first_col].str.contains("كود الفرع", na=False)) &
-        (~df[first_col].str.contains("كود العميل", na=False))
-    ].copy()
-
-    df = df.reset_index(drop=True)
-
-    # =========================
-    # 🧾 SAFE RENAME
+    # 2️⃣ SAFE RENAME (BEFORE ANY CLEANING)
     # =========================
     expected_cols = [
         "Client Code",
@@ -55,7 +43,31 @@ def load_client_haraka():
     df.columns = expected_cols[:df.shape[1]]
 
     # =========================
-    # 🔢 NUMERIC CLEAN
+    # 3️⃣ 🧠 EXTRACT REP (BEFORE DELETING ROWS)
+    # =========================
+
+    df["Rep Code"] = np.nan
+    df["Rep Name"] = np.nan
+
+    mask = df["Sales Value"].astype(str).str.contains("مندوب المبيعات", na=False)
+
+    df.loc[mask, "Rep Code"] = pd.to_numeric(
+        df.loc[mask, "Returns Value"],
+        errors="coerce"
+    )
+
+    df.loc[mask, "Rep Name"] = df.loc[mask, "Tasweyat Madinah (Credit)"].astype(object)
+
+    df["Rep Code"] = df["Rep Code"].ffill()
+    df["Rep Name"] = df["Rep Name"].ffill()
+
+    # =========================
+    # 4️⃣ REMOVE MARKER ROWS (AFTER EXTRACTION)
+    # =========================
+    df = df[~df["Sales Value"].astype(str).str.contains("مندوب المبيعات", na=False)].copy()
+
+    # =========================
+    # 5️⃣ NUMERIC CLEAN
     # =========================
     num_cols = [
         "Opening Balance",
@@ -73,28 +85,6 @@ def load_client_haraka():
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    # =========================
-    # 🧠 REP EXTRACTION (FIXED 100%)
-    # =========================
-
-    df["Rep Code"] = np.nan
-    df["Rep Name"] = np.nan
-
-    mask = df["Sales Value"].astype(str).str.contains("مندوب المبيعات", na=False)
-
-    # 🔥 FIX: safe object assignment
-    df["Rep Name"] = df["Rep Name"].astype(object)
-
-    df.loc[mask, "Rep Code"] = pd.to_numeric(
-        df.loc[mask, "Returns Value"],
-        errors="coerce"
-    )
-
-    df.loc[mask, "Rep Name"] = df.loc[mask, "Tasweyat Madinah (Credit)"].values
-
-    df["Rep Code"] = df["Rep Code"].ffill()
-    df["Rep Name"] = df["Rep Name"].ffill()
-
     return df
 
 
@@ -109,7 +99,7 @@ df = load_client_haraka()
 if df.empty:
     st.warning("⚠️ No data loaded")
 else:
-    st.success("✅ Loaded Successfully")
+    st.success("✅ Data Loaded Successfully")
 
     st.dataframe(df, use_container_width=True)
 
