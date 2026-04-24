@@ -12,18 +12,19 @@ st.title("👤 Client Harakah Dashboard")
 def load_client_haraka():
 
     file_path = "Client Harakah.xlsx"
+    mapping_path = "Code.xlsx"
 
     if not os.path.exists(file_path):
-        st.error("File not found")
+        st.error("Client file not found")
         return pd.DataFrame()
 
     # =========================
-    # 1️⃣ READ RAW FILE (IMPORTANT)
+    # 1️⃣ READ RAW FILE
     # =========================
     df = pd.read_excel(file_path, header=None)
 
     # =========================
-    # 2️⃣ EXTRACT REP FIRST (BEFORE ANY CLEANING)
+    # 2️⃣ EXTRACT REP FIRST
     # =========================
     rep_mask = df.astype(str).apply(
         lambda row: row.str.contains("مندوب المبيعات", na=False)
@@ -57,7 +58,7 @@ def load_client_haraka():
     ]
 
     # =========================
-    # 5️⃣ REMOVE "كود العميل" FROM ANY COLUMN
+    # 5️⃣ REMOVE "كود العميل"
     # =========================
     df = df[
         ~df.astype(str).apply(
@@ -66,7 +67,7 @@ def load_client_haraka():
     ].copy()
 
     # =========================
-    # 6️⃣ REMOVE EMPTY / NONE ROWS (FIRST COLUMN CLEAN)
+    # 6️⃣ CLEAN EMPTY ROWS
     # =========================
     first_col = df.columns[0]
 
@@ -93,6 +94,21 @@ def load_client_haraka():
     # =========================
     df["Rep Code"] = rep_code
     df["Rep Name"] = rep_name
+
+    # =========================
+    # 9️⃣ LOAD MAPPING (AREA / SUPERVISOR / MANAGER)
+    # =========================
+    if os.path.exists(mapping_path):
+
+        mapping = pd.read_excel(mapping_path)
+        mapping.columns = mapping.columns.str.strip()
+
+        # ensure same type
+        df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce")
+        mapping["Rep Code"] = pd.to_numeric(mapping["Rep Code"], errors="coerce")
+
+        # merge hierarchy
+        df = df.merge(mapping, on="Rep Code", how="left")
 
     return df
 
