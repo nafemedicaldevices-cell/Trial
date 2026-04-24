@@ -33,8 +33,9 @@ def load_targets():
         df["Level"] = level
         df["Target (Year)"] = pd.to_numeric(df["Target (Year)"], errors="coerce")
 
-        df["Target (Unit") = df["Target (Year)"] / 12
-        df["Target (Value") = df["Target (Unit") * df["Sales Price"]
+        # ✅ FIXED SYNTAX
+        df["Target (Unit)"] = df["Target (Year)"] / 12
+        df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
 
         months = ["Jan","Feb","Mar","Apr","May","Jun",
                   "Jul","Aug","Sep","Oct","Nov","Dec"]
@@ -42,8 +43,9 @@ def load_targets():
         df_long = df.loc[df.index.repeat(12)].copy()
         df_long["Month"] = months * len(df)
 
-        df_long["Target (Unit") = df["Target (Unit")].repeat(12).values
-        df_long["Target (Value") = df["Target (Value")].repeat(12).values
+        # ✅ FIXED SYNTAX
+        df_long["Target (Unit)"] = df["Target (Unit)"].repeat(12).values
+        df_long["Target (Value)"] = df["Target (Value)"].repeat(12).values
 
         all_data.append(df_long)
 
