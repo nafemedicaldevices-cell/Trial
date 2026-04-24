@@ -37,9 +37,6 @@ def load_targets():
         df["Target (Unit)"] = df["Target (Year)"] / 12
         df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
 
-        # =========================
-        # 🔁 Expand months safely
-        # =========================
         df_expanded = df.loc[df.index.repeat(12)].copy()
         df_expanded["Month"] = months * len(df)
 
@@ -52,18 +49,17 @@ def load_targets():
 
 
 # =========================
-# 📂 REP HARKA
+# 📂 REP HARKA (FIXED)
 # =========================
 def load_haraka():
 
     df = pd.read_excel("Rep Harakah.xlsx")
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
-    df = df.dropna(how="all")
 
-    df = df[~df.astype(str).apply(
-        lambda x: x.str.contains("مندوب المبيعات|صافى مبيعات", na=False)
-    ).any(axis=1)]
+    # ✅ FIX: first column only
+    df = df[df.iloc[:, 0].notna()]
+    df = df[df.iloc[:, 0].astype(str).str.strip() != ""]
 
     df.columns = [
         "Rep Code",
@@ -83,28 +79,21 @@ def load_haraka():
 
 
 # =========================
-# 📂 CLIENT HARKA
+# 📂 CLIENT HARKA (FIXED)
 # =========================
 def load_client_haraka():
 
     df = pd.read_excel("Client Harakah.xlsx")
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
-    df = df.dropna(how="all")
 
-    # ❌ remove internal headers
-    df = df[~df.astype(str).apply(
-        lambda x: x.str.contains(
-            "رصيد افتتاحى|صافى مبيعات|صافى مرتجع مبيعات|مندوب المبيعات",
-            na=False
-        )
-    ).any(axis=1)]
+    # ✅ FIX: first column only
+    df = df[df.iloc[:, 0].notna()]
+    df = df[df.iloc[:, 0].astype(str).str.strip() != ""]
 
     df.columns = [f"Col{i}" for i in range(df.shape[1])]
 
-    # =========================
-    # 👤 Extract Rep safely
-    # =========================
+    # Extract rep info safely
     rep_row = df[df.astype(str).apply(
         lambda x: x.str.contains("مندوب المبيعات", na=False)
     ).any(axis=1)]
@@ -119,9 +108,6 @@ def load_client_haraka():
     df["Rep Code"] = rep_code
     df["Rep Name"] = rep_name
 
-    # =========================
-    # 🔁 Fill down correctly
-    # =========================
     df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce").ffill()
     df["Rep Name"] = df["Rep Name"].ffill()
 
