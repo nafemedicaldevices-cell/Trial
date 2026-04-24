@@ -1,218 +1,97 @@
+import streamlit as st
 import pandas as pd
 import numpy as np
 import os
 
-# =========================
-# 📂 TARGET FILES
-# =========================
-FILES = {
-    "Rep": "Target Rep.xlsx",
-    "Manager": "Target Manager.xlsx",
-    "Area": "Target Area.xlsx",
-    "Supervisor": "Target Supervisor.xlsx",
-    "Evak": "Target Evak.xlsx",
-}
+from cleaning import (
+    load_targets,
+    load_haraka,
+    load_overdue,
+    load_client_haraka
+)
 
-def load_targets():
-
-    targets = {}
-
-    for level, file in FILES.items():
-
-        sheets = pd.read_excel(file, sheet_name=None)
-
-        level_data = []
-
-        for sheet_name, df in sheets.items():
-
-            df.columns = df.columns.str.strip()
-
-            fixed_cols = ["Year", "Product Code", "Old Product Name", "Sales Price"]
-
-            df = df.melt(
-                id_vars=fixed_cols,
-                var_name="Code",
-                value_name="Target (Year)"
-            )
-
-            df["Target (Year)"] = pd.to_numeric(df["Target (Year)"], errors="coerce")
-
-            df["Target (Unit)"] = df["Target (Year)"] / 12
-            df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
-
-            months = ["Jan","Feb","Mar","Apr","May","Jun",
-                      "Jul","Aug","Sep","Oct","Nov","Dec"]
-
-            df_long = df.loc[df.index.repeat(12)].copy()
-            df_long["Month"] = months * len(df)
-
-            df_long["Target (Unit)"] = df["Target (Unit)"].repeat(12).values
-            df_long["Target (Value)"] = df["Target (Value)"].repeat(12).values
-
-            df_long["Level"] = level
-
-            level_data.append(df_long)
-
-        targets[level] = pd.concat(level_data, ignore_index=True)
-
-    return targets
-
+st.set_page_config(page_title="Sales Dashboard", layout="wide")
+st.title("📊 Sales + KPI Dashboard")
 
 # =========================
-# 📂 HARKA
+# 📁 FILE LOADER
 # =========================
-def load_haraka():
+def load_file(path):
+    if not os.path.exists(path):
+        st.error(f"❌ File not found: {path}")
+        st.stop()
+    return pd.read_excel(path)
 
-    df = pd.read_excel("Rep Harakah.xlsx")
-    df = df.replace(r'^\s*$', pd.NA, regex=True)
+@st.cache_data
+def load_data():
+    sales = load_file("Sales.xlsx")
+    mapping = load_file("Mapping.xlsx")
+    codes = load_file("Code.xlsx")
+    return sales, mapping, codes
 
-    first_col = df.columns[0]
-    df[first_col] = df[first_col].astype(str)
+sales, mapping, codes = load_data()
 
-    df = df[
-        df[first_col].notna() &
-        (df[first_col].str.strip() != "") &
-        (~df[first_col].str.contains("كود الفرع", na=False)) &
-        (~df[first_col].str.contains("كود المندوب", na=False))
-    ]
+sales.columns = sales.columns.str.strip()
 
-    cols = df.columns.tolist()
-    seen = {}
-    new_cols = []
+sales.columns = [
+    'Date','Warehouse Name','Client Code','Client Name','Notes','MF','Mostanad',
+    'Rep Code','Sales Unit Before Edit','Returns Unit Before Edit',
+    'Sales Price','Invoice Discounts','Sales Value'
+]
 
-    for c in cols:
-        if c in seen:
-            seen[c] += 1
-            new_cols.append(f"{c}_{seen[c]}")
-        else:
-            seen[c] = 0
-            new_cols.append(c)
+for col in ['Old Product Code', 'Old Product Name']:
+    if col not in sales.columns:
+        sales[col] = None
 
-    df.columns = new_cols
+mask = sales['Date'].astype(str).str.strip() == "كود الصنف"
 
-    df = df.rename(columns={
-        df.columns[0]: "Rep Code",
-        df.columns[1]: "Old Rep Name",
-        df.columns[2]: "Opening Balance",
-        df.columns[3]: "Sales Value",
-        df.columns[4]: "Returns Value",
-        df.columns[5]: "Tasweyat Madinah (Credit)",
-        df.columns[6]: "Total Collection",
-        df.columns[7]: "Madfoaat",
-        df.columns[8]: "Tasweyat Madinah (Debit)",
-        df.columns[9]: "End Balance",
-        df.columns[10]: "Motalbet El Fatrah",
-    })
+sales.loc[mask, 'Old Product Code'] = sales.loc[mask, 'Warehouse Name']
+sales.loc[mask, 'Old Product Name'] = sales.loc[mask, 'Client Code']
 
-    return df
+sales[['Old Product Code','Old Product Name']] = sales[['Old Product Code','Old Product Name']].ffill()
 
+sales = sales[
+    sales['Date'].notna() &
+    (~sales['Date'].astype(str).str.contains('المندوب|كود الفرع|تاريخ|كود الصنف', na=False))
+].copy()
+
+sales = sales.merge(codes, on='Rep Code', how='left')
 
 # =========================
-# 📂 OVERDUE
+# 📥 MODULES
 # =========================
-def load_overdue(overdue_path, codes):
-
-    overdue = pd.read_excel(overdue_path)
-
-    overdue.columns = [
-        "Client Name", "Client Code", "30 Days", "60 Days", "90 Days", "120 Days",
-        "150 Days", "More Than 150 Days", "Balance"
-    ]
-
-    overdue['Rep Code'] = None
-    overdue['Old Rep Name'] = None
-
-    mask = overdue['Client Name'].astype(str).str.strip() == "كود المندوب"
-
-    overdue.loc[mask, 'Rep Code'] = overdue.loc[mask, 'Client Code']
-    overdue.loc[mask, 'Old Rep Name'] = overdue.loc[mask, '30 Days']
-
-    overdue[['Rep Code', 'Old Rep Name']] = overdue[['Rep Code', 'Old Rep Name']].ffill()
-
-    overdue = overdue[
-        overdue['Client Name'].notna() &
-        (overdue['Client Name'].astype(str).str.strip() != '') &
-        (~overdue['Client Name'].astype(str).str.contains(
-            'اجمالــــــي التقرير|اجمالى الفرع/المندوب|كود الفرع|كود المندوب|اسم العميل',
-            na=False
-        ))
-    ].copy()
-
-    num_cols = [
-        '30 Days','60 Days','90 Days','120 Days',
-        '150 Days','More Than 150 Days','Client Code','Rep Code'
-    ]
-
-    for col in num_cols:
-        overdue[col] = pd.to_numeric(overdue[col], errors='coerce').fillna(0)
-
-    overdue['Rep Code'] = overdue['Rep Code'].astype(int)
-    overdue['Client Code'] = overdue['Client Code'].astype(int)
-
-    overdue['Overdue'] = (
-        overdue['120 Days'] +
-        overdue['150 Days'] +
-        overdue['More Than 150 Days']
-    )
-
-    codes['Rep Code'] = pd.to_numeric(codes['Rep Code'], errors='coerce').astype(int)
-    overdue = overdue.merge(codes, on='Rep Code', how='left')
-
-    overdue['Rep Code'] = overdue['Rep Code'].astype(str)
-
-    return overdue
-
+targets = load_targets()
+haraka = load_haraka()
+overdue = load_overdue("Overdue.xlsx", codes)
+client_haraka = load_client_haraka()
 
 # =========================
-# 👤 CLIENT HARKAH
+# 📌 TABS
 # =========================
-def load_client_haraka():
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "📊 Sales",
+    "🎯 Targets",
+    "📈 Harakah",
+    "⏳ Overdue",
+    "👤 Client Harakah"
+])
 
-    file_path = "Client Harakah.xlsx"
-    code_path = "Code.xlsx"
+with tab1:
+    st.dataframe(sales, use_container_width=True)
 
-    df = pd.read_excel(file_path, header=None)
+with tab2:
+    st.subheader("🎯 Targets")
 
-    rep_mask = df.astype(str).apply(
-        lambda row: row.str.contains("مندوب المبيعات", na=False)
-    ).any(axis=1)
+    for level, df in targets.items():
+        st.markdown(f"### {level}")
+        st.dataframe(df, use_container_width=True)
 
-    rep_row = df[rep_mask]
+with tab3:
+    st.dataframe(haraka, use_container_width=True)
 
-    if not rep_row.empty:
-        r = rep_row.iloc[0]
-        rep_code = r.iloc[4]
-        rep_name = r.iloc[5]
-    else:
-        rep_code = np.nan
-        rep_name = ""
+with tab4:
+    st.dataframe(overdue, use_container_width=True)
+    st.metric("Overdue Total", overdue["Overdue"].sum())
 
-    df = df[~rep_mask].reset_index(drop=True)
-
-    df.columns = [
-        "Client Code","Client Name","Opening Balance",
-        "Sales Value","Returns Value",
-        "Tasweyat Madinah (Credit)",
-        "Total Collection","Madfoaat",
-        "Tasweyat Madinah (Debit)",
-        "End Balance","Motalbet El Fatrah"
-    ]
-
-    for col in df.columns[2:]:
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-
-    df["Rep Code"] = rep_code
-    df["Old Rep Name"] = rep_name
-
-    if os.path.exists(code_path):
-
-        codes = pd.read_excel(code_path)
-        codes.columns = codes.columns.str.strip()
-        codes = codes.drop_duplicates(subset=["Rep Code"])
-
-        df["Rep Code"] = df["Rep Code"].astype(str).str.strip()
-        codes["Rep Code"] = codes["Rep Code"].astype(str).str.strip()
-
-        df = df.merge(codes, on="Rep Code", how="left")
-
-    return df
+with tab5:
+    st.dataframe(client_haraka, use_container_width=True)
