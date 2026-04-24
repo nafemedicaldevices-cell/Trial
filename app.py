@@ -12,10 +12,10 @@ st.title("👤 Client Harakah Dashboard")
 def load_client_haraka():
 
     file_path = "Client Harakah.xlsx"
-    mapping_path = "Code.xlsx"
+    codes_path = "Code.xlsx"
 
     if not os.path.exists(file_path):
-        st.error("Client file not found")
+        st.error("Client Harakah file not found")
         return pd.DataFrame()
 
     # =========================
@@ -58,7 +58,7 @@ def load_client_haraka():
     ]
 
     # =========================
-    # 5️⃣ REMOVE "كود العميل"
+    # 5️⃣ REMOVE NOISE ROWS ("كود العميل")
     # =========================
     df = df[
         ~df.astype(str).apply(
@@ -67,7 +67,7 @@ def load_client_haraka():
     ].copy()
 
     # =========================
-    # 6️⃣ CLEAN EMPTY ROWS
+    # 6️⃣ REMOVE EMPTY ROWS
     # =========================
     first_col = df.columns[0]
 
@@ -90,25 +90,34 @@ def load_client_haraka():
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
     # =========================
-    # 8️⃣ ASSIGN REP
+    # 8️⃣ ASSIGN REP INFO
     # =========================
     df["Rep Code"] = rep_code
     df["Rep Name"] = rep_name
 
     # =========================
-    # 9️⃣ LOAD MAPPING (AREA / SUPERVISOR / MANAGER)
+    # 9️⃣ LOAD CODES (HIERARCHY)
     # =========================
-    if os.path.exists(mapping_path):
+    if os.path.exists(codes_path):
 
-        mapping = pd.read_excel(mapping_path)
-        mapping.columns = mapping.columns.str.strip()
+        codes = pd.read_excel(codes_path)
+        codes.columns = codes.columns.str.strip()
 
-        # ensure same type
+        # clean duplicates
+        codes = codes.drop_duplicates(subset=["Rep Code"])
+
+        # unify types
         df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce")
-        mapping["Rep Code"] = pd.to_numeric(mapping["Rep Code"], errors="coerce")
+        codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
 
-        # merge hierarchy
-        df = df.merge(mapping, on="Rep Code", how="left")
+        # =========================
+        # 🔗 MERGE (ONLY HERE)
+        # =========================
+        df = df.merge(
+            codes,
+            on="Rep Code",
+            how="left"
+        )
 
     return df
 
