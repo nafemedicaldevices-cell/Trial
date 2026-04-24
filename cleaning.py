@@ -15,41 +15,47 @@ FILES = {
 
 def load_targets():
 
-    all_data = []
+    targets = {}
 
     for level, file in FILES.items():
 
-        df = pd.read_excel(file)
-        df.columns = df.columns.str.strip()
+        sheets = pd.read_excel(file, sheet_name=None)
 
-        fixed_cols = ["Year", "Product Code", "Old Product Name", "Sales Price"]
+        level_data = []
 
-        df = df.melt(
-            id_vars=fixed_cols,
-            var_name="Code",
-            value_name="Target (Year)"
-        )
+        for sheet_name, df in sheets.items():
 
-        df["Level"] = level
-        df["Target (Year)"] = pd.to_numeric(df["Target (Year)"], errors="coerce")
+            df.columns = df.columns.str.strip()
 
-        # ✅ FIXED SYNTAX
-        df["Target (Unit)"] = df["Target (Year)"] / 12
-        df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
+            fixed_cols = ["Year", "Product Code", "Old Product Name", "Sales Price"]
 
-        months = ["Jan","Feb","Mar","Apr","May","Jun",
-                  "Jul","Aug","Sep","Oct","Nov","Dec"]
+            df = df.melt(
+                id_vars=fixed_cols,
+                var_name="Code",
+                value_name="Target (Year)"
+            )
 
-        df_long = df.loc[df.index.repeat(12)].copy()
-        df_long["Month"] = months * len(df)
+            df["Target (Year)"] = pd.to_numeric(df["Target (Year)"], errors="coerce")
 
-        # ✅ FIXED SYNTAX
-        df_long["Target (Unit)"] = df["Target (Unit)"].repeat(12).values
-        df_long["Target (Value)"] = df["Target (Value)"].repeat(12).values
+            df["Target (Unit)"] = df["Target (Year)"] / 12
+            df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
 
-        all_data.append(df_long)
+            months = ["Jan","Feb","Mar","Apr","May","Jun",
+                      "Jul","Aug","Sep","Oct","Nov","Dec"]
 
-    return pd.concat(all_data, ignore_index=True)
+            df_long = df.loc[df.index.repeat(12)].copy()
+            df_long["Month"] = months * len(df)
+
+            df_long["Target (Unit)"] = df["Target (Unit)"].repeat(12).values
+            df_long["Target (Value)"] = df["Target (Value)"].repeat(12).values
+
+            df_long["Sheet"] = sheet_name
+
+            level_data.append(df_long)
+
+        targets[level] = pd.concat(level_data, ignore_index=True)
+
+    return targets
 
 
 # =========================
