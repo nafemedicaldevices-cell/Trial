@@ -12,7 +12,7 @@ st.title("👤 Client Harakah Dashboard")
 def load_client_haraka():
 
     file_path = "Client Harakah.xlsx"
-    codes_path = "Code.xlsx"
+    code_path = "Code.xlsx"   # ✔️ FIX HERE
 
     if not os.path.exists(file_path):
         st.error("Client Harakah file not found")
@@ -58,7 +58,7 @@ def load_client_haraka():
     ]
 
     # =========================
-    # 5️⃣ REMOVE NOISE ROWS ("كود العميل")
+    # 5️⃣ REMOVE "كود العميل"
     # =========================
     df = df[
         ~df.astype(str).apply(
@@ -90,17 +90,17 @@ def load_client_haraka():
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
     # =========================
-    # 8️⃣ ASSIGN REP INFO
+    # 8️⃣ ASSIGN REP
     # =========================
     df["Rep Code"] = rep_code
     df["Rep Name"] = rep_name
 
     # =========================
-    # 9️⃣ LOAD CODES (HIERARCHY)
+    # 9️⃣ MERGE WITH CODE.XLSX (FIXED NAME)
     # =========================
-    if os.path.exists(codes_path):
+    if os.path.exists(code_path):
 
-        codes = pd.read_excel(codes_path)
+        codes = pd.read_excel(code_path)
         codes.columns = codes.columns.str.strip()
 
         # clean duplicates
@@ -110,9 +110,7 @@ def load_client_haraka():
         df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce")
         codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
 
-        # =========================
-        # 🔗 MERGE (ONLY HERE)
-        # =========================
+        # merge
         df = df.merge(
             codes,
             on="Rep Code",
