@@ -83,7 +83,7 @@ def load_haraka():
 
 
 # =========================
-# 📊 SALES (CLEAN ONLY)
+# 📊 SALES CLEAN
 # =========================
 def load_sales(sales):
 
