@@ -100,4 +100,3 @@ def load_haraka():
     })
 
     return df
-سس
