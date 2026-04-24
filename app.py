@@ -13,23 +13,55 @@ st.title("📊 KPI Dashboard")
 targets = load_targets()
 haraka = load_haraka()
 
-# ⚠️ لو عندك ملف sales
-# sales_df = pd.read_excel("Sales.xlsx")
-# sales = load_sales(sales_df)
-
 # =========================
 # TABS
 # =========================
 tab1, tab2, tab3 = st.tabs(["Targets", "Harakah", "Sales"])
 
+# =========================
+# TARGETS (5 SHEETS EFFECT)
+# =========================
 with tab1:
-    st.subheader("Targets")
-    st.dataframe(targets, use_container_width=True)
+    st.subheader("Targets (All Levels)")
 
+    if targets.empty:
+        st.error("❌ No Targets Loaded - Check Excel Files")
+    else:
+        st.success("✅ Targets Loaded Successfully")
+
+        # عرض كل Level لوحده (ده الحل اللي انت عايزه)
+        levels = ["Rep", "Manager", "Area", "Supervisor", "Evak"]
+
+        for lvl in levels:
+            st.markdown(f"### 📌 {lvl}")
+            st.dataframe(
+                targets[targets["Level"] == lvl],
+                use_container_width=True
+            )
+
+# =========================
+# HARKA
+# =========================
 with tab2:
     st.subheader("Harakah")
     st.dataframe(haraka, use_container_width=True)
 
+# =========================
+# SALES (UPLOAD)
+# =========================
 with tab3:
-    st.subheader("Sales")
-    st.warning("اربط ملف Sales هنا في الكود")
+    st.subheader("Sales Data")
+
+    uploaded_file = st.file_uploader("📂 Upload Sales Excel", type=["xlsx"])
+
+    if uploaded_file is not None:
+
+        sales_df = pd.read_excel(uploaded_file)
+        sales = load_sales(sales_df)
+
+        st.success("✅ Sales Loaded")
+
+        st.dataframe(sales, use_container_width=True)
+
+    else:
+        st.info("⬆️ Upload Sales file to display data")
