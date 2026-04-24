@@ -1,56 +1,47 @@
 import streamlit as st
-import cleaning
+import pandas as pd
+
+from clean_sales import clean_sales
 
 st.set_page_config(layout="wide")
-
-st.title("📊 KPI Dashboard")
-
-# =========================
-# LOAD DATA SAFELY
-# =========================
-targets = cleaning.load_targets()
-haraka = cleaning.load_haraka()
-sales = cleaning.load_sales()
+st.title("📊 Sales Dashboard")
 
 # =========================
-# TABS
+# Upload files
 # =========================
-tab1, tab2, tab3 = st.tabs(["Targets", "Harakah", "Sales"])
+sales_file = st.file_uploader("Upload Sales", type=["xlsx"])
+mapping_file = st.file_uploader("Upload Mapping", type=["xlsx"])
+codes_file = st.file_uploader("Upload Codes", type=["xlsx"])
 
-# =========================
-# TARGETS
-# =========================
-with tab1:
-    st.subheader("Targets")
+if sales_file and mapping_file and codes_file:
 
-    if targets.empty:
-        st.warning("No Targets Found")
-    else:
-        for lvl in ["Rep","Manager","Area","Supervisor","Evak"]:
-            st.markdown(f"### 📌 {lvl}")
-            st.dataframe(
-                targets[targets["Level"] == lvl],
-                use_container_width=True
-            )
+    sales = pd.read_excel(sales_file)
+    mapping = pd.read_excel(mapping_file)
+    codes = pd.read_excel(codes_file)
 
-# =========================
-# HARKA
-# =========================
-with tab2:
-    st.subheader("Harakah")
+    # =========================
+    # Clean
+    # =========================
+    sales = clean_sales(sales, mapping, codes)
 
-    if haraka.empty:
-        st.warning("No Harakah Data")
-    else:
-        st.dataframe(haraka, use_container_width=True)
+    # =========================
+    # Aggregations
+    # =========================
+    st.subheader("📌 Rep Summary")
 
-# =========================
-# SALES
-# =========================
-with tab3:
-    st.subheader("Sales")
+    rep_summary = sales.groupby("Rep Code", as_index=False)[
+        ["Total Sales Value","Returns Value","Sales After Returns","Invoice Discounts"]
+    ].sum()
 
-    if sales.empty:
-        st.warning("No Sales Data")
-    else:
-        st.dataframe(sales, use_container_width=True)
+    st.dataframe(rep_summary)
+
+    st.subheader("📌 Top Products")
+
+    product_summary = sales.groupby(
+        ["Rep Code","Product Code","Product Name"], as_index=False
+    )[["Sales Value","Net Sales Unit"]].sum()
+
+    st.dataframe(product_summary)
+
+else:
+    st.warning("Please upload all required files")
