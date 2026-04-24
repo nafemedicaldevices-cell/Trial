@@ -49,7 +49,7 @@ def load_targets():
 
 
 # =========================
-# 📂 REP HARKA (FIXED)
+# 📂 REP HARKA
 # =========================
 def load_haraka():
 
@@ -57,9 +57,9 @@ def load_haraka():
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
 
-    # ✅ FIX: first column only
-    df = df[df.iloc[:, 0].notna()]
-    df = df[df.iloc[:, 0].astype(str).str.strip() != ""]
+    # ✅ FIX: ONLY FIRST COLUMN controls row deletion
+    first_col = df.columns[0]
+    df = df[df[first_col].notna() & (df[first_col].astype(str).str.strip() != "")]
 
     df.columns = [
         "Rep Code",
@@ -79,7 +79,7 @@ def load_haraka():
 
 
 # =========================
-# 📂 CLIENT HARKA (FIXED)
+# 📂 CLIENT HARKA
 # =========================
 def load_client_haraka():
 
@@ -87,13 +87,12 @@ def load_client_haraka():
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
 
-    # ✅ FIX: first column only
-    df = df[df.iloc[:, 0].notna()]
-    df = df[df.iloc[:, 0].astype(str).str.strip() != ""]
+    # ✅ FIX: ONLY FIRST COLUMN controls row deletion
+    first_col = df.columns[0]
+    df = df[df[first_col].notna() & (df[first_col].astype(str).str.strip() != "")]
 
     df.columns = [f"Col{i}" for i in range(df.shape[1])]
 
-    # Extract rep info safely
     rep_row = df[df.astype(str).apply(
         lambda x: x.str.contains("مندوب المبيعات", na=False)
     ).any(axis=1)]
