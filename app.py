@@ -7,22 +7,35 @@ st.set_page_config(page_title="Client Harakah", layout="wide")
 st.title("👤 Client Harakah Dashboard")
 
 # =========================
-# 📂 LOAD FUNCTION
+# 📂 LOAD
 # =========================
 def load_client_haraka():
 
     file_path = "Client Harakah.xlsx"
 
     if not os.path.exists(file_path):
-        st.error("❌ File not found")
+        st.error("File not found")
         return pd.DataFrame()
 
-    df = pd.read_excel(file_path)
+    df = pd.read_excel(file_path, header=None)
 
     # =========================
-    # 🧾 RENAME
+    # 🧠 1. EXTRACT REP FROM FIRST METADATA ROW
     # =========================
-    cols = [
+    meta_row = df.iloc[0]
+
+    rep_code = meta_row[4]   # "10"
+    rep_name = meta_row[5]   # "باسم"
+
+    # =========================
+    # 🧹 REMOVE FIRST ROW (metadata row)
+    # =========================
+    df = df.iloc[1:].reset_index(drop=True)
+
+    # =========================
+    # 🧾 SET HEADERS
+    # =========================
+    df.columns = [
         "Client Code","Client Name","Opening Balance",
         "Sales Value","Returns Value",
         "Tasweyat Madinah (Credit)",
@@ -31,59 +44,26 @@ def load_client_haraka():
         "End Balance","Motalbet El Fatrah"
     ]
 
-    df = df.iloc[:, :len(cols)]
-    df.columns = cols[:df.shape[1]]
-
     # =========================
     # 🔢 NUMERIC CLEAN
     # =========================
-    num_cols = [
-        "Opening Balance","Sales Value","Returns Value",
-        "Tasweyat Madinah (Credit)","Total Collection",
-        "Madfoaat","Tasweyat Madinah (Debit)",
-        "End Balance","Motalbet El Fatrah"
-    ]
-
-    for c in num_cols:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+    for c in df.columns[2:]:
+        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
     # =========================
-    # 🧠 REP LOGIC (SAFE - NO ASSIGNMENT CRASH)
+    # 🧠 ASSIGN REP (SAFE)
     # =========================
-
-    mask = df["Sales Value"].astype(str).str.contains("مندوب المبيعات", na=False)
-
-    rep_code_series = pd.Series(np.nan, index=df.index)
-    rep_name_series = pd.Series("", index=df.index)
-
-    rep_code_series.loc[mask] = df.loc[mask, "Returns Value"]
-    rep_name_series.loc[mask] = df.loc[mask, "Tasweyat Madinah (Credit)"].astype(str)
-
-    # 🔽 fill down BEFORE attaching
-    rep_code_series = rep_code_series.ffill()
-    rep_name_series = rep_name_series.ffill()
-
-    # attach safely
-    df["Rep Code"] = rep_code_series
-    df["Rep Name"] = rep_name_series
-
-    # =========================
-    # 🧹 REMOVE MARKER ROWS
-    # =========================
-    df = df[~mask].copy()
+    df["Rep Code"] = rep_code
+    df["Rep Name"] = rep_name
 
     return df
 
 
 # =========================
-# 📥 RUN
+# RUN
 # =========================
 df = load_client_haraka()
 
-# =========================
-# 📊 UI
-# =========================
 if df.empty:
     st.warning("No data")
 else:
