@@ -7,7 +7,7 @@ st.set_page_config(page_title="Client Harakah", layout="wide")
 st.title("👤 Client Harakah Dashboard")
 
 # =========================
-# 📂 LOAD
+# 📂 LOAD FUNCTION
 # =========================
 def load_client_haraka():
 
@@ -17,25 +17,37 @@ def load_client_haraka():
         st.error("File not found")
         return pd.DataFrame()
 
-    df = pd.read_excel(file_path, header=None)
+    # =========================
+    # 1️⃣ READ RAW FILE
+    # =========================
+    raw = pd.read_excel(file_path, header=None)
 
     # =========================
-    # 🧠 1. EXTRACT REP FROM FIRST METADATA ROW
+    # 2️⃣ FIND REP ROW (BEFORE ANY CLEANING)
     # =========================
-    meta_row = df.iloc[0]
+    rep_mask = raw.astype(str).apply(
+        lambda row: row.str.contains("مندوب المبيعات", na=False)
+    ).any(axis=1)
 
-    rep_code = meta_row[4]   # "10"
-    rep_name = meta_row[5]   # "باسم"
+    rep_row = raw[rep_mask]
+
+    if not rep_row.empty:
+        r = rep_row.iloc[0]
+        rep_code = r.iloc[4]   # 10
+        rep_name = r.iloc[5]   # باسم
+    else:
+        rep_code = np.nan
+        rep_name = ""
 
     # =========================
-    # 🧹 REMOVE FIRST ROW (metadata row)
+    # 3️⃣ REMOVE REP ROW FROM DATA
     # =========================
-    df = df.iloc[1:].reset_index(drop=True)
+    raw = raw[~rep_mask].reset_index(drop=True)
 
     # =========================
-    # 🧾 SET HEADERS
+    # 4️⃣ SET COLUMNS
     # =========================
-    df.columns = [
+    raw.columns = [
         "Client Code","Client Name","Opening Balance",
         "Sales Value","Returns Value",
         "Tasweyat Madinah (Credit)",
@@ -45,18 +57,29 @@ def load_client_haraka():
     ]
 
     # =========================
-    # 🔢 NUMERIC CLEAN
+    # 5️⃣ ASSIGN REP FIRST (IMPORTANT STEP DONE FIRST)
     # =========================
-    for c in df.columns[2:]:
-        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+    raw["Rep Code"] = rep_code
+    raw["Rep Name"] = rep_name
 
     # =========================
-    # 🧠 ASSIGN REP (SAFE)
+    # 6️⃣ NOW SAFE TYPE CONVERSION
     # =========================
-    df["Rep Code"] = rep_code
-    df["Rep Name"] = rep_name
+    num_cols = [
+        "Opening Balance","Sales Value","Returns Value",
+        "Tasweyat Madinah (Credit)","Total Collection",
+        "Madfoaat","Tasweyat Madinah (Debit)",
+        "End Balance","Motalbet El Fatrah"
+    ]
 
-    return df
+    for col in num_cols:
+        raw[col] = pd.to_numeric(raw[col], errors="coerce").fillna(0)
+
+    # Rep columns after assignment
+    raw["Rep Code"] = pd.to_numeric(raw["Rep Code"], errors="coerce")
+    raw["Rep Name"] = raw["Rep Name"].astype(str)
+
+    return raw
 
 
 # =========================
@@ -67,7 +90,7 @@ df = load_client_haraka()
 if df.empty:
     st.warning("No data")
 else:
-    st.success("Loaded")
+    st.success("Loaded successfully")
 
     st.dataframe(df, use_container_width=True)
 
