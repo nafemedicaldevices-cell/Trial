@@ -10,7 +10,92 @@ def process_sales(sales, mapping, codes):
 
     sales.columns = [
         'Date','Warehouse Name','Client Code','Client Name','Notes','MF','Mostanad',
-        'Rep Code','Sales Unit Before Edit','Returns Unit Before Edit',
+        'Rep Code','Sales Unit Before Ediimport pandas as pd
+
+# =========================
+# 📊 TARGETS
+# =========================
+def load_targets():
+
+    files = {
+        "Rep": "Target Rep.xlsx",
+        "Manager": "Target Manager.xlsx",
+        "Area": "Target Area.xlsx",
+        "Supervisor": "Target Supervisor.xlsx",
+        "Evak": "Target Evak.xlsx",
+    }
+
+    all_data = []
+
+    for level, file in files.items():
+
+        try:
+            df = pd.read_excel(file)
+            df.columns = df.columns.str.strip()
+
+            required = ["Year", "Product Code", "Old Product Name", "Sales Price"]
+
+            if not all(c in df.columns for c in required):
+                continue
+
+            df = df.melt(
+                id_vars=required,
+                var_name="Code",
+                value_name="Target (Year)"
+            )
+
+            df["Level"] = level
+
+            all_data.append(df)
+
+        except Exception as e:
+            print(f"❌ Error loading {level}: {e}")
+            continue
+
+    if len(all_data) == 0:
+        return pd.DataFrame()
+
+    return pd.concat(all_data, ignore_index=True)
+
+
+# =========================
+# 📊 HARKA
+# =========================
+def load_haraka():
+
+    try:
+        df = pd.read_excel("Rep Harakah.xlsx")
+        df.columns = df.columns.str.strip()
+
+        df = df.replace(r'^\s*$', pd.NA, regex=True)
+
+        first = df.columns[0]
+
+        df = df[
+            df[first].notna() &
+            (df[first].astype(str).str.strip() != "")
+        ]
+
+        return df
+
+    except Exception as e:
+        print("❌ Harakah error:", e)
+        return pd.DataFrame()
+
+
+# =========================
+# 📊 SALES (SAFE LOAD ONLY)
+# =========================
+def load_sales():
+
+    try:
+        df = pd.read_excel("Sales.xlsx")
+        df.columns = df.columns.str.strip()
+        return df
+
+    except Exception as e:
+        print("❌ Sales error:", e)
+        return pd.DataFrame()t','Returns Unit Before Edit',
         'Sales Price','Invoice Discounts','Sales Value',
     ]
 
