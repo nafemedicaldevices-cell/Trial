@@ -49,7 +49,6 @@ def load_targets():
             df_long["Target (Unit)"] = df["Target (Unit)"].repeat(12).values
             df_long["Target (Value)"] = df["Target (Value)"].repeat(12).values
 
-            # ✅ بدل Sheet → Level
             df_long["Level"] = level
 
             level_data.append(df_long)
