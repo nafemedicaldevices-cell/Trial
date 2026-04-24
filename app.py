@@ -1,67 +1,85 @@
 import streamlit as st
 import pandas as pd
 
+from linking import build_model
+
 # =========================
-# 📌 LOAD DATA
+# 📌 LOAD CLEAN + LINKED DATA
 # =========================
 
-sales = pd.read_excel("Sales.xlsx")
+model = build_model()
+sales = model["sales"].copy()
+
+# =========================
+# 🧠 ENSURE CODE EXISTS
+# =========================
+
 codes = pd.read_excel("Code.xlsx")
-
-sales.columns = sales.columns.str.strip()
 codes.columns = codes.columns.str.strip()
 
-# =========================
-# 🔗 MERGE FOR FILTERS
-# =========================
-
-sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
-codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
-
-sales = sales.merge(codes, on="Rep Code", how="left")
+# لو الفلاتر مش موجودة في sales نجيبها من codes
+if "Manager" not in sales.columns:
+    sales = sales.merge(codes, on="Rep Code", how="left")
 
 # =========================
-# 🎛 STREAMLIT UI
+# 🎛 STREAMLIT SETUP
 # =========================
 
+st.set_page_config(page_title="Sales Dashboard", layout="wide")
 st.title("📊 Sales Dashboard")
 
 st.sidebar.header("🎛 Filters")
 
-def opts(col):
+# =========================
+# 🧠 SAFE OPTIONS FUNCTION
+# =========================
+
+def options(col):
     if col in sales.columns:
         return ["All"] + sorted(sales[col].dropna().unique())
     return ["All"]
 
-manager = st.sidebar.selectbox("Manager", opts("Manager"))
-area = st.sidebar.selectbox("Area", opts("Area"))
-supervisor = st.sidebar.selectbox("Supervisor", opts("Supervisor"))
-company = st.sidebar.selectbox("Company", opts("Company"))
-rep = st.sidebar.selectbox("Rep Name", opts("Old Rep Name"))
+# =========================
+# 🎛 FILTERS FROM CODE
+# =========================
+
+manager = st.sidebar.selectbox("Manager", options("Manager"))
+area = st.sidebar.selectbox("Area", options("Area"))
+supervisor = st.sidebar.selectbox("Supervisor", options("Supervisor"))
+company = st.sidebar.selectbox("Company", options("Company"))
+rep = st.sidebar.selectbox("Rep Name", options("Old Rep Name"))
 
 # =========================
 # 🔗 APPLY FILTERS
 # =========================
 
-df = sales.copy()
+filtered = sales.copy()
 
 if manager != "All":
-    df = df[df["Manager"] == manager]
+    filtered = filtered[filtered["Manager"] == manager]
 
 if area != "All":
-    df = df[df["Area"] == area]
+    filtered = filtered[filtered["Area"] == area]
 
 if supervisor != "All":
-    df = df[df["Supervisor"] == supervisor]
+    filtered = filtered[filtered["Supervisor"] == supervisor]
 
 if company != "All":
-    df = df[df["Company"] == company]
+    filtered = filtered[filtered["Company"] == company]
 
 if rep != "All":
-    df = df[df["Old Rep Name"] == rep]
+    filtered = filtered[filtered["Old Rep Name"] == rep]
 
 # =========================
 # 📊 OUTPUT
 # =========================
 
-st.dataframe(df, use_container_width=True)
+st.subheader("📌 Filtered Data")
+st.dataframe(filtered, use_container_width=True)
+
+# =========================
+# 📊 KPI SIMPLE
+# =========================
+
+if "Net Sales" in filtered.columns:
+    st.metric("Net Sales", filtered["Net Sales"].sum())
