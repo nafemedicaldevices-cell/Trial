@@ -12,9 +12,11 @@ FILES = {
 }
 
 def load_targets():
+
     all_data = []
 
     for level, file in FILES.items():
+
         df = pd.read_excel(file)
         df.columns = df.columns.str.strip()
 
@@ -50,11 +52,18 @@ def load_targets():
 # 📂 REP HARKA
 # =========================
 def load_haraka():
+
     df = pd.read_excel("Rep Harakah.xlsx")
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
-    df = df.dropna(how="all")
 
+    # =========================
+    # ❌ حذف الصفوف حسب أول كولمن فقط
+    # =========================
+    df = df[df.iloc[:, 0].notna()]
+    df = df[df.iloc[:, 0].astype(str).str.strip() != ""]
+
+    # حذف الهيدر الداخلي
     df = df[~df.astype(str).apply(
         lambda x: x.str.contains("مندوب المبيعات|صافى مبيعات", na=False)
     ).any(axis=1)]
@@ -77,15 +86,15 @@ def load_haraka():
 
 
 # =========================
-# 📂 CLIENT HARKA (FIX)
+# 📂 CLIENT HARKA
 # =========================
 def load_client_haraka():
+
     df = pd.read_excel("Client Harakah.xlsx")
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
     df = df.dropna(how="all")
 
-    # rename مؤقت
     df.columns = [f"Col{i}" for i in range(df.shape[1])]
 
     # صفوف المندوب
@@ -94,7 +103,6 @@ def load_client_haraka():
     df["Rep Code"] = None
     df["Rep Name"] = None
 
-    # استخراج الكود والاسم
     df.loc[mask_rep, "Rep Code"] = df.loc[mask_rep, "Col2"]
     df.loc[mask_rep, "Rep Name"] = df.loc[mask_rep, "Col3"]
 
@@ -102,7 +110,7 @@ def load_client_haraka():
     df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce").ffill()
     df["Rep Name"] = df["Rep Name"].ffill()
 
-    # حذف صف المندوب فقط
+    # حذف صف المندوب
     df = df[~mask_rep]
 
     return df
