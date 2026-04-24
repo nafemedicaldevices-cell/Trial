@@ -7,7 +7,7 @@ from cleaning import load_targets, load_haraka, load_client_haraka
 st.title("📊 KPI + Harakah System")
 
 # =========================
-# ⚡ CACHE DATA
+# ⚡ CACHE
 # =========================
 @st.cache_data
 def get_data():
@@ -60,11 +60,11 @@ with tab5:
 # =========================
 with tab6:
     st.subheader("Rep Harakah")
-    st.dataframe(rep_haraka, use_container_width=True) if not rep_haraka.empty else st.warning("No data")
+    st.dataframe(rep_haraka, use_container_width=True)
 
 # =========================
 # 📊 CLIENT HARKA
 # =========================
 with tab7:
     st.subheader("Client Harakah")
-    st.dataframe(client_haraka, use_container_width=True) if not client_haraka.empty else st.warning("No data")
+    st.dataframe(client_haraka, use_container_width=True)
