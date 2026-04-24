@@ -1,55 +1,38 @@
-import streamlit as st
-from cleaning import load_targets, load_haraka
+import pandas as pd
 
-# =========================
-# 📊 TITLE
-# =========================
-st.title("📊 KPI + Harakah Dashboard")
+def export_all_excel(targets, haraka, sales, file_name="KPI_FULL_REPORT.xlsx"):
 
-# =========================
-# 📥 LOAD DATA
-# =========================
-targets = load_targets()
-haraka = load_haraka()
+    with pd.ExcelWriter(file_name, engine="openpyxl") as writer:
 
-# =========================
-# 📌 TABS (6 TABLES)
-# =========================
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-    "Rep Target",
-    "Manager Target",
-    "Area Target",
-    "Supervisor Target",
-    "Evak Target",
-    "Harakah"
-])
+        # =========================
+        # TARGETS
+        # =========================
+        targets.to_excel(writer, sheet_name="Targets", index=False)
 
-# =========================
-# 📊 TARGETS
-# =========================
-with tab1:
-    st.subheader("Rep Target")
-    st.dataframe(targets[targets["Level"] == "Rep"], use_container_width=True)
+        # =========================
+        # HARKA
+        # =========================
+        haraka.to_excel(writer, sheet_name="Harakah", index=False)
 
-with tab2:
-    st.subheader("Manager Target")
-    st.dataframe(targets[targets["Level"] == "Manager"], use_container_width=True)
+        # =========================
+        # SALES
+        # =========================
+        sales.to_excel(writer, sheet_name="Sales", index=False)
 
-with tab3:
-    st.subheader("Area Target")
-    st.dataframe(targets[targets["Level"] == "Area"], use_container_width=True)
+        # =========================
+        # COMBINED VIEW
+        # =========================
+        targets_c = targets.copy()
+        targets_c["Source"] = "Targets"
 
-with tab4:
-    st.subheader("Supervisor Target")
-    st.dataframe(targets[targets["Level"] == "Supervisor"], use_container_width=True)
+        haraka_c = haraka.copy()
+        haraka_c["Source"] = "Harakah"
 
-with tab5:
-    st.subheader("Evak Target")
-    st.dataframe(targets[targets["Level"] == "Evak"], use_container_width=True)
+        sales_c = sales.copy()
+        sales_c["Source"] = "Sales"
 
-# =========================
-# 📊 HARKA TABLE
-# =========================
-with tab6:
-    st.subheader("Rep Harakah")
-    st.dataframe(haraka, use_container_width=True)
+        combined = pd.concat([targets_c, haraka_c, sales_c], ignore_index=True, sort=False)
+
+        combined.to_excel(writer, sheet_name="Combined", index=False)
+
+    return file_name
