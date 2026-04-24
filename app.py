@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 from linking import build_model
 
 # =========================
@@ -8,8 +9,16 @@ from linking import build_model
 model = build_model()
 sales = model["sales"].copy()
 
+codes = pd.read_excel("Code.xlsx")
+codes.columns = codes.columns.str.strip()
+
+# ندمج codes لو مش متعمل merge في linking
+if "Manager" not in sales.columns:
+    sales = sales.merge(codes, on="Rep Code", how="left")
+
+
 # =========================
-# 🎛 STREAMLIT SETUP
+# 🎛 STREAMLIT
 # =========================
 
 st.set_page_config(page_title="Dashboard", layout="wide")
@@ -17,39 +26,46 @@ st.title("📊 Sales Dashboard")
 
 st.sidebar.header("🎛 Filters")
 
+
 # =========================
-# 🎯 FILTER OPTIONS
+# 🧠 SAFE FUNCTION
 # =========================
 
-def safe_list(col):
+def options(col):
     if col in sales.columns:
         return ["All"] + sorted(sales[col].dropna().unique())
     return ["All"]
 
+
+# =========================
+# 🎛 FILTERS FROM CODE
+# =========================
+
 manager = st.sidebar.selectbox(
     "Manager",
-    safe_list("Manager")
-)
-
-supervisor = st.sidebar.selectbox(
-    "Supervisor",
-    safe_list("Supervisor")
+    options("Manager")
 )
 
 area = st.sidebar.selectbox(
     "Area",
-    safe_list("Area")
+    options("Area")
+)
+
+supervisor = st.sidebar.selectbox(
+    "Supervisor",
+    options("Supervisor")
 )
 
 company = st.sidebar.selectbox(
     "Company",
-    safe_list("Company")
+    options("Company")
 )
 
 rep = st.sidebar.selectbox(
     "Rep Name",
-    safe_list("Old Rep Name")
+    options("Old Rep Name")
 )
+
 
 # =========================
 # 🔗 APPLY FILTERS
@@ -60,17 +76,18 @@ filtered = sales.copy()
 if manager != "All":
     filtered = filtered[filtered["Manager"] == manager]
 
-if supervisor != "All":
-    filtered = filtered[filtered["Supervisor"] == supervisor]
-
 if area != "All":
     filtered = filtered[filtered["Area"] == area]
+
+if supervisor != "All":
+    filtered = filtered[filtered["Supervisor"] == supervisor]
 
 if company != "All":
     filtered = filtered[filtered["Company"] == company]
 
 if rep != "All":
     filtered = filtered[filtered["Old Rep Name"] == rep]
+
 
 # =========================
 # 📊 OUTPUT
@@ -80,8 +97,9 @@ st.subheader("📌 Filtered Data")
 
 st.dataframe(filtered, use_container_width=True)
 
+
 # =========================
-# 📊 QUICK KPI
+# 📊 KPI SIMPLE
 # =========================
 
 if "Net Sales" in filtered.columns:
