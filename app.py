@@ -24,7 +24,7 @@ def load_client_haraka():
     df = pd.read_excel(file_path, header=None)
 
     # =========================
-    # 2️⃣ EXTRACT REP INFO
+    # 2️⃣ EXTRACT REP
     # =========================
     rep_mask = df.astype(str).apply(
         lambda row: row.str.contains("مندوب المبيعات", na=False)
@@ -46,7 +46,7 @@ def load_client_haraka():
     df = df[~rep_mask].reset_index(drop=True)
 
     # =========================
-    # 4️⃣ SET COLUMNS
+    # 4️⃣ SET HEADERS
     # =========================
     df.columns = [
         "Client Code","Client Name","Opening Balance",
@@ -58,7 +58,7 @@ def load_client_haraka():
     ]
 
     # =========================
-    # 5️⃣ REMOVE NOISE ROWS
+    # 5️⃣ REMOVE NOISE
     # =========================
     df = df[
         ~df.astype(str).apply(
@@ -90,45 +90,28 @@ def load_client_haraka():
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
     # =========================
-    # 8️⃣ ASSIGN REP
+    # 8️⃣ ASSIGN REP INFO
     # =========================
     df["Rep Code"] = rep_code
     df["Rep Name"] = rep_name
 
     # =========================
-    # 9️⃣ LOAD & MERGE CODE.XLSX
+    # 9️⃣ MERGE CODE.XLSX (FINAL CLEAN)
     # =========================
     if os.path.exists(code_path):
 
         codes = pd.read_excel(code_path)
         codes.columns = codes.columns.str.strip()
 
-        # =========================
-        # 🧠 CLEAN KEYS (IMPORTANT)
-        # =========================
+        # clean duplicates
+        codes = codes.drop_duplicates(subset=["Rep Code"])
+
+        # unify type
         df["Rep Code"] = df["Rep Code"].astype(str).str.strip()
         codes["Rep Code"] = codes["Rep Code"].astype(str).str.strip()
 
-        # =========================
-        # 🧹 DROP DUPLICATES
-        # =========================
-        codes = codes.drop_duplicates(subset=["Rep Code"])
-
-        # =========================
-        # 🔍 DEBUG (optional but useful)
-        # =========================
-        st.write("Sample DF Rep Codes:", df["Rep Code"].dropna().unique()[:10])
-        st.write("Sample Codes Rep Codes:", codes["Rep Code"].dropna().unique()[:10])
-
-        # =========================
-        # 🔗 FINAL MERGE
-        # =========================
+        # final merge
         df = df.merge(codes, on="Rep Code", how="left")
-
-        # =========================
-        # 🔍 CHECK MATCH RESULT
-        # =========================
-        st.write("Matched rows:", df["Supervisor Code"].notna().sum())
 
     return df
 
