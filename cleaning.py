@@ -1,59 +1,103 @@
-import streamlit as st
-from cleaning import load_targets, load_haraka, load_client_haraka
+import pandas as pd
 
 # =========================
-# 📊 TITLE
+# 📂 TARGET FILES
 # =========================
-st.title("📊 KPI + Harakah System")
+FILES = {
+    "Rep": "Target Rep.xlsx",
+    "Manager": "Target Manager.xlsx",
+    "Area": "Target Area.xlsx",
+    "Supervisor": "Target Supervisor.xlsx",
+    "Evak": "Target Evak.xlsx",
+}
+
+def load_targets():
+
+    all_data = []
+
+    for level, file in FILES.items():
+
+        df = pd.read_excel(file)
+        df.columns = df.columns.str.strip()
+
+        fixed_cols = ["Year", "Product Code", "Old Product Name", "Sales Price"]
+
+        df = df.melt(
+            id_vars=fixed_cols,
+            var_name="Code",
+            value_name="Target (Year)"
+        )
+
+        df["Level"] = level
+
+        df["Target (Year)"] = pd.to_numeric(df["Target (Year)"], errors="coerce")
+
+        df["Target (Unit)"] = df["Target (Year)"] / 12
+        df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
+
+        months = ["Jan","Feb","Mar","Apr","May","Jun",
+                  "Jul","Aug","Sep","Oct","Nov","Dec"]
+
+        df_long = df.loc[df.index.repeat(12)].copy()
+        df_long["Month"] = months * len(df)
+
+        df_long["Target (Unit)"] = df["Target (Unit)"].repeat(12).values
+        df_long["Target (Value)"] = df["Target (Value)"].repeat(12).values
+
+        all_data.append(df_long)
+
+    return pd.concat(all_data, ignore_index=True)
+
 
 # =========================
-# 📥 LOAD DATA
+# 📂 HARKA (MOVEMENT)
 # =========================
-targets = load_targets()
-rep_haraka = load_haraka()
-client_haraka = load_client_haraka()
+def load_haraka():
 
-# =========================
-# 📌 TABS
-# =========================
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-    "Rep Target",
-    "Manager Target",
-    "Area Target",
-    "Supervisor Target",
-    "Evak Target",
-    "Rep Harakah",
-    "Client Harakah"
-])
+    df = pd.read_excel("Rep Harakah.xlsx")
 
-# =========================
-# 📊 TARGETS
-# =========================
-with tab1:
-    st.dataframe(targets[targets["Level"] == "Rep"], use_container_width=True)
+    # 🧹 CLEAN
+    df = df.replace(r'^\s*$', pd.NA, regex=True)
 
-with tab2:
-    st.dataframe(targets[targets["Level"] == "Manager"], use_container_width=True)
+    first_col = df.columns[0]
+    df[first_col] = df[first_col].astype(str)
 
-with tab3:
-    st.dataframe(targets[targets["Level"] == "Area"], use_container_width=True)
+    df = df[
+        df[first_col].notna() &
+        (df[first_col].str.strip() != "") &
+        (~df[first_col].str.contains("كود الفرع", na=False)) &
+        (~df[first_col].str.contains("كود المندوب", na=False))
+    ]
 
-with tab4:
-    st.dataframe(targets[targets["Level"] == "Supervisor"], use_container_width=True)
+    # 🏷️ FIX DUPLICATES
+    cols = df.columns.tolist()
+    seen = {}
+    new_cols = []
 
-with tab5:
-    st.dataframe(targets[targets["Level"] == "Evak"], use_container_width=True)
+    for c in cols:
+        if c in seen:
+            seen[c] += 1
+            new_cols.append(f"{c}_{seen[c]}")
+        else:
+            seen[c] = 0
+            new_cols.append(c)
 
-# =========================
-# 📊 REP HARKA
-# =========================
-with tab6:
-    st.subheader("Rep Harakah")
-    st.dataframe(rep_haraka, use_container_width=True)
+    df.columns = new_cols
 
-# =========================
-# 📊 CLIENT HARKA
-# =========================
-with tab7:
-    st.subheader("Client Harakah")
-    st.dataframe(client_haraka, use_container_width=True)
+    # ✏️ RENAME COLUMNS
+    df = df.rename(columns={
+        df.columns[0]: "Rep Code",
+        df.columns[1]: "Rep Name",
+        df.columns[2]: "Opening Balance",
+        df.columns[3]: "Sales Value",
+        df.columns[4]: "Returns Value",
+        df.columns[5]: "Tasweyat Madinah (Credit)",
+        df.columns[6]: "Total Collection",
+        df.columns[7]: "Madfoaat",
+        df.columns[8]: "Tasweyat Madinah (Debit)",
+        df.columns[9]: "End Balance",
+        df.columns[10]: "Motalbet El Fatrah",
+    })
+
+    return df
+س
