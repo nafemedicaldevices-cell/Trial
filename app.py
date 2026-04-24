@@ -1,49 +1,55 @@
-import pandas as pd
+import streamlit as st
+from cleaning import load_targets, load_haraka
 
 # =========================
-# 🧹 CLEAN FUNCTION
+# 📊 TITLE
 # =========================
-def remove_empty_first_column(df):
-    first_col = df.columns[0]
-
-    df[first_col] = df[first_col].astype(str).str.strip()
-
-    df = df[
-        (df[first_col].notna()) &
-        (df[first_col] != "") &
-        (df[first_col].str.lower() != "nan")
-    ]
-
-    return df
-
+st.title("📊 KPI + Harakah Dashboard")
 
 # =========================
-# 📥 LOAD TARGETS
+# 📥 LOAD DATA
 # =========================
-def load_targets():
-    df = pd.read_excel("Targets.xlsx")
-    return df
-
+targets = load_targets()
+haraka = load_haraka()
 
 # =========================
-# 📥 LOAD REP HARKA
+# 📌 TABS (6 TABLES)
 # =========================
-def load_haraka():
-    df = pd.read_excel("Rep Haraka.xlsx")
-
-    # 🔥 أهم سطر
-    df = remove_empty_first_column(df)
-
-    return df
-
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    "Rep Target",
+    "Manager Target",
+    "Area Target",
+    "Supervisor Target",
+    "Evak Target",
+    "Harakah"
+])
 
 # =========================
-# 📥 LOAD CLIENT HARKA
+# 📊 TARGETS
 # =========================
-def load_client_haraka():
-    df = pd.read_excel("Client Haraka.xlsx")
+with tab1:
+    st.subheader("Rep Target")
+    st.dataframe(targets[targets["Level"] == "Rep"], use_container_width=True)
 
-    # 🔥 أهم سطر
-    df = remove_empty_first_column(df)
+with tab2:
+    st.subheader("Manager Target")
+    st.dataframe(targets[targets["Level"] == "Manager"], use_container_width=True)
 
-    return df
+with tab3:
+    st.subheader("Area Target")
+    st.dataframe(targets[targets["Level"] == "Area"], use_container_width=True)
+
+with tab4:
+    st.subheader("Supervisor Target")
+    st.dataframe(targets[targets["Level"] == "Supervisor"], use_container_width=True)
+
+with tab5:
+    st.subheader("Evak Target")
+    st.dataframe(targets[targets["Level"] == "Evak"], use_container_width=True)
+
+# =========================
+# 📊 HARKA TABLE
+# =========================
+with tab6:
+    st.subheader("Rep Harakah")
+    st.dataframe(haraka, use_container_width=True)
