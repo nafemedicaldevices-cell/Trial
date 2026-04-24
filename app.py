@@ -23,7 +23,7 @@ def load_client_haraka():
     df = pd.read_excel(file_path, header=None)
 
     # =========================
-    # 2️⃣ 🔥 EXTRACT REP FIRST (BEFORE ANY CLEANING)
+    # 2️⃣ EXTRACT REP FIRST (IMPORTANT)
     # =========================
     rep_mask = df.astype(str).apply(
         lambda row: row.str.contains("مندوب المبيعات", na=False)
@@ -45,22 +45,7 @@ def load_client_haraka():
     df = df[~rep_mask].reset_index(drop=True)
 
     # =========================
-    # 4️⃣ CLEAN FIRST COLUMN ONLY
-    # =========================
-    first_col = df.columns[0]
-    df[first_col] = df[first_col].astype(str)
-
-    df = df[
-        (df[first_col].str.strip() != "") &
-        (~df[first_col].str.contains("كود العميل", na=False)) &
-        (~df[first_col].str.contains("كود الفرع", na=False)) &
-        (~df[first_col].str.contains("اجمال", na=False))
-    ].copy()
-
-    df = df.reset_index(drop=True)
-
-    # =========================
-    # 5️⃣ SET HEADERS
+    # 4️⃣ SET HEADERS
     # =========================
     df.columns = [
         "Client Code","Client Name","Opening Balance",
@@ -70,6 +55,21 @@ def load_client_haraka():
         "Tasweyat Madinah (Debit)",
         "End Balance","Motalbet El Fatrah"
     ]
+
+    # =========================
+    # 5️⃣ 🧹 REMOVE EMPTY ROWS (FIRST COLUMN CLEAN)
+    # =========================
+    first_col = df.columns[0]
+
+    df[first_col] = df[first_col].astype(str)
+
+    df = df[
+        (df[first_col].notna()) &
+        (df[first_col].str.strip() != "") &
+        (~df[first_col].str.lower().isin(["none", "nan"]))
+    ].copy()
+
+    df = df.reset_index(drop=True)
 
     # =========================
     # 6️⃣ NUMERIC CLEAN
@@ -94,7 +94,7 @@ def load_client_haraka():
 df = load_client_haraka()
 
 if df.empty:
-    st.warning("No data")
+    st.warning("No data found")
 else:
     st.success("Loaded successfully")
 
