@@ -7,7 +7,7 @@ from cleaning import load_targets, load_haraka, load_client_haraka
 st.title("📊 KPI + Harakah System")
 
 # =========================
-# ⚡ CACHE DATA
+# ⚡ LOAD DATA
 # =========================
 @st.cache_data
 def get_data():
@@ -35,8 +35,10 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
 # 📊 TARGET FILTER
 # =========================
 def show_target(level):
-    df = targets[targets["Level"] == level]
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(
+        targets[targets["Level"] == level],
+        use_container_width=True
+    )
 
 # =========================
 # 📊 TARGETS
@@ -62,10 +64,10 @@ with tab5:
 with tab6:
     st.subheader("Rep Harakah")
 
-    if rep_haraka is not None and not rep_haraka.empty:
+    if not rep_haraka.empty:
         st.dataframe(rep_haraka, use_container_width=True)
     else:
-        st.warning("No Rep Harakah data found")
+        st.warning("No data found")
 
 # =========================
 # 📊 CLIENT HARKA
@@ -73,7 +75,7 @@ with tab6:
 with tab7:
     st.subheader("Client Harakah")
 
-    if client_haraka is not None and not client_haraka.empty:
+    if not client_haraka.empty:
         st.dataframe(client_haraka, use_container_width=True)
     else:
-        st.warning("No Client Harakah data found")
+        st.warning("No data found")
