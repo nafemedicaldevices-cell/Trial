@@ -15,9 +15,6 @@ def load_targets():
 
     all_data = []
 
-    months = ["Jan","Feb","Mar","Apr","May","Jun",
-              "Jul","Aug","Sep","Oct","Nov","Dec"]
-
     for level, file in FILES.items():
 
         df = pd.read_excel(file)
@@ -37,34 +34,33 @@ def load_targets():
         df["Target (Unit)"] = df["Target (Year)"] / 12
         df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
 
-        df_expanded = df.loc[df.index.repeat(12)].copy()
-        df_expanded["Month"] = months * len(df)
+        months = ["Jan","Feb","Mar","Apr","May","Jun",
+                  "Jul","Aug","Sep","Oct","Nov","Dec"]
 
-        df_expanded["Target (Unit)"] = df["Target (Unit)"].repeat(12).values
-        df_expanded["Target (Value)"] = df["Target (Value)"].repeat(12).values
+        df_long = df.loc[df.index.repeat(12)].copy()
+        df_long["Month"] = months * len(df)
 
-        all_data.append(df_expanded)
+        df_long["Target (Unit)"] = df["Target (Unit)"].repeat(12).values
+        df_long["Target (Value)"] = df["Target (Value)"].repeat(12).values
+
+        all_data.append(df_long)
 
     return pd.concat(all_data, ignore_index=True)
 
 
 # =========================
-# 📂 REP HARKA (FIXED FINAL)
+# 📂 REP HARKA
 # =========================
 def load_haraka():
 
     df = pd.read_excel("Rep Harakah.xlsx")
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
+    df = df.dropna(how="all")
 
-    # 🔥 FIX FINAL: handle None / nan / empty
-    first_col = df.columns[0]
-
-    df[first_col] = df[first_col].astype(str).str.strip().str.lower()
-
-    df = df[
-        ~df[first_col].isin(["", "nan", "none"])
-    ]
+    df = df[~df.astype(str).apply(
+        lambda x: x.str.contains("مندوب المبيعات|صافى مبيعات", na=False)
+    ).any(axis=1)]
 
     df.columns = [
         "Rep Code",
@@ -84,40 +80,46 @@ def load_haraka():
 
 
 # =========================
-# 📂 CLIENT HARKA (FIXED FINAL)
+# 📂 CLIENT HARKA (FINAL FIX - FILL DOWN)
 # =========================
 def load_client_haraka():
 
     df = pd.read_excel("Client Harakah.xlsx")
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
+    df = df.dropna(how="all")
 
-    # 🔥 FIX FINAL: handle None / nan / empty
-    first_col = df.columns[0]
+    # ❌ حذف الهيدر الداخلي
+    df = df[~df.astype(str).apply(
+        lambda x: x.str.contains(
+            "رصيد افتتاحى|صافى مبيعات|صافى مرتجع مبيعات|مندوب المبيعات",
+            na=False
+        )
+    ).any(axis=1)]
 
-    df[first_col] = df[first_col].astype(str).str.strip().str.lower()
-
-    df = df[
-        ~df[first_col].isin(["", "nan", "none"])
-    ]
-
+    # =========================
+    # 🏷️ أعمدة عامة
+    # =========================
     df.columns = [f"Col{i}" for i in range(df.shape[1])]
 
+    # =========================
+    # 👤 استخراج Rep من صف المندوب
+    # =========================
     rep_row = df[df.astype(str).apply(
         lambda x: x.str.contains("مندوب المبيعات", na=False)
     ).any(axis=1)]
 
-    rep_code = pd.NA
-    rep_name = pd.NA
-
     if not rep_row.empty:
-        rep_code = rep_row.iloc[0, 2]
-        rep_name = rep_row.iloc[0, 3]
+        df["Rep Code"] = rep_row.iloc[:, 2].values[0]
+        df["Rep Name"] = rep_row.iloc[:, 3].values[0]
+    else:
+        df["Rep Code"] = pd.NA
+        df["Rep Name"] = pd.NA
 
-    df["Rep Code"] = rep_code
-    df["Rep Name"] = rep_name
-
+    # =========================
+    # 🔁 Fill Down (مهم جدًا)
+    # =========================
     df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce").ffill()
     df["Rep Name"] = df["Rep Name"].ffill()
 
-    return df
+    return dfس
