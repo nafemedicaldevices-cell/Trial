@@ -126,7 +126,21 @@ with tab1:
 
 with tab2:
     st.subheader("🎯 Targets")
-    st.dataframe(targets, use_container_width=True)
+
+    st.subheader("Rep")
+    st.dataframe(targets["Rep"], use_container_width=True)
+
+    st.subheader("Manager")
+    st.dataframe(targets["Manager"], use_container_width=True)
+
+    st.subheader("Area")
+    st.dataframe(targets["Area"], use_container_width=True)
+
+    st.subheader("Supervisor")
+    st.dataframe(targets["Supervisor"], use_container_width=True)
+
+    st.subheader("Evak")
+    st.dataframe(targets["Evak"], use_container_width=True)
 
 with tab3:
     st.subheader("📈 Harakah")
