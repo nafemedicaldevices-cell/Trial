@@ -1,12 +1,13 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import os
 
 st.set_page_config(page_title="Sales Dashboard", layout="wide")
 st.title("📊 Sales Dashboard")
 
 # =========================
-# 📁 Safe file loader
+# 📁 Safe Loader
 # =========================
 def load_file(path):
     if not os.path.exists(path):
@@ -18,13 +19,13 @@ def load_file(path):
 def load_data():
     sales = load_file("Sales.xlsx")
     mapping = load_file("Mapping.xlsx")
-    codes = load_file("Codes.xlsx")
+    codes = load_file("Code.xlsx")  # ✔️ fixed هنا
     return sales, mapping, codes
 
 sales, mapping, codes = load_data()
 
 # =========================
-# 🧹 Clean columns
+# 🧹 Clean Columns
 # =========================
 sales.columns = sales.columns.str.strip()
 
@@ -35,14 +36,14 @@ sales.columns = [
 ]
 
 # =========================
-# ➕ Extra columns
+# ➕ Extra Columns
 # =========================
 for col in ['Old Product Code', 'Old Product Name']:
     if col not in sales.columns:
         sales[col] = None
 
 # =========================
-# 🧠 Handle header rows
+# 🧠 Handle product rows
 # =========================
 mask = sales['Date'].astype(str).str.strip() == "كود الصنف"
 
@@ -52,7 +53,7 @@ sales.loc[mask, 'Old Product Name'] = sales.loc[mask, 'Client Code']
 sales[['Old Product Code','Old Product Name']] = sales[['Old Product Code','Old Product Name']].ffill()
 
 # =========================
-# 🚫 Clean junk rows
+# 🚫 Clean invalid rows
 # =========================
 sales = sales[
     sales['Date'].notna() &
@@ -61,7 +62,7 @@ sales = sales[
 ].copy()
 
 # =========================
-# 🔢 Convert numeric
+# 🔢 Numeric conversion
 # =========================
 num_cols = [
     'Sales Unit Before Edit',
@@ -78,7 +79,7 @@ sales['Rep Code'] = pd.to_numeric(sales['Rep Code'], errors='coerce').astype('In
 codes['Rep Code'] = pd.to_numeric(codes['Rep Code'], errors='coerce').astype('Int64')
 
 # =========================
-# 🔗 Merge data
+# 🔗 Merge Mapping
 # =========================
 sales = sales.merge(
     mapping[
@@ -91,6 +92,9 @@ sales = sales.merge(
 
 sales['Next Factor'] = sales.get('Next Factor', 1).fillna(1)
 
+# =========================
+# 🔗 Merge Codes
+# =========================
 sales = sales.merge(codes, on='Rep Code', how='left')
 
 # =========================
@@ -113,7 +117,7 @@ st.subheader("📋 Data Preview")
 st.dataframe(sales, use_container_width=True)
 
 # =========================
-# 📌 KPIs
+# 📊 KPIs
 # =========================
 st.subheader("📊 KPIs")
 
