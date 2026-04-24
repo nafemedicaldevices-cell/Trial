@@ -35,25 +35,38 @@ def load_targets():
                 value_name="Target (Year)"
             )
 
-            df["Target (Year)"] = pd.to_numeric(df["Target (Year)"], errors="coerce")
+            df["Target (Year)"] = pd.to_numeric(
+                df["Target (Year)"], errors="coerce"
+            )
 
             df["Target (Unit)"] = df["Target (Year)"] / 12
             df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
 
-            months = ["Jan","Feb","Mar","Apr","May","Jun",
-                      "Jul","Aug","Sep","Oct","Nov","Dec"]
+            months = [
+                "Jan","Feb","Mar","Apr","May","Jun",
+                "Jul","Aug","Sep","Oct","Nov","Dec"
+            ]
 
             df_long = df.loc[df.index.repeat(12)].copy()
+
             df_long["Month"] = months * len(df)
 
-            df_long["Target (Unit)"] = df["Target (Unit)"].repeat(12).values
-            df_long["Target (Value)"] = df["Target (Value)"].repeat(12).values
+            df_long["Target (Unit)"] = (
+                df["Target (Unit)"].repeat(12).values
+            )
+
+            df_long["Target (Value)"] = (
+                df["Target (Value)"].repeat(12).values
+            )
 
             df_long["Level"] = level
 
             level_data.append(df_long)
 
-        targets[level] = pd.concat(level_data, ignore_index=True)
+        targets[level] = pd.concat(
+            level_data,
+            ignore_index=True
+        )
 
     return targets
 
@@ -68,6 +81,7 @@ def load_haraka():
     df = df.replace(r'^\s*$', pd.NA, regex=True)
 
     first_col = df.columns[0]
+
     df[first_col] = df[first_col].astype(str)
 
     df = df[
@@ -83,16 +97,21 @@ def load_haraka():
     new_cols = []
 
     for c in cols:
+
         if c in seen:
+
             seen[c] += 1
             new_cols.append(f"{c}_{seen[c]}")
+
         else:
+
             seen[c] = 0
             new_cols.append(c)
 
     df.columns = new_cols
 
     df = df.rename(columns={
+
         df.columns[0]: "Rep Code",
         df.columns[1]: "Old Rep Name",
         df.columns[2]: "Opening Balance",
@@ -104,6 +123,7 @@ def load_haraka():
         df.columns[8]: "Tasweyat Madinah (Debit)",
         df.columns[9]: "End Balance",
         df.columns[10]: "Motalbet El Fatrah",
+
     })
 
     return df
@@ -117,51 +137,81 @@ def load_overdue(overdue_path, codes):
     overdue = pd.read_excel(overdue_path)
 
     overdue.columns = [
-        "Client Name", "Client Code", "30 Days", "60 Days", "90 Days", "120 Days",
-        "150 Days", "More Than 150 Days", "Balance"
+        "Client Name","Client Code",
+        "30 Days","60 Days","90 Days",
+        "120 Days","150 Days",
+        "More Than 150 Days","Balance"
     ]
 
-    overdue['Rep Code'] = None
-    overdue['Old Rep Name'] = None
+    overdue["Rep Code"] = None
+    overdue["Old Rep Name"] = None
 
-    mask = overdue['Client Name'].astype(str).str.strip() == "كود المندوب"
+    mask = (
+        overdue["Client Name"]
+        .astype(str)
+        .str.strip()
+        == "كود المندوب"
+    )
 
-    overdue.loc[mask, 'Rep Code'] = overdue.loc[mask, 'Client Code']
-    overdue.loc[mask, 'Old Rep Name'] = overdue.loc[mask, '30 Days']
+    overdue.loc[mask, "Rep Code"] = overdue.loc[
+        mask, "Client Code"
+    ]
 
-    overdue[['Rep Code', 'Old Rep Name']] = overdue[['Rep Code', 'Old Rep Name']].ffill()
+    overdue.loc[mask, "Old Rep Name"] = overdue.loc[
+        mask, "30 Days"
+    ]
+
+    overdue[["Rep Code","Old Rep Name"]] = (
+        overdue[["Rep Code","Old Rep Name"]]
+        .ffill()
+    )
 
     overdue = overdue[
-        overdue['Client Name'].notna() &
-        (overdue['Client Name'].astype(str).str.strip() != '') &
-        (~overdue['Client Name'].astype(str).str.contains(
-            'اجمالــــــي التقرير|اجمالى الفرع/المندوب|كود الفرع|كود المندوب|اسم العميل',
+        overdue["Client Name"].notna() &
+        (overdue["Client Name"].astype(str).str.strip() != '') &
+        (~overdue["Client Name"].astype(str).str.contains(
+            "اجمال|كود الفرع|كود المندوب|اسم العميل",
             na=False
         ))
     ].copy()
 
     num_cols = [
-        '30 Days','60 Days','90 Days','120 Days',
-        '150 Days','More Than 150 Days','Client Code','Rep Code'
+        "30 Days","60 Days","90 Days",
+        "120 Days","150 Days",
+        "More Than 150 Days",
+        "Client Code","Rep Code"
     ]
 
     for col in num_cols:
-        overdue[col] = pd.to_numeric(overdue[col], errors='coerce').fillna(0)
 
-    overdue['Rep Code'] = overdue['Rep Code'].astype(int)
-    overdue['Client Code'] = overdue['Client Code'].astype(int)
+        overdue[col] = pd.to_numeric(
+            overdue[col],
+            errors="coerce"
+        ).fillna(0)
 
-    overdue['Overdue'] = (
-        overdue['120 Days'] +
-        overdue['150 Days'] +
-        overdue['More Than 150 Days']
+    overdue["Rep Code"] = overdue["Rep Code"].astype(int)
+    overdue["Client Code"] = overdue["Client Code"].astype(int)
+
+    overdue["Overdue"] = (
+
+        overdue["120 Days"]
+        + overdue["150 Days"]
+        + overdue["More Than 150 Days"]
+
     )
 
-    codes['Rep Code'] = pd.to_numeric(codes['Rep Code'], errors='coerce').astype(int)
+    codes["Rep Code"] = pd.to_numeric(
+        codes["Rep Code"],
+        errors="coerce"
+    ).astype(int)
 
-    overdue = overdue.merge(codes, on='Rep Code', how='left')
+    overdue = overdue.merge(
+        codes,
+        on="Rep Code",
+        how="left"
+    )
 
-    overdue['Rep Code'] = overdue['Rep Code'].astype(str)
+    overdue["Rep Code"] = overdue["Rep Code"].astype(str)
 
     return overdue
 
@@ -174,56 +224,94 @@ def load_client_haraka():
     file_path = "Client Harakah.xlsx"
     code_path = "Code.xlsx"
 
-    df = pd.read_excel(file_path, header=None)
+    df = pd.read_excel(
+        file_path,
+        header=None
+    )
 
     # استخراج المندوب
     rep_mask = df.astype(str).apply(
-        lambda row: row.str.contains("مندوب المبيعات", na=False)
+
+        lambda row:
+        row.str.contains(
+            "مندوب المبيعات",
+            na=False
+        )
+
     ).any(axis=1)
 
     rep_row = df[rep_mask]
 
     if not rep_row.empty:
+
         r = rep_row.iloc[0]
+
         rep_code = r.iloc[4]
         rep_name = r.iloc[5]
+
     else:
+
         rep_code = np.nan
         rep_name = ""
 
+    # حذف صف المندوب
     df = df[~rep_mask].reset_index(drop=True)
 
     # تسمية الأعمدة
     df.columns = [
-        "Client Code","Client Name","Opening Balance",
-        "Sales Value","Returns Value",
+
+        "Client Code",
+        "Client Name",
+        "Opening Balance",
+
+        "Sales Value",
+        "Returns Value",
+
         "Tasweyat Madinah (Credit)",
-        "Total Collection","Madfoaat",
+        "Total Collection",
+
+        "Madfoaat",
         "Tasweyat Madinah (Debit)",
-        "End Balance","Motalbet El Fatrah"
+
+        "End Balance",
+        "Motalbet El Fatrah"
+
     ]
 
     # حذف الصفوف الافتراضية
     df = df[
         ~df.astype(str).apply(
-            lambda row: row.str.contains("كود العميل", na=False)
+
+            lambda row:
+            row.str.contains(
+                "كود العميل",
+                na=False
+            )
+
         ).any(axis=1)
     ].copy()
 
     first_col = df.columns[0]
+
     df[first_col] = df[first_col].astype(str)
 
     df = df[
         (df[first_col].notna()) &
         (df[first_col].str.strip() != "") &
-        (~df[first_col].str.lower().isin(["none", "nan"]))
+        (~df[first_col]
+         .str.lower()
+         .isin(["none","nan"]))
     ].copy()
 
     df = df.reset_index(drop=True)
 
     # تحويل أرقام
     for col in df.columns[2:]:
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+        df[col] = pd.to_numeric(
+            df[col],
+            errors="coerce"
+        ).fillna(0)
 
     df["Rep Code"] = rep_code
     df["Old Rep Name"] = rep_name
@@ -232,11 +320,28 @@ def load_client_haraka():
     if os.path.exists(code_path):
 
         codes = pd.read_excel(code_path)
-        codes.columns = codes.columns.str.strip()
 
-        df["Rep Code"] = df["Rep Code"].astype(str).str.strip()
-        codes["Rep Code"] = codes["Rep Code"].astype(str).str.strip()
+        codes.columns = (
+            codes.columns
+            .str.strip()
+        )
 
-        df = df.merge(codes, on="Rep Code", how="left")
+        df["Rep Code"] = (
+            df["Rep Code"]
+            .astype(str)
+            .str.strip()
+        )
+
+        codes["Rep Code"] = (
+            codes["Rep Code"]
+            .astype(str)
+            .str.strip()
+        )
+
+        df = df.merge(
+            codes,
+            on="Rep Code",
+            how="left"
+        )
 
     return df
