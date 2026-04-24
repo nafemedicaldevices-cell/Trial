@@ -1,7 +1,7 @@
 import pandas as pd
 
 # =========================
-# 📂 TARGET FILES
+# 📊 TARGETS
 # =========================
 FILES = {
     "Rep": "Target Rep.xlsx",
@@ -29,7 +29,6 @@ def load_targets():
         )
 
         df["Level"] = level
-
         df["Target (Year)"] = pd.to_numeric(df["Target (Year)"], errors="coerce")
 
         df["Target (Unit)"] = df["Target (Year)"] / 12
@@ -50,13 +49,12 @@ def load_targets():
 
 
 # =========================
-# 📂 HARKA (MOVEMENT)
+# 📊 HARKA
 # =========================
 def load_haraka():
 
     df = pd.read_excel("Rep Harakah.xlsx")
 
-    # 🧹 CLEAN
     df = df.replace(r'^\s*$', pd.NA, regex=True)
 
     first_col = df.columns[0]
@@ -65,38 +63,51 @@ def load_haraka():
     df = df[
         df[first_col].notna() &
         (df[first_col].str.strip() != "") &
-        (~df[first_col].str.contains("كود الفرع", na=False)) &
-        (~df[first_col].str.contains("كود المندوب", na=False))
+        (~df[first_col].str.contains("كود الفرع|كود المندوب", na=False))
     ]
 
-    # 🏷️ FIX DUPLICATES
-    cols = df.columns.tolist()
-    seen = {}
-    new_cols = []
+    df.columns = df.columns.str.strip()
 
-    for c in cols:
-        if c in seen:
-            seen[c] += 1
-            new_cols.append(f"{c}_{seen[c]}")
-        else:
-            seen[c] = 0
-            new_cols.append(c)
-
-    df.columns = new_cols
-
-    # ✏️ RENAME COLUMNS
     df = df.rename(columns={
         df.columns[0]: "Rep Code",
         df.columns[1]: "Rep Name",
         df.columns[2]: "Opening Balance",
         df.columns[3]: "Sales Value",
         df.columns[4]: "Returns Value",
-        df.columns[5]: "Tasweyat Madinah (Credit)",
-        df.columns[6]: "Total Collection",
-        df.columns[7]: "Madfoaat",
-        df.columns[8]: "Tasweyat Madinah (Debit)",
-        df.columns[9]: "End Balance",
-        df.columns[10]: "Motalbet El Fatrah",
+        df.columns[5]: "Total Collection",
+        df.columns[6]: "End Balance",
+        df.columns[7]: "Motalbet El Fatrah",
     })
 
     return df
+
+
+# =========================
+# 📊 SALES (CLEAN ONLY)
+# =========================
+def load_sales(sales):
+
+    sales.columns = sales.columns.str.strip()
+
+    sales = sales.replace(r'^\s*$', pd.NA, regex=True)
+
+    sales = sales[
+        sales['Date'].notna() &
+        (sales['Date'].astype(str).str.strip() != '') &
+        (~sales['Date'].astype(str).str.contains('المندوب|كود الفرع|كود الصنف', na=False))
+    ].copy()
+
+    num_cols = [
+        'Sales Unit Before Edit',
+        'Returns Unit Before Edit',
+        'Sales Price',
+        'Invoice Discounts'
+    ]
+
+    sales[num_cols] = sales[num_cols].apply(pd.to_numeric, errors='coerce').fillna(0)
+
+    sales['Total Sales Value'] = sales['Sales Unit Before Edit'] * sales['Sales Price']
+    sales['Returns Value'] = sales['Returns Unit Before Edit'] * sales['Sales Price']
+    sales['Net Sales Value'] = sales['Total Sales Value'] - sales['Returns Value']
+
+    return sales
