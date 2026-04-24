@@ -3,11 +3,13 @@ import pandas as pd
 import numpy as np
 import os
 
+from cleaning import load_targets, load_haraka
+
 st.set_page_config(page_title="Sales Dashboard", layout="wide")
-st.title("📊 Sales Dashboard")
+st.title("📊 Sales + KPI Dashboard")
 
 # =========================
-# 📁 Safe Loader
+# 📁 SAFE LOADER
 # =========================
 def load_file(path):
     if not os.path.exists(path):
@@ -19,13 +21,13 @@ def load_file(path):
 def load_data():
     sales = load_file("Sales.xlsx")
     mapping = load_file("Mapping.xlsx")
-    codes = load_file("Code.xlsx")  # ✔️ fixed هنا
+    codes = load_file("Code.xlsx")
     return sales, mapping, codes
 
 sales, mapping, codes = load_data()
 
 # =========================
-# 🧹 Clean Columns
+# 🧹 CLEAN SALES
 # =========================
 sales.columns = sales.columns.str.strip()
 
@@ -35,16 +37,10 @@ sales.columns = [
     'Sales Price','Invoice Discounts','Sales Value'
 ]
 
-# =========================
-# ➕ Extra Columns
-# =========================
 for col in ['Old Product Code', 'Old Product Name']:
     if col not in sales.columns:
         sales[col] = None
 
-# =========================
-# 🧠 Handle product rows
-# =========================
 mask = sales['Date'].astype(str).str.strip() == "كود الصنف"
 
 sales.loc[mask, 'Old Product Code'] = sales.loc[mask, 'Warehouse Name']
@@ -52,18 +48,12 @@ sales.loc[mask, 'Old Product Name'] = sales.loc[mask, 'Client Code']
 
 sales[['Old Product Code','Old Product Name']] = sales[['Old Product Code','Old Product Name']].ffill()
 
-# =========================
-# 🚫 Clean invalid rows
-# =========================
 sales = sales[
     sales['Date'].notna() &
     (sales['Date'].astype(str).str.strip() != '') &
     (~sales['Date'].astype(str).str.contains('المندوب|كود الفرع|تاريخ|كود الصنف', na=False))
 ].copy()
 
-# =========================
-# 🔢 Numeric conversion
-# =========================
 num_cols = [
     'Sales Unit Before Edit',
     'Returns Unit Before Edit',
@@ -79,7 +69,7 @@ sales['Rep Code'] = pd.to_numeric(sales['Rep Code'], errors='coerce').astype('In
 codes['Rep Code'] = pd.to_numeric(codes['Rep Code'], errors='coerce').astype('Int64')
 
 # =========================
-# 🔗 Merge Mapping
+# 🔗 MERGE
 # =========================
 sales = sales.merge(
     mapping[
@@ -92,37 +82,59 @@ sales = sales.merge(
 
 sales['Next Factor'] = sales.get('Next Factor', 1).fillna(1)
 
-# =========================
-# 🔗 Merge Codes
-# =========================
 sales = sales.merge(codes, on='Rep Code', how='left')
 
 # =========================
-# 📊 Calculations
+# 📊 KPIs
 # =========================
 sales['Total Sales Value'] = sales['Sales Unit Before Edit'] * sales['Sales Price']
 sales['Returns Value'] = sales['Returns Unit Before Edit'] * sales['Sales Price']
 sales['Sales After Returns'] = sales['Total Sales Value'] - sales['Returns Value']
 
-sales['Net Sales Unit Before Edit'] = (
-    sales['Sales Unit Before Edit'] - sales['Returns Unit Before Edit']
-)
-
-sales['Net Sales Unit'] = sales['Net Sales Unit Before Edit'] * sales['Next Factor']
+# =========================
+# 📥 LOAD NEW MODULES
+# =========================
+targets = load_targets()
+haraka = load_haraka()
 
 # =========================
-# 📋 Output
+# 📌 TABS
 # =========================
-st.subheader("📋 Data Preview")
-st.dataframe(sales, use_container_width=True)
+tab1, tab2, tab3 = st.tabs([
+    "📊 Sales Dashboard",
+    "🎯 Targets",
+    "📈 Harakah"
+])
 
 # =========================
-# 📊 KPIs
+# SALES TAB
 # =========================
-st.subheader("📊 KPIs")
+with tab1:
+    st.subheader("📋 Sales Data")
+    st.dataframe(sales, use_container_width=True)
 
-c1, c2, c3 = st.columns(3)
+    st.subheader("📊 KPIs")
 
-c1.metric("Total Sales", f"{sales['Total Sales Value'].sum():,.0f}")
-c2.metric("Returns", f"{sales['Returns Value'].sum():,.0f}")
-c3.metric("Net Sales", f"{sales['Sales After Returns'].sum():,.0f}")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total Sales", f"{sales['Total Sales Value'].sum():,.0f}")
+    c2.metric("Returns", f"{sales['Returns Value'].sum():,.0f}")
+    c3.metric("Net Sales", f"{sales['Sales After Returns'].sum():,.0f}")
+
+# =========================
+# TARGETS TAB
+# =========================
+with tab2:
+    st.subheader("🎯 Targets")
+
+    st.dataframe(targets[targets["Level"] == "Rep"], use_container_width=True)
+    st.dataframe(targets[targets["Level"] == "Manager"], use_container_width=True)
+    st.dataframe(targets[targets["Level"] == "Area"], use_container_width=True)
+    st.dataframe(targets[targets["Level"] == "Supervisor"], use_container_width=True)
+    st.dataframe(targets[targets["Level"] == "Evak"], use_container_width=True)
+
+# =========================
+# HARKAH TAB
+# =========================
+with tab3:
+    st.subheader("📈 Harakah Data")
+    st.dataframe(haraka, use_container_width=True)
