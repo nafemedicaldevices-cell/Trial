@@ -2,9 +2,49 @@ import pandas as pd
 import numpy as np
 import os
 
-# =====================================================
-# 🎯 TARGETS
-# =====================================================
+# =========================
+# 📂 FILE LOADER
+# =========================
+def load_excel(path):
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Missing file: {path}")
+    return pd.read_excel(path)
+
+
+# =========================
+# 📂 CLIENT HARAKAH
+# =========================
+def load_client_haraka():
+
+    df = load_excel("Client Harakah.xlsx")
+
+    df = df.replace(r'^\s*$', np.nan, regex=True)
+
+    first_col = df.columns[0]
+    df[first_col] = df[first_col].astype(str)
+
+    df = df[
+        df[first_col].notna() &
+        (df[first_col].str.strip() != "") &
+        (~df[first_col].str.contains("كود العميل", na=False))
+    ]
+
+    df.columns = [
+        "Client Code","Client Name","Opening Balance",
+        "Sales Value","Returns Value",
+        "Credit","Total Collection","Madfoaat",
+        "Debit","End Balance","Motalbet"
+    ]
+
+    num_cols = df.columns[2:]
+    df[num_cols] = df[num_cols].apply(pd.to_numeric, errors="coerce").fillna(0)
+
+    return df
+
+
+# =========================
+# 📂 TARGETS
+# =========================
 def load_targets():
 
     files = {
@@ -19,11 +59,13 @@ def load_targets():
 
     for level, file in files.items():
 
-        df = pd.read_excel(file)
+        df = load_excel(file)
         df.columns = df.columns.str.strip()
 
+        fixed = ["Year", "Product Code", "Old Product Name", "Sales Price"]
+
         df = df.melt(
-            id_vars=["Year", "Product Code", "Old Product Name", "Sales Price"],
+            id_vars=fixed,
             var_name="Code",
             value_name="Target (Year)"
         )
@@ -34,78 +76,80 @@ def load_targets():
         df["Target (Unit)"] = df["Target (Year)"] / 12
         df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
 
-        all_data.append(df)
+        months = ["Jan","Feb","Mar","Apr","May","Jun",
+                  "Jul","Aug","Sep","Oct","Nov","Dec"]
+
+        df_long = df.loc[df.index.repeat(12)].copy()
+        df_long["Month"] = months * len(df)
+
+        df_long["Target (Unit)"] = df["Target (Unit)"].repeat(12).values
+        df_long["Target (Value)"] = df["Target (Value)"].repeat(12).values
+
+        all_data.append(df_long)
 
     return pd.concat(all_data, ignore_index=True)
 
 
-# =====================================================
-# 📈 HARKAH
-# =====================================================
+# =========================
+# 📂 HARKA
+# =========================
 def load_haraka():
 
-    df = pd.read_excel("Rep Harakah.xlsx")
-    df = df.replace(r'^\s*$', pd.NA, regex=True)
+    df = load_excel("Rep Harakah.xlsx")
+
+    df = df.replace(r'^\s*$', np.nan, regex=True)
 
     first_col = df.columns[0]
 
-    df[first_col] = df[first_col].astype(str)
-
     df = df[
         df[first_col].notna() &
-        (df[first_col].str.strip() != "") &
-        (~df[first_col].str.contains("كود الفرع|كود المندوب", na=False))
+        (~df[first_col].astype(str).str.contains("كود", na=False))
     ]
+
+    df.columns = [
+        "Rep Code","Rep Name","Opening",
+        "Sales","Returns","Credit",
+        "Collection","Payments","Debit",
+        "End Balance","Due"
+    ]
+
+    num_cols = df.columns[2:]
+    df[num_cols] = df[num_cols].apply(pd.to_numeric, errors="coerce").fillna(0)
 
     return df
 
 
-# =====================================================
-# ⏳ OVERDUE
-# =====================================================
-def load_overdue(codes):
+# =========================
+# 📂 OVERDUE
+# =========================
+def load_overdue():
 
-    overdue = pd.read_excel("Overdue.xlsx")
+    df = load_excel("Overdue.xlsx")
 
-    overdue.columns = [
+    df.columns = [
         "Client Name","Client Code","30","60","90","120","150","150+","Balance"
     ]
 
-    overdue["Overdue"] = overdue["120"] + overdue["150"] + overdue["150+"]
+    df["Rep Code"] = np.nan
+    df["Rep Name"] = np.nan
 
-    overdue["Rep Code"] = None
+    mask = df["Client Name"].astype(str).str.contains("كود المندوب", na=False)
 
-    overdue["Rep Code"] = pd.to_numeric(overdue["Rep Code"], errors="coerce")
+    df.loc[mask, "Rep Code"] = df.loc[mask, "Client Code"]
+    df.loc[mask, "Rep Name"] = df.loc[mask, "30"]
 
-    overdue = overdue.merge(codes, on="Rep Code", how="left")
+    df[["Rep Code","Rep Name"]] = df[["Rep Code","Rep Name"]].ffill()
 
-    return overdue
+    df = df[
+        ~df["Client Name"].astype(str).str.contains(
+            "اجمالي|كود الفرع|كود المندوب", na=False
+        )
+    ]
 
+    num_cols = ["30","60","90","120","150","150+","Client Code","Rep Code"]
 
-# =====================================================
-# 👤 CLIENT HARAKAH (NEW ADD)
-# =====================================================
-def load_client_harakah():
-
-    file_path = "Client Harakah.xlsx"
-
-    df = pd.read_excel(file_path)
-    df.columns = df.columns.str.strip()
-
-    df = df.rename(columns={
-        df.columns[0]: "Client Code",
-        df.columns[1]: "Client Name",
-        df.columns[2]: "Opening Balance",
-        df.columns[3]: "Sales Value",
-        df.columns[4]: "Returns Value",
-        df.columns[5]: "Credit",
-        df.columns[6]: "Collection",
-        df.columns[7]: "Payments",
-        df.columns[8]: "Debit",
-        df.columns[9]: "End Balance",
-    })
-
-    num_cols = df.columns[2:]
     df[num_cols] = df[num_cols].apply(pd.to_numeric, errors="coerce").fillna(0)
+
+    df["Overdue"] = df["120"] + df["150"] + df["150+"]
 
     return df
