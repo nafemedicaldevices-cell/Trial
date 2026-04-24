@@ -1,59 +1,49 @@
-import streamlit as st
-from cleaning import load_targets, load_haraka, load_client_haraka
+import pandas as pd
 
 # =========================
-# 📊 TITLE
+# 🧹 CLEAN FUNCTION
 # =========================
-st.title("📊 KPI + Harakah System")
+def remove_empty_first_column(df):
+    first_col = df.columns[0]
+
+    df[first_col] = df[first_col].astype(str).str.strip()
+
+    df = df[
+        (df[first_col].notna()) &
+        (df[first_col] != "") &
+        (df[first_col].str.lower() != "nan")
+    ]
+
+    return df
+
 
 # =========================
-# 📥 LOAD DATA
+# 📥 LOAD TARGETS
 # =========================
-targets = load_targets()
-rep_haraka = load_haraka()
-client_haraka = load_client_haraka()
+def load_targets():
+    df = pd.read_excel("Targets.xlsx")
+    return df
+
 
 # =========================
-# 📌 TABS
+# 📥 LOAD REP HARKA
 # =========================
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
-    "Rep Target",
-    "Manager Target",
-    "Area Target",
-    "Supervisor Target",
-    "Evak Target",
-    "Rep Harakah",
-    "Client Harakah"
-])
+def load_haraka():
+    df = pd.read_excel("Rep Haraka.xlsx")
+
+    # 🔥 أهم سطر
+    df = remove_empty_first_column(df)
+
+    return df
+
 
 # =========================
-# 📊 TARGETS
+# 📥 LOAD CLIENT HARKA
 # =========================
-with tab1:
-    st.dataframe(targets[targets["Level"] == "Rep"], use_container_width=True)
+def load_client_haraka():
+    df = pd.read_excel("Client Haraka.xlsx")
 
-with tab2:
-    st.dataframe(targets[targets["Level"] == "Manager"], use_container_width=True)
+    # 🔥 أهم سطر
+    df = remove_empty_first_column(df)
 
-with tab3:
-    st.dataframe(targets[targets["Level"] == "Area"], use_container_width=True)
-
-with tab4:
-    st.dataframe(targets[targets["Level"] == "Supervisor"], use_container_width=True)
-
-with tab5:
-    st.dataframe(targets[targets["Level"] == "Evak"], use_container_width=True)
-
-# =========================
-# 📊 REP HARKA
-# =========================
-with tab6:
-    st.subheader("Rep Harakah")
-    st.dataframe(rep_haraka, use_container_width=True)
-
-# =========================
-# 📊 CLIENT HARKA
-# =========================
-with tab7:
-    st.subheader("Client Harakah")
-    st.dataframe(client_haraka, use_container_width=True)
+    return df
