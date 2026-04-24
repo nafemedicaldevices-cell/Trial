@@ -18,36 +18,52 @@ def load_client_haraka():
         return pd.DataFrame()
 
     # =========================
-    # 1️⃣ READ RAW FILE
+    # 1️⃣ READ RAW (NO HEADER)
     # =========================
-    raw = pd.read_excel(file_path, header=None)
+    df = pd.read_excel(file_path, header=None)
 
     # =========================
-    # 2️⃣ FIND REP ROW (BEFORE ANY CLEANING)
+    # 2️⃣ CLEAN FIRST COLUMN (MAIN FILTER)
     # =========================
-    rep_mask = raw.astype(str).apply(
+    first_col = df.columns[0]
+
+    df[first_col] = df[first_col].astype(str)
+
+    df = df[
+        (df[first_col].str.strip() != "") &          # remove empty
+        (~df[first_col].str.contains("كود العميل", na=False)) &  # remove headers repeat
+        (~df[first_col].str.contains("كود الفرع", na=False)) &   # remove metadata
+        (~df[first_col].str.contains("اجمال", na=False))         # remove totals
+    ].copy()
+
+    df = df.reset_index(drop=True)
+
+    # =========================
+    # 3️⃣ FIND REP ROW BEFORE CLEANING TYPES
+    # =========================
+    rep_mask = df.astype(str).apply(
         lambda row: row.str.contains("مندوب المبيعات", na=False)
     ).any(axis=1)
 
-    rep_row = raw[rep_mask]
+    rep_row = df[rep_mask]
 
     if not rep_row.empty:
         r = rep_row.iloc[0]
-        rep_code = r.iloc[4]   # 10
-        rep_name = r.iloc[5]   # باسم
+        rep_code = r.iloc[4]
+        rep_name = r.iloc[5]
     else:
         rep_code = np.nan
         rep_name = ""
 
     # =========================
-    # 3️⃣ REMOVE REP ROW FROM DATA
+    # 4️⃣ REMOVE REP ROW
     # =========================
-    raw = raw[~rep_mask].reset_index(drop=True)
+    df = df[~rep_mask].reset_index(drop=True)
 
     # =========================
-    # 4️⃣ SET COLUMNS
+    # 5️⃣ SET PROPER HEADERS
     # =========================
-    raw.columns = [
+    df.columns = [
         "Client Code","Client Name","Opening Balance",
         "Sales Value","Returns Value",
         "Tasweyat Madinah (Credit)",
@@ -57,13 +73,7 @@ def load_client_haraka():
     ]
 
     # =========================
-    # 5️⃣ ASSIGN REP FIRST (IMPORTANT STEP DONE FIRST)
-    # =========================
-    raw["Rep Code"] = rep_code
-    raw["Rep Name"] = rep_name
-
-    # =========================
-    # 6️⃣ NOW SAFE TYPE CONVERSION
+    # 6️⃣ NUMERIC CLEAN
     # =========================
     num_cols = [
         "Opening Balance","Sales Value","Returns Value",
@@ -73,13 +83,15 @@ def load_client_haraka():
     ]
 
     for col in num_cols:
-        raw[col] = pd.to_numeric(raw[col], errors="coerce").fillna(0)
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-    # Rep columns after assignment
-    raw["Rep Code"] = pd.to_numeric(raw["Rep Code"], errors="coerce")
-    raw["Rep Name"] = raw["Rep Name"].astype(str)
+    # =========================
+    # 7️⃣ ASSIGN REP
+    # =========================
+    df["Rep Code"] = rep_code
+    df["Rep Name"] = rep_name
 
-    return raw
+    return df
 
 
 # =========================
@@ -88,7 +100,7 @@ def load_client_haraka():
 df = load_client_haraka()
 
 if df.empty:
-    st.warning("No data")
+    st.warning("No data found")
 else:
     st.success("Loaded successfully")
 
