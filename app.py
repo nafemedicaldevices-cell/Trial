@@ -97,7 +97,7 @@ sales['Returns Value'] = sales['Returns Unit Before Edit'] * sales['Sales Price'
 sales['Sales After Returns'] = sales['Total Sales Value'] - sales['Returns Value']
 
 # =========================
-# 📥 LOAD MODULES
+# 📥 MODULES
 # =========================
 targets = load_targets()
 haraka = load_haraka()
@@ -115,9 +115,6 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "👤 Client Harakah"
 ])
 
-# =========================
-# SALES
-# =========================
 with tab1:
     st.subheader("📊 Sales Data")
     st.dataframe(sales, use_container_width=True)
@@ -127,31 +124,19 @@ with tab1:
     c2.metric("Returns", f"{sales['Returns Value'].sum():,.0f}")
     c3.metric("Net Sales", f"{sales['Sales After Returns'].sum():,.0f}")
 
-# =========================
-# TARGETS
-# =========================
 with tab2:
     st.subheader("🎯 Targets")
     st.dataframe(targets, use_container_width=True)
 
-# =========================
-# HARKAH
-# =========================
 with tab3:
     st.subheader("📈 Harakah")
     st.dataframe(haraka, use_container_width=True)
 
-# =========================
-# OVERDUE
-# =========================
 with tab4:
     st.subheader("⏳ Overdue")
     st.dataframe(overdue, use_container_width=True)
     st.metric("Total Overdue", f"{overdue['Overdue'].sum():,.0f}")
 
-# =========================
-# CLIENT HARKAH
-# =========================
 with tab5:
     st.subheader("👤 Client Harakah")
 
@@ -161,7 +146,6 @@ with tab5:
         st.dataframe(client_haraka, use_container_width=True)
 
         c1, c2, c3 = st.columns(3)
-
         c1.metric("Sales", f"{client_haraka['Sales Value'].sum():,.0f}")
         c2.metric("Returns", f"{client_haraka['Returns Value'].sum():,.0f}")
         c3.metric(
