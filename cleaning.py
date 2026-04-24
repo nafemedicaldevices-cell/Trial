@@ -59,11 +59,12 @@ def load_targets():
 
 
 # =========================
-# 📂 HARKA
+# 📂 REP HARKAH
 # =========================
 def load_haraka():
 
     df = pd.read_excel("Rep Harakah.xlsx")
+
     df = df.replace(r'^\s*$', pd.NA, regex=True)
 
     first_col = df.columns[0]
@@ -77,6 +78,7 @@ def load_haraka():
     ]
 
     cols = df.columns.tolist()
+
     seen = {}
     new_cols = []
 
@@ -156,6 +158,7 @@ def load_overdue(overdue_path, codes):
     )
 
     codes['Rep Code'] = pd.to_numeric(codes['Rep Code'], errors='coerce').astype(int)
+
     overdue = overdue.merge(codes, on='Rep Code', how='left')
 
     overdue['Rep Code'] = overdue['Rep Code'].astype(str)
@@ -173,6 +176,7 @@ def load_client_haraka():
 
     df = pd.read_excel(file_path, header=None)
 
+    # استخراج المندوب
     rep_mask = df.astype(str).apply(
         lambda row: row.str.contains("مندوب المبيعات", na=False)
     ).any(axis=1)
@@ -189,6 +193,7 @@ def load_client_haraka():
 
     df = df[~rep_mask].reset_index(drop=True)
 
+    # تسمية الأعمدة
     df.columns = [
         "Client Code","Client Name","Opening Balance",
         "Sales Value","Returns Value",
@@ -198,17 +203,36 @@ def load_client_haraka():
         "End Balance","Motalbet El Fatrah"
     ]
 
+    # حذف الصفوف الافتراضية
+    df = df[
+        ~df.astype(str).apply(
+            lambda row: row.str.contains("كود العميل", na=False)
+        ).any(axis=1)
+    ].copy()
+
+    first_col = df.columns[0]
+    df[first_col] = df[first_col].astype(str)
+
+    df = df[
+        (df[first_col].notna()) &
+        (df[first_col].str.strip() != "") &
+        (~df[first_col].str.lower().isin(["none", "nan"]))
+    ].copy()
+
+    df = df.reset_index(drop=True)
+
+    # تحويل أرقام
     for col in df.columns[2:]:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
     df["Rep Code"] = rep_code
     df["Old Rep Name"] = rep_name
 
+    # Merge codes
     if os.path.exists(code_path):
 
         codes = pd.read_excel(code_path)
         codes.columns = codes.columns.str.strip()
-        codes = codes.drop_duplicates(subset=["Rep Code"])
 
         df["Rep Code"] = df["Rep Code"].astype(str).str.strip()
         codes["Rep Code"] = codes["Rep Code"].astype(str).str.strip()
