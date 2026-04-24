@@ -1,142 +1,88 @@
 import streamlit as st
-import pandas as pd
-
 from linking import build_model
 
 # =========================
-# 📌 LOAD FROM LINKING LAYER
+# 📌 LOAD DATA
 # =========================
 
 model = build_model()
-
-sales = model["sales"]
-
-# مهم جدًا لتجنب NameError + مشاكل النسخ
-sales = sales.copy()
-
+sales = model["sales"].copy()
 
 # =========================
-# 🎛 FILTER ENGINE
+# 🎛 STREAMLIT SETUP
 # =========================
 
-def filter_data(df, manager, area, supervisor, company, rep):
-
-    if manager != "All":
-        df = df[df["Manager"] == manager]
-
-    if area != "All":
-        df = df[df["Area"] == area]
-
-    if supervisor != "All":
-        df = df[df["Supervisor"] == supervisor]
-
-    if company != "All":
-        df = df[df["Company"] == company]
-
-    if rep != "All":
-        df = df[df["Old Rep Name"] == rep]
-
-    return df
-
-
-# =========================
-# 🧹 CLEAN COLUMNS SAFETY
-# =========================
-
-required_cols = [
-    "Manager",
-    "Area",
-    "Supervisor",
-    "Company",
-    "Old Rep Name"
-]
-
-for col in required_cols:
-    if col not in sales.columns:
-        sales[col] = None
-
-
-# =========================
-# 🎛 STREAMLIT UI
-# =========================
-
-st.set_page_config(
-    page_title="Sales Dashboard",
-    layout="wide"
-)
-
+st.set_page_config(page_title="Dashboard", layout="wide")
 st.title("📊 Sales Dashboard")
-
 
 st.sidebar.header("🎛 Filters")
 
+# =========================
+# 🎯 FILTER OPTIONS
+# =========================
+
+def safe_list(col):
+    if col in sales.columns:
+        return ["All"] + sorted(sales[col].dropna().unique())
+    return ["All"]
 
 manager = st.sidebar.selectbox(
     "Manager",
-    ["All"] + sorted(sales["Manager"].dropna().unique())
-)
-
-area = st.sidebar.selectbox(
-    "Area",
-    ["All"] + sorted(sales["Area"].dropna().unique())
+    safe_list("Manager")
 )
 
 supervisor = st.sidebar.selectbox(
     "Supervisor",
-    ["All"] + sorted(sales["Supervisor"].dropna().unique())
+    safe_list("Supervisor")
+)
+
+area = st.sidebar.selectbox(
+    "Area",
+    safe_list("Area")
 )
 
 company = st.sidebar.selectbox(
     "Company",
-    ["All"] + sorted(sales["Company"].dropna().unique())
+    safe_list("Company")
 )
 
 rep = st.sidebar.selectbox(
     "Rep Name",
-    ["All"] + sorted(sales["Old Rep Name"].dropna().unique())
+    safe_list("Old Rep Name")
 )
-
 
 # =========================
 # 🔗 APPLY FILTERS
 # =========================
 
-filtered_sales = filter_data(
-    sales,
-    manager,
-    area,
-    supervisor,
-    company,
-    rep
-)
+filtered = sales.copy()
 
+if manager != "All":
+    filtered = filtered[filtered["Manager"] == manager]
+
+if supervisor != "All":
+    filtered = filtered[filtered["Supervisor"] == supervisor]
+
+if area != "All":
+    filtered = filtered[filtered["Area"] == area]
+
+if company != "All":
+    filtered = filtered[filtered["Company"] == company]
+
+if rep != "All":
+    filtered = filtered[filtered["Old Rep Name"] == rep]
 
 # =========================
 # 📊 OUTPUT
 # =========================
 
-st.subheader("📌 Filtered Sales Data")
+st.subheader("📌 Filtered Data")
 
-st.dataframe(
-    filtered_sales,
-    use_container_width=True
-)
-
+st.dataframe(filtered, use_container_width=True)
 
 # =========================
-# 📊 SIMPLE KPIs (اختياري)
+# 📊 QUICK KPI
 # =========================
 
-if "Net Sales" in filtered_sales.columns:
-
-    st.metric(
-        "Net Sales",
-        filtered_sales["Net Sales"].sum()
-    )
-
-if "Returns Value" in filtered_sales.columns:
-
-    st.metric(
-        "Returns",
-        filtered_sales["Returns Value"].sum()
-    )
+if "Net Sales" in filtered.columns:
+    st.metric("Net Sales", filtered["Net Sales"].sum())
