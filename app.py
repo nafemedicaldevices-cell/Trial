@@ -18,12 +18,12 @@ def load_client_haraka():
         return pd.DataFrame()
 
     # =========================
-    # 1️⃣ LOAD RAW (IMPORTANT)
+    # 1️⃣ READ FILE
     # =========================
     df = pd.read_excel(file_path)
 
     # =========================
-    # 2️⃣ SAFE RENAME (BEFORE ANY CLEANING)
+    # 2️⃣ RENAME COLUMNS SAFELY
     # =========================
     expected_cols = [
         "Client Code",
@@ -43,31 +43,7 @@ def load_client_haraka():
     df.columns = expected_cols[:df.shape[1]]
 
     # =========================
-    # 3️⃣ 🧠 EXTRACT REP (BEFORE DELETING ROWS)
-    # =========================
-
-    df["Rep Code"] = np.nan
-    df["Rep Name"] = np.nan
-
-    mask = df["Sales Value"].astype(str).str.contains("مندوب المبيعات", na=False)
-
-    df.loc[mask, "Rep Code"] = pd.to_numeric(
-        df.loc[mask, "Returns Value"],
-        errors="coerce"
-    )
-
-    df.loc[mask, "Rep Name"] = df.loc[mask, "Tasweyat Madinah (Credit)"].astype(object)
-
-    df["Rep Code"] = df["Rep Code"].ffill()
-    df["Rep Name"] = df["Rep Name"].ffill()
-
-    # =========================
-    # 4️⃣ REMOVE MARKER ROWS (AFTER EXTRACTION)
-    # =========================
-    df = df[~df["Sales Value"].astype(str).str.contains("مندوب المبيعات", na=False)].copy()
-
-    # =========================
-    # 5️⃣ NUMERIC CLEAN
+    # 3️⃣ NUMERIC CLEAN
     # =========================
     num_cols = [
         "Opening Balance",
@@ -84,6 +60,31 @@ def load_client_haraka():
     for col in num_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+    # =========================
+    # 4️⃣ REP EXTRACTION (FINAL SAFE VERSION)
+    # =========================
+
+    df["Rep Code"] = np.nan
+    df["Rep Name"] = ""
+
+    mask = df["Sales Value"].astype(str).str.contains("مندوب المبيعات", na=False)
+
+    # 🔥 safe extraction
+    rep_code = pd.to_numeric(df.loc[mask, "Returns Value"], errors="coerce").values.copy()
+    rep_name = df.loc[mask, "Tasweyat Madinah (Credit)"].astype(str).values.copy()
+
+    df.loc[mask, "Rep Code"] = rep_code
+    df.loc[mask, "Rep Name"] = rep_name
+
+    # 🔽 fill down
+    df["Rep Code"] = df["Rep Code"].ffill()
+    df["Rep Name"] = df["Rep Name"].ffill()
+
+    # =========================
+    # 5️⃣ REMOVE MARKER ROWS
+    # =========================
+    df = df[~df["Sales Value"].astype(str).str.contains("مندوب المبيعات", na=False)].copy()
 
     return df
 
