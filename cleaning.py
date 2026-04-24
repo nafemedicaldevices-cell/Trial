@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 
 # =========================
 # 📂 TARGET FILES
@@ -67,7 +68,6 @@ def load_haraka():
         (~df[first_col].str.contains("كود المندوب", na=False))
     ]
 
-    # إزالة تكرار الأعمدة
     cols = df.columns.tolist()
     seen = {}
     new_cols = []
@@ -97,3 +97,59 @@ def load_haraka():
     })
 
     return df
+
+
+# =========================
+# 📂 OVERDUE
+# =========================
+def load_overdue(overdue_path, codes):
+
+    overdue = pd.read_excel(overdue_path)
+
+    overdue.columns = [
+        "Client Name", "Client Code", "30 Days", "60 Days", "90 Days", "120 Days",
+        "150 Days", "More Than 150 Days", "Balance"
+    ]
+
+    overdue['Rep Code'] = None
+    overdue['Rep Name'] = None
+
+    mask = overdue['Client Name'].astype(str).str.strip() == "كود المندوب"
+
+    overdue.loc[mask, 'Rep Code'] = overdue.loc[mask, 'Client Code']
+    overdue.loc[mask, 'Rep Name'] = overdue.loc[mask, '30 Days']
+
+    overdue[['Rep Code', 'Rep Name']] = overdue[['Rep Code', 'Rep Name']].ffill()
+
+    overdue = overdue[
+        overdue['Client Name'].notna() &
+        (overdue['Client Name'].astype(str).str.strip() != '') &
+        (~overdue['Client Name'].astype(str).str.contains(
+            'اجمالــــــي التقرير|اجمالى الفرع/المندوب|كود الفرع|كود المندوب|اسم العميل',
+            na=False
+        ))
+    ].copy()
+
+    num_cols = [
+        '30 Days','60 Days','90 Days','120 Days',
+        '150 Days','More Than 150 Days','Client Code','Rep Code'
+    ]
+
+    for col in num_cols:
+        overdue[col] = pd.to_numeric(overdue[col], errors='coerce').fillna(0)
+
+    overdue['Rep Code'] = overdue['Rep Code'].astype(int)
+    overdue['Client Code'] = overdue['Client Code'].astype(int)
+
+    overdue['Overdue'] = (
+        overdue['120 Days'] +
+        overdue['150 Days'] +
+        overdue['More Than 150 Days']
+    )
+
+    codes['Rep Code'] = pd.to_numeric(codes['Rep Code'], errors='coerce').astype(int)
+    overdue = overdue.merge(codes, on='Rep Code', how='left')
+
+    overdue['Rep Code'] = overdue['Rep Code'].astype(str)
+
+    return overdue
