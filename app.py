@@ -12,7 +12,7 @@ st.title("👤 Client Harakah Dashboard")
 def load_client_haraka():
 
     file_path = "Client Harakah.xlsx"
-    code_path = "Code.xlsx"   # ✔️ FIX HERE
+    code_path = "Code.xlsx"
 
     if not os.path.exists(file_path):
         st.error("Client Harakah file not found")
@@ -96,7 +96,7 @@ def load_client_haraka():
     df["Rep Name"] = rep_name
 
     # =========================
-    # 9️⃣ MERGE WITH CODE.XLSX (FIXED NAME)
+    # 9️⃣ LOAD HIERARCHY (CODE.XLSX)
     # =========================
     if os.path.exists(code_path):
 
@@ -106,13 +106,26 @@ def load_client_haraka():
         # clean duplicates
         codes = codes.drop_duplicates(subset=["Rep Code"])
 
-        # unify types
+        # ensure same type
         df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce")
         codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce")
 
-        # merge
+        # =========================
+        # 🔗 MERGE FULL HIERARCHY
+        # =========================
         df = df.merge(
-            codes,
+            codes[
+                [
+                    "Rep Code",
+                    "Rep Name",
+                    "Supervisor Code",
+                    "Supervisor Name",
+                    "Manager Code",
+                    "Manager Name",
+                    "Area Code",
+                    "Area Name"
+                ]
+            ],
             on="Rep Code",
             how="left"
         )
