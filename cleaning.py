@@ -59,12 +59,11 @@ def load_targets():
 
 
 # =========================
-# 📂 HARKA (WITH MERGE FIX)
+# 📂 HARKAH
 # =========================
 def load_haraka():
 
     df = pd.read_excel("Rep Harakah.xlsx")
-
     df = df.replace(r'^\s*$', pd.NA, regex=True)
 
     first_col = df.columns[0]
@@ -91,9 +90,12 @@ def load_haraka():
 
     df.columns = new_cols
 
+    # =========================
+    # OLD NAME + CODE
+    # =========================
     df = df.rename(columns={
         df.columns[0]: "Rep Code",
-        df.columns[1]: "Rep Name",
+        df.columns[1]: "Old Rep Name",
         df.columns[2]: "Opening Balance",
         df.columns[3]: "Sales Value",
         df.columns[4]: "Returns Value",
@@ -106,12 +108,11 @@ def load_haraka():
     })
 
     num_cols = df.columns[2:]
-
     for col in num_cols:
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
     # =========================
-    # 🔗 MERGE WITH CODE.xlsx
+    # MERGE CODE (NEW NAME SOURCE)
     # =========================
     code_path = "Code.xlsx"
 
@@ -122,8 +123,6 @@ def load_haraka():
 
         df["Rep Code"] = df["Rep Code"].astype(str).str.strip()
         codes["Rep Code"] = codes["Rep Code"].astype(str).str.strip()
-
-        codes = codes.drop_duplicates(subset=["Rep Code"])
 
         df = df.merge(codes, on="Rep Code", how="left")
 
@@ -142,46 +141,49 @@ def load_overdue(overdue_path, codes):
         "150 Days", "More Than 150 Days", "Balance"
     ]
 
-    overdue['Rep Code'] = None
-    overdue['Rep Name'] = None
+    overdue["Rep Code"] = None
+    overdue["Old Rep Name"] = None
 
-    mask = overdue['Client Name'].astype(str).str.strip() == "كود المندوب"
+    mask = overdue["Client Name"].astype(str).str.strip() == "كود المندوب"
 
-    overdue.loc[mask, 'Rep Code'] = overdue.loc[mask, 'Client Code']
-    overdue.loc[mask, 'Rep Name'] = overdue.loc[mask, '30 Days']
+    overdue.loc[mask, "Rep Code"] = overdue.loc[mask, "Client Code"]
+    overdue.loc[mask, "Old Rep Name"] = overdue.loc[mask, "30 Days"]
 
-    overdue[['Rep Code', 'Rep Name']] = overdue[['Rep Code', 'Rep Name']].ffill()
+    overdue[["Rep Code", "Old Rep Name"]] = overdue[["Rep Code", "Old Rep Name"]].ffill()
 
     overdue = overdue[
-        overdue['Client Name'].notna() &
-        (overdue['Client Name'].astype(str).str.strip() != '') &
-        (~overdue['Client Name'].astype(str).str.contains(
-            'اجمالــــــي التقرير|اجمالى الفرع/المندوب|كود الفرع|كود المندوب|اسم العميل',
+        overdue["Client Name"].notna() &
+        (overdue["Client Name"].astype(str).str.strip() != "") &
+        (~overdue["Client Name"].astype(str).str.contains(
+            "اجمالــــــي التقرير|اجمالى الفرع/المندوب|كود الفرع|كود المندوب|اسم العميل",
             na=False
         ))
     ].copy()
 
     num_cols = [
-        '30 Days','60 Days','90 Days','120 Days',
-        '150 Days','More Than 150 Days','Client Code','Rep Code'
+        "30 Days","60 Days","90 Days","120 Days",
+        "150 Days","More Than 150 Days","Client Code","Rep Code"
     ]
 
     for col in num_cols:
-        overdue[col] = pd.to_numeric(overdue[col], errors='coerce').fillna(0)
+        overdue[col] = pd.to_numeric(overdue[col], errors="coerce").fillna(0)
 
-    overdue['Rep Code'] = overdue['Rep Code'].astype(int)
-    overdue['Client Code'] = overdue['Client Code'].astype(int)
+    overdue["Rep Code"] = overdue["Rep Code"].astype(int)
+    overdue["Client Code"] = overdue["Client Code"].astype(int)
 
-    overdue['Overdue'] = (
-        overdue['120 Days'] +
-        overdue['150 Days'] +
-        overdue['More Than 150 Days']
+    overdue["Overdue"] = (
+        overdue["120 Days"] +
+        overdue["150 Days"] +
+        overdue["More Than 150 Days"]
     )
 
-    codes['Rep Code'] = pd.to_numeric(codes['Rep Code'], errors='coerce').astype(int)
-    overdue = overdue.merge(codes, on='Rep Code', how='left')
+    codes["Rep Code"] = pd.to_numeric(codes["Rep Code"], errors="coerce").astype(int)
 
-    overdue['Rep Code'] = overdue['Rep Code'].astype(str)
+    overdue = overdue.merge(
+        codes.rename(columns={"Rep Name": "Rep Name"}),
+        on="Rep Code",
+        how="left"
+    )
 
     return overdue
 
@@ -205,10 +207,10 @@ def load_client_haraka():
     if not rep_row.empty:
         r = rep_row.iloc[0]
         rep_code = r.iloc[4]
-        rep_name = r.iloc[5]
+        old_rep_name = r.iloc[5]
     else:
         rep_code = np.nan
-        rep_name = ""
+        old_rep_name = ""
 
     df = df[~rep_mask].reset_index(drop=True)
 
@@ -242,13 +244,12 @@ def load_client_haraka():
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
     df["Rep Code"] = rep_code
-    df["Rep Name"] = rep_name
+    df["Old Rep Name"] = old_rep_name
 
     if os.path.exists(code_path):
 
         codes = pd.read_excel(code_path)
         codes.columns = codes.columns.str.strip()
-        codes = codes.drop_duplicates(subset=["Rep Code"])
 
         df["Rep Code"] = df["Rep Code"].astype(str).str.strip()
         codes["Rep Code"] = codes["Rep Code"].astype(str).str.strip()
