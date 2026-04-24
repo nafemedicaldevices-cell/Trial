@@ -14,77 +14,64 @@ def load_client_haraka():
     file_path = "Client Harakah.xlsx"
 
     if not os.path.exists(file_path):
-        st.error("❌ File not found: Client Harakah.xlsx")
+        st.error("❌ File not found")
         return pd.DataFrame()
 
-    # =========================
-    # 1️⃣ READ FILE
-    # =========================
     df = pd.read_excel(file_path)
 
     # =========================
-    # 2️⃣ RENAME COLUMNS SAFELY
+    # 🧾 RENAME
     # =========================
-    expected_cols = [
-        "Client Code",
-        "Client Name",
-        "Opening Balance",
-        "Sales Value",
-        "Returns Value",
+    cols = [
+        "Client Code","Client Name","Opening Balance",
+        "Sales Value","Returns Value",
         "Tasweyat Madinah (Credit)",
-        "Total Collection",
-        "Madfoaat",
+        "Total Collection","Madfoaat",
         "Tasweyat Madinah (Debit)",
-        "End Balance",
-        "Motalbet El Fatrah"
+        "End Balance","Motalbet El Fatrah"
     ]
 
-    df = df.iloc[:, :len(expected_cols)]
-    df.columns = expected_cols[:df.shape[1]]
+    df = df.iloc[:, :len(cols)]
+    df.columns = cols[:df.shape[1]]
 
     # =========================
-    # 3️⃣ NUMERIC CLEAN
+    # 🔢 NUMERIC CLEAN
     # =========================
     num_cols = [
-        "Opening Balance",
-        "Sales Value",
-        "Returns Value",
-        "Tasweyat Madinah (Credit)",
-        "Total Collection",
-        "Madfoaat",
-        "Tasweyat Madinah (Debit)",
-        "End Balance",
-        "Motalbet El Fatrah"
+        "Opening Balance","Sales Value","Returns Value",
+        "Tasweyat Madinah (Credit)","Total Collection",
+        "Madfoaat","Tasweyat Madinah (Debit)",
+        "End Balance","Motalbet El Fatrah"
     ]
 
-    for col in num_cols:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+    for c in num_cols:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
     # =========================
-    # 4️⃣ REP EXTRACTION (FINAL SAFE VERSION)
+    # 🧠 REP LOGIC (SAFE - NO ASSIGNMENT CRASH)
     # =========================
-
-    df["Rep Code"] = np.nan
-    df["Rep Name"] = ""
 
     mask = df["Sales Value"].astype(str).str.contains("مندوب المبيعات", na=False)
 
-    # 🔥 safe extraction
-    rep_code = pd.to_numeric(df.loc[mask, "Returns Value"], errors="coerce").values.copy()
-    rep_name = df.loc[mask, "Tasweyat Madinah (Credit)"].astype(str).values.copy()
+    rep_code_series = pd.Series(np.nan, index=df.index)
+    rep_name_series = pd.Series("", index=df.index)
 
-    df.loc[mask, "Rep Code"] = rep_code
-    df.loc[mask, "Rep Name"] = rep_name
+    rep_code_series.loc[mask] = df.loc[mask, "Returns Value"]
+    rep_name_series.loc[mask] = df.loc[mask, "Tasweyat Madinah (Credit)"].astype(str)
 
-    # 🔽 fill down
-    df["Rep Code"] = df["Rep Code"].ffill()
-    df["Rep Name"] = df["Rep Name"].ffill()
+    # 🔽 fill down BEFORE attaching
+    rep_code_series = rep_code_series.ffill()
+    rep_name_series = rep_name_series.ffill()
+
+    # attach safely
+    df["Rep Code"] = rep_code_series
+    df["Rep Name"] = rep_name_series
 
     # =========================
-    # 5️⃣ REMOVE MARKER ROWS
+    # 🧹 REMOVE MARKER ROWS
     # =========================
-    df = df[~df["Sales Value"].astype(str).str.contains("مندوب المبيعات", na=False)].copy()
+    df = df[~mask].copy()
 
     return df
 
@@ -98,13 +85,13 @@ df = load_client_haraka()
 # 📊 UI
 # =========================
 if df.empty:
-    st.warning("⚠️ No data loaded")
+    st.warning("No data")
 else:
-    st.success("✅ Data Loaded Successfully")
+    st.success("Loaded")
 
     st.dataframe(df, use_container_width=True)
 
-    st.subheader("📊 KPIs")
+    st.subheader("KPIs")
 
     c1, c2, c3 = st.columns(3)
 
