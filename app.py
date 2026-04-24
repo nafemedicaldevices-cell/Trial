@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 
 # =========================
-# 📥 LOAD DATA مباشرة
+# 📥 LOAD CLEAN DATA
 # =========================
 
 sales = pd.read_excel("Sales.xlsx")
@@ -12,7 +12,7 @@ sales.columns = sales.columns.str.strip()
 codes.columns = codes.columns.str.strip()
 
 # =========================
-# 🔗 MERGE CODE (عشان الفلاتر)
+# 🔗 MERGE FOR FILTERS
 # =========================
 
 sales["Rep Code"] = pd.to_numeric(sales["Rep Code"], errors="coerce")
@@ -24,29 +24,22 @@ sales = sales.merge(codes, on="Rep Code", how="left")
 # 🎛 STREAMLIT
 # =========================
 
-st.set_page_config(page_title="Sales Dashboard", layout="wide")
 st.title("📊 Sales Dashboard")
 
 st.sidebar.header("🎛 Filters")
 
-# =========================
-# 🧠 SAFE OPTIONS
-# =========================
 
-def opts(col):
+def options(col):
     if col in sales.columns:
         return ["All"] + sorted(sales[col].dropna().unique())
     return ["All"]
 
-# =========================
-# 🎛 FILTERS
-# =========================
 
-manager = st.sidebar.selectbox("Manager", opts("Manager"))
-area = st.sidebar.selectbox("Area", opts("Area"))
-supervisor = st.sidebar.selectbox("Supervisor", opts("Supervisor"))
-company = st.sidebar.selectbox("Company", opts("Company"))
-rep = st.sidebar.selectbox("Rep Name", opts("Old Rep Name"))
+manager = st.sidebar.selectbox("Manager", options("Manager"))
+area = st.sidebar.selectbox("Area", options("Area"))
+supervisor = st.sidebar.selectbox("Supervisor", options("Supervisor"))
+company = st.sidebar.selectbox("Company", options("Company"))
+rep = st.sidebar.selectbox("Rep Name", options("Old Rep Name"))
 
 # =========================
 # 🔗 APPLY FILTERS
@@ -74,10 +67,3 @@ if rep != "All":
 # =========================
 
 st.dataframe(df, use_container_width=True)
-
-# =========================
-# 📊 SIMPLE KPI
-# =========================
-
-if "Net Sales" in df.columns:
-    st.metric("Net Sales", df["Net Sales"].sum())
