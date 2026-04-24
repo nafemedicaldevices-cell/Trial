@@ -7,7 +7,7 @@ st.set_page_config(layout="wide")
 st.title("📊 Sales Dashboard")
 
 # =========================
-# Upload files
+# Upload Files
 # =========================
 sales_file = st.file_uploader("Upload Sales", type=["xlsx"])
 mapping_file = st.file_uploader("Upload Mapping", type=["xlsx"])
