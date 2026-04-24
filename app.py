@@ -9,27 +9,26 @@ st.set_page_config(layout="wide")
 st.title("📊 KPI + Harakah System")
 
 # =========================
-# ⚡ LOAD DATA (CACHED)
+# 📥 LOAD DATA
 # =========================
 @st.cache_data
-def load_all():
-    return load_targets(), load_haraka(), load_client_haraka()
+def load_all_data():
+    targets = load_targets()
+    rep_haraka = load_haraka()
+    client_haraka = load_client_haraka()
+    return targets, rep_haraka, client_haraka
 
-targets, rep_haraka, client_haraka = load_all()
-
-# =========================
-# 📌 FILTER
-# =========================
-level_filter = st.selectbox(
-    "Select Level",
-    ["All", "Rep", "Manager", "Area", "Supervisor", "Evak"]
-)
+targets, rep_haraka, client_haraka = load_all_data()
 
 # =========================
 # 📌 TABS
 # =========================
-tab1, tab2, tab3 = st.tabs([
-    "Targets",
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+    "Rep Target",
+    "Manager Target",
+    "Area Target",
+    "Supervisor Target",
+    "Evak Target",
     "Rep Harakah",
     "Client Harakah"
 ])
@@ -38,36 +37,30 @@ tab1, tab2, tab3 = st.tabs([
 # 📊 TARGETS
 # =========================
 with tab1:
+    st.dataframe(targets[targets["Level"] == "Rep"], use_container_width=True)
 
-    if level_filter == "All":
-        df_show = targets
-    else:
-        df_show = targets[targets["Level"] == level_filter]
+with tab2:
+    st.dataframe(targets[targets["Level"] == "Manager"], use_container_width=True)
 
-    st.dataframe(df_show, use_container_width=True)
+with tab3:
+    st.dataframe(targets[targets["Level"] == "Area"], use_container_width=True)
 
+with tab4:
+    st.dataframe(targets[targets["Level"] == "Supervisor"], use_container_width=True)
+
+with tab5:
+    st.dataframe(targets[targets["Level"] == "Evak"], use_container_width=True)
 
 # =========================
 # 📊 REP HARKA
 # =========================
-with tab2:
+with tab6:
     st.subheader("Rep Harakah")
     st.dataframe(rep_haraka, use_container_width=True)
-
 
 # =========================
 # 📊 CLIENT HARKA
 # =========================
-with tab3:
+with tab7:
     st.subheader("Client Harakah")
-
-    # فلترة بالمندوب
-    reps = client_haraka["Rep Name"].dropna().unique()
-    selected_rep = st.selectbox("Filter by Rep", ["All"] + list(reps))
-
-    if selected_rep != "All":
-        df_client = client_haraka[client_haraka["Rep Name"] == selected_rep]
-    else:
-        df_client = client_haraka
-
-    st.dataframe(df_client, use_container_width=True)
+    st.dataframe(client_haraka, use_container_width=True)
