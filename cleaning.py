@@ -57,9 +57,14 @@ def load_haraka():
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
 
-    # ✅ FIX: ONLY FIRST COLUMN controls row deletion
+    # 🔥 FIX STRONG: first column only
     first_col = df.columns[0]
-    df = df[df[first_col].notna() & (df[first_col].astype(str).str.strip() != "")]
+    df[first_col] = df[first_col].astype(str)
+
+    df = df[
+        df[first_col].str.strip().ne("") &
+        df[first_col].str.lower().ne("nan")
+    ]
 
     df.columns = [
         "Rep Code",
@@ -87,9 +92,14 @@ def load_client_haraka():
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
 
-    # ✅ FIX: ONLY FIRST COLUMN controls row deletion
+    # 🔥 FIX STRONG: first column only
     first_col = df.columns[0]
-    df = df[df[first_col].notna() & (df[first_col].astype(str).str.strip() != "")]
+    df[first_col] = df[first_col].astype(str)
+
+    df = df[
+        df[first_col].str.strip().ne("") &
+        df[first_col].str.lower().ne("nan")
+    ]
 
     df.columns = [f"Col{i}" for i in range(df.shape[1])]
 
