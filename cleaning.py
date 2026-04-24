@@ -12,6 +12,7 @@ FILES = {
 }
 
 def load_targets():
+
     all_data = []
 
     for level, file in FILES.items():
@@ -20,6 +21,11 @@ def load_targets():
         df.columns = df.columns.str.strip()
 
         required_cols = ["Year", "Product Code", "Old Product Name", "Sales Price"]
+
+        missing = [c for c in required_cols if c not in df.columns]
+        if missing:
+            print(f"❌ Missing in {level}: {missing}")
+            continue
 
         df = df.melt(
             id_vars=required_cols,
@@ -44,7 +50,7 @@ def load_targets():
 
         all_data.append(df_long)
 
-    return pd.concat(all_data, ignore_index=True)
+    return pd.concat(all_data, ignore_index=True) if all_data else pd.DataFrame()
 
 
 # =========================
@@ -53,10 +59,12 @@ def load_targets():
 def load_haraka():
 
     df = pd.read_excel("Rep Harakah.xlsx")
+    df.columns = df.columns.str.strip()
 
     df = df.replace(r'^\s*$', pd.NA, regex=True)
 
     first_col = df.columns[0]
+
     df[first_col] = df[first_col].astype(str)
 
     df = df[
@@ -64,8 +72,6 @@ def load_haraka():
         (df[first_col].str.strip() != "") &
         (~df[first_col].str.contains("كود الفرع|كود المندوب", na=False))
     ]
-
-    df.columns = df.columns.str.strip()
 
     df = df.rename(columns={
         df.columns[0]: "Rep Code",
@@ -82,33 +88,59 @@ def load_haraka():
 
 
 # =========================
-# 📊 SALES (FROM FILE - NOT UPLOAD)
+# 📊 SALES (SMART FIX - NO KEYERROR)
 # =========================
 def load_sales():
 
-    sales = pd.read_excel("Sales.xlsx")  # 👈 نفس فكرة باقي الشيتات
-
+    sales = pd.read_excel("Sales.xlsx")
     sales.columns = sales.columns.str.strip()
 
+    # =========================
+    # 🔥 AUTO DETECT DATE COLUMN
+    # =========================
+    date_col = None
+    for c in sales.columns:
+        if "date" in c.lower() or "تاريخ" in c:
+            date_col = c
+            break
+
+    if date_col is None:
+        raise ValueError("❌ Date column not found in Sales file")
+
+    # =========================
+    # CLEAN
+    # =========================
     sales = sales.replace(r'^\s*$', pd.NA, regex=True)
 
     sales = sales[
-        sales['Date'].notna() &
-        (sales['Date'].astype(str).str.strip() != '') &
-        (~sales['Date'].astype(str).str.contains('المندوب|كود الفرع|كود الصنف', na=False))
+        sales[date_col].notna() &
+        (sales[date_col].astype(str).str.strip() != '')
     ].copy()
 
-    num_cols = [
-        'Sales Unit Before Edit',
-        'Returns Unit Before Edit',
-        'Sales Price',
-        'Invoice Discounts'
+    # =========================
+    # NUMERIC SAFE
+    # =========================
+    possible_num_cols = [
+        "Sales Unit Before Edit",
+        "Returns Unit Before Edit",
+        "Sales Price",
+        "Invoice Discounts"
     ]
 
-    sales[num_cols] = sales[num_cols].apply(pd.to_numeric, errors='coerce').fillna(0)
+    for c in possible_num_cols:
+        if c in sales.columns:
+            sales[c] = pd.to_numeric(sales[c], errors="coerce").fillna(0)
 
-    sales['Total Sales Value'] = sales['Sales Unit Before Edit'] * sales['Sales Price']
-    sales['Returns Value'] = sales['Returns Unit Before Edit'] * sales['Sales Price']
-    sales['Net Sales Value'] = sales['Total Sales Value'] - sales['Returns Value']
+    # =========================
+    # CALCULATION
+    # =========================
+    if "Sales Unit Before Edit" in sales.columns and "Sales Price" in sales.columns:
+        sales["Total Sales Value"] = sales["Sales Unit Before Edit"] * sales["Sales Price"]
+
+    if "Returns Unit Before Edit" in sales.columns and "Sales Price" in sales.columns:
+        sales["Returns Value"] = sales["Returns Unit Before Edit"] * sales["Sales Price"]
+
+    if "Total Sales Value" in sales.columns and "Returns Value" in sales.columns:
+        sales["Net Sales Value"] = sales["Total Sales Value"] - sales["Returns Value"]
 
     return sales
