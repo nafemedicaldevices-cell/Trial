@@ -7,16 +7,11 @@ from cleaning import load_targets, load_haraka, load_client_haraka
 st.title("📊 KPI + Harakah System")
 
 # =========================
-# ⚡ CACHE
+# 📥 LOAD DATA
 # =========================
-@st.cache_data
-def get_data():
-    targets = load_targets()
-    rep_haraka = load_haraka()
-    client_haraka = load_client_haraka()
-    return targets, rep_haraka, client_haraka
-
-targets, rep_haraka, client_haraka = get_data()
+targets = load_targets()
+rep_haraka = load_haraka()
+client_haraka = load_client_haraka()
 
 # =========================
 # 📌 TABS
@@ -34,26 +29,20 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
 # =========================
 # 📊 TARGETS
 # =========================
-def show_target(level):
-    st.dataframe(
-        targets[targets["Level"] == level],
-        use_container_width=True
-    )
-
 with tab1:
-    show_target("Rep")
+    st.dataframe(targets[targets["Level"] == "Rep"], use_container_width=True)
 
 with tab2:
-    show_target("Manager")
+    st.dataframe(targets[targets["Level"] == "Manager"], use_container_width=True)
 
 with tab3:
-    show_target("Area")
+    st.dataframe(targets[targets["Level"] == "Area"], use_container_width=True)
 
 with tab4:
-    show_target("Supervisor")
+    st.dataframe(targets[targets["Level"] == "Supervisor"], use_container_width=True)
 
 with tab5:
-    show_target("Evak")
+    st.dataframe(targets[targets["Level"] == "Evak"], use_container_width=True)
 
 # =========================
 # 📊 REP HARKA
