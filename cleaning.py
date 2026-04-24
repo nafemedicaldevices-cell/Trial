@@ -80,7 +80,7 @@ def load_haraka():
 
 
 # =========================
-# 📂 CLIENT HARKA (FINAL FIX - FILL DOWN)
+# 📂 CLIENT HARKA (FIXED)
 # =========================
 def load_client_haraka():
 
@@ -89,37 +89,47 @@ def load_client_haraka():
     df = df.replace(r'^\s*$', pd.NA, regex=True)
     df = df.dropna(how="all")
 
-    # ❌ حذف الهيدر الداخلي
+    # rename مؤقت
+    df.columns = [f"Col{i}" for i in range(df.shape[1])]
+
+    # =========================
+    # 👤 تحديد صفوف المندوب
+    # =========================
+    mask_rep = df.astype(str).apply(
+        lambda x: x.str.contains("مندوب المبيعات", na=False)
+    ).any(axis=1)
+
+    # إنشاء أعمدة
+    df["Rep Code"] = None
+    df["Rep Name"] = None
+
+    # استخراج البيانات من صف المندوب
+    df.loc[mask_rep, "Rep Code"] = df.loc[mask_rep, "Col2"]
+    df.loc[mask_rep, "Rep Name"] = df.loc[mask_rep, "Col3"]
+
+    # =========================
+    # 🔢 تقسيم البيانات لمجموعات
+    # =========================
+    df["Group"] = mask_rep.cumsum()
+
+    # =========================
+    # 🔁 Fill Down لكل مندوب
+    # =========================
+    df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce")
+    df["Rep Code"] = df.groupby("Group")["Rep Code"].ffill()
+    df["Rep Name"] = df.groupby("Group")["Rep Name"].ffill()
+
+    # =========================
+    # ❌ حذف صفوف المندوب والهيدر
+    # =========================
     df = df[~df.astype(str).apply(
         lambda x: x.str.contains(
-            "رصيد افتتاحى|صافى مبيعات|صافى مرتجع مبيعات|مندوب المبيعات",
+            "مندوب المبيعات|رصيد افتتاحى|صافى مبيعات|صافى مرتجع مبيعات",
             na=False
         )
     ).any(axis=1)]
 
-    # =========================
-    # 🏷️ أعمدة عامة
-    # =========================
-    df.columns = [f"Col{i}" for i in range(df.shape[1])]
-
-    # =========================
-    # 👤 استخراج Rep من صف المندوب
-    # =========================
-    rep_row = df[df.astype(str).apply(
-        lambda x: x.str.contains("مندوب المبيعات", na=False)
-    ).any(axis=1)]
-
-    if not rep_row.empty:
-        df["Rep Code"] = rep_row.iloc[:, 2].values[0]
-        df["Rep Name"] = rep_row.iloc[:, 3].values[0]
-    else:
-        df["Rep Code"] = pd.NA
-        df["Rep Name"] = pd.NA
-
-    # =========================
-    # 🔁 Fill Down (مهم جدًا)
-    # =========================
-    df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce").ffill()
-    df["Rep Name"] = df["Rep Name"].ffill()
+    # حذف الأعمدة المؤقتة
+    df = df.drop(columns=["Group"])
 
     return df
