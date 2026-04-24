@@ -55,20 +55,28 @@ def load_client_haraka():
     df.columns = expected_cols[:df.shape[1]]
 
     # =========================
-    # 🧠 MARKER LOGIC (LIKE opening_detail)
+    # 🧠 REP EXTRACTION (FIXED)
     # =========================
-    df["Rep Code"] = None
-    df["Rep Name"] = None
 
-    mask = df["Client Name"].astype(str).str.strip().str.contains("مندوب المبيعات", na=False)
+    # مهم جدًا
+    df["Sales Value"] = df["Sales Value"].astype(str)
 
+    df["Rep Code"] = np.nan
+    df["Rep Name"] = np.nan
+
+    # 🔍 الماركَر الحقيقي
+    mask = df["Sales Value"].str.contains("مندوب المبيعات", na=False)
+
+    # 📌 استخراج
     df.loc[mask, "Rep Code"] = df.loc[mask, "Returns Value"]
     df.loc[mask, "Rep Name"] = df.loc[mask, "Tasweyat Madinah (Credit)"]
 
-    df[["Rep Code", "Rep Name"]] = df[["Rep Code", "Rep Name"]].ffill()
+    # 🔽 Fill Down
+    df["Rep Code"] = df["Rep Code"].ffill()
+    df["Rep Name"] = df["Rep Name"].ffill()
 
     # =========================
-    # 🔢 NUMERIC CLEAN
+    # 🔢 NUMERIC FIX
     # =========================
     num_cols = [
         "Opening Balance",
@@ -98,9 +106,10 @@ df = load_client_haraka()
 # 📊 DISPLAY
 # =========================
 if df.empty:
-    st.warning("No data loaded")
+    st.warning("⚠️ No data loaded")
 else:
-    st.subheader("📋 Client Harakah Data")
+    st.success("✅ Data Loaded Successfully")
+
     st.dataframe(df, use_container_width=True)
 
     st.subheader("📊 KPIs")
