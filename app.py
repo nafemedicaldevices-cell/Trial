@@ -18,12 +18,12 @@ def load_client_haraka():
         return pd.DataFrame()
 
     # =========================
-    # 1️⃣ READ RAW (NO CLEANING)
+    # 1️⃣ READ RAW (NO HEADERS)
     # =========================
     df = pd.read_excel(file_path, header=None)
 
     # =========================
-    # 2️⃣ EXTRACT REP FIRST (IMPORTANT)
+    # 2️⃣ EXTRACT REP FIRST
     # =========================
     rep_mask = df.astype(str).apply(
         lambda row: row.str.contains("مندوب المبيعات", na=False)
@@ -57,14 +57,24 @@ def load_client_haraka():
     ]
 
     # =========================
-    # 5️⃣ 🧹 REMOVE EMPTY ROWS (FIRST COLUMN CLEAN)
+    # 5️⃣ 🧹 REMOVE "كود العميل" FROM ANY COLUMN
+    # =========================
+    df = df[
+        ~df.astype(str).apply(
+            lambda row: row.str.contains("كود العميل", na=False)
+        ).any(axis=1)
+    ].copy()
+
+    df = df.reset_index(drop=True)
+
+    # =========================
+    # 6️⃣ REMOVE EMPTY / NONE ROWS (FIRST COLUMN)
     # =========================
     first_col = df.columns[0]
 
     df[first_col] = df[first_col].astype(str)
 
     df = df[
-        (df[first_col].notna()) &
         (df[first_col].str.strip() != "") &
         (~df[first_col].str.lower().isin(["none", "nan"]))
     ].copy()
@@ -72,7 +82,7 @@ def load_client_haraka():
     df = df.reset_index(drop=True)
 
     # =========================
-    # 6️⃣ NUMERIC CLEAN
+    # 7️⃣ NUMERIC CLEAN
     # =========================
     num_cols = df.columns[2:]
 
@@ -80,7 +90,7 @@ def load_client_haraka():
         df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
     # =========================
-    # 7️⃣ ASSIGN REP
+    # 8️⃣ ASSIGN REP
     # =========================
     df["Rep Code"] = rep_code
     df["Rep Name"] = rep_name
@@ -89,7 +99,7 @@ def load_client_haraka():
 
 
 # =========================
-# RUN
+# RUN APP
 # =========================
 df = load_client_haraka()
 
@@ -100,7 +110,7 @@ else:
 
     st.dataframe(df, use_container_width=True)
 
-    st.subheader("KPIs")
+    st.subheader("📊 KPIs")
 
     c1, c2, c3 = st.columns(3)
 
