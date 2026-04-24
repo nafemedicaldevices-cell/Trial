@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 # =========================
-# 📂 FILE LOADER
+# 📂 LOAD EXCEL SAFELY
 # =========================
 def load_excel(path):
     if not os.path.exists(path):
@@ -120,7 +120,7 @@ def load_haraka():
 
 
 # =========================
-# 📂 OVERDUE
+# 📂 OVERDUE (FIXED ⚡)
 # =========================
 def load_overdue():
 
@@ -130,13 +130,15 @@ def load_overdue():
         "Client Name","Client Code","30","60","90","120","150","150+","Balance"
     ]
 
-    df["Rep Code"] = np.nan
-    df["Rep Name"] = np.nan
+    # initialize safely as string (IMPORTANT FIX)
+    df["Rep Code"] = ""
+    df["Rep Name"] = ""
 
     mask = df["Client Name"].astype(str).str.contains("كود المندوب", na=False)
 
-    df.loc[mask, "Rep Code"] = df.loc[mask, "Client Code"]
-    df.loc[mask, "Rep Name"] = df.loc[mask, "30"]
+    # SAFE ASSIGNMENT (FIX TYPEERROR)
+    df.loc[mask, "Rep Code"] = df.loc[mask, "Client Code"].astype(str).values
+    df.loc[mask, "Rep Name"] = df.loc[mask, "30"].astype(str).values
 
     df[["Rep Code","Rep Name"]] = df[["Rep Code","Rep Name"]].ffill()
 
@@ -146,7 +148,7 @@ def load_overdue():
         )
     ]
 
-    num_cols = ["30","60","90","120","150","150+","Client Code","Rep Code"]
+    num_cols = ["30","60","90","120","150","150+","Client Code"]
 
     df[num_cols] = df[num_cols].apply(pd.to_numeric, errors="coerce").fillna(0)
 
