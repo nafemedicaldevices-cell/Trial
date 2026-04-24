@@ -55,28 +55,7 @@ def load_client_haraka():
     df.columns = expected_cols[:df.shape[1]]
 
     # =========================
-    # 🧠 REP EXTRACTION (FIXED)
-    # =========================
-
-    # مهم جدًا
-    df["Sales Value"] = df["Sales Value"].astype(str)
-
-    df["Rep Code"] = np.nan
-    df["Rep Name"] = np.nan
-
-    # 🔍 الماركَر الحقيقي
-    mask = df["Sales Value"].str.contains("مندوب المبيعات", na=False)
-
-    # 📌 استخراج
-    df.loc[mask, "Rep Code"] = df.loc[mask, "Returns Value"]
-    df.loc[mask, "Rep Name"] = df.loc[mask, "Tasweyat Madinah (Credit)"]
-
-    # 🔽 Fill Down
-    df["Rep Code"] = df["Rep Code"].ffill()
-    df["Rep Name"] = df["Rep Name"].ffill()
-
-    # =========================
-    # 🔢 NUMERIC FIX
+    # 🧹 SAFE NUMERIC CLEAN (IMPORTANT FIX)
     # =========================
     num_cols = [
         "Opening Balance",
@@ -93,6 +72,21 @@ def load_client_haraka():
     for col in num_cols:
         if col in df.columns:
             df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+    # =========================
+    # 🧠 REP EXTRACTION (FIXED TYPE ERROR)
+    # =========================
+    df["Rep Code"] = np.nan
+    df["Rep Name"] = np.nan
+
+    mask = df["Sales Value"].astype(str).str.contains("مندوب المبيعات", na=False)
+
+    # 🔥 safe assign (no type crash)
+    df.loc[mask, "Rep Code"] = pd.to_numeric(df.loc[mask, "Returns Value"], errors="coerce")
+    df.loc[mask, "Rep Name"] = df.loc[mask, "Tasweyat Madinah (Credit)"].astype(str)
+
+    df["Rep Code"] = df["Rep Code"].ffill()
+    df["Rep Name"] = df["Rep Name"].ffill()
 
     return df
 
