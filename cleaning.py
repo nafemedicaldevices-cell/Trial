@@ -1,125 +1,59 @@
-import pandas as pd
+import streamlit as st
+from cleaning import load_targets, load_haraka, load_client_haraka
 
 # =========================
-# 📂 TARGET FILES
+# 📊 TITLE
 # =========================
-FILES = {
-    "Rep": "Target Rep.xlsx",
-    "Manager": "Target Manager.xlsx",
-    "Area": "Target Area.xlsx",
-    "Supervisor": "Target Supervisor.xlsx",
-    "Evak": "Target Evak.xlsx",
-}
-
-def load_targets():
-
-    all_data = []
-
-    for level, file in FILES.items():
-
-        df = pd.read_excel(file)
-        df.columns = df.columns.str.strip()
-
-        fixed_cols = ["Year", "Product Code", "Old Product Name", "Sales Price"]
-
-        df = df.melt(
-            id_vars=fixed_cols,
-            var_name="Code",
-            value_name="Target (Year)"
-        )
-
-        df["Level"] = level
-        df["Target (Year)"] = pd.to_numeric(df["Target (Year)"], errors="coerce")
-
-        df["Target (Unit)"] = df["Target (Year)"] / 12
-        df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
-
-        months = ["Jan","Feb","Mar","Apr","May","Jun",
-                  "Jul","Aug","Sep","Oct","Nov","Dec"]
-
-        df_long = df.loc[df.index.repeat(12)].copy()
-        df_long["Month"] = months * len(df)
-
-        df_long["Target (Unit)"] = df["Target (Unit)"].repeat(12).values
-        df_long["Target (Value)"] = df["Target (Value)"].repeat(12).values
-
-        all_data.append(df_long)
-
-    return pd.concat(all_data, ignore_index=True)
-
+st.title("📊 KPI + Harakah System")
 
 # =========================
-# 📂 REP HARKA
+# 📥 LOAD DATA
 # =========================
-def load_haraka():
-
-    df = pd.read_excel("Rep Harakah.xlsx")
-
-    df = df.replace(r'^\s*$', pd.NA, regex=True)
-    df = df.dropna(how="all")
-
-    df = df[~df.astype(str).apply(
-        lambda x: x.str.contains("مندوب المبيعات|صافى مبيعات", na=False)
-    ).any(axis=1)]
-
-    df.columns = [
-        "Rep Code",
-        "Rep Name",
-        "Opening Balance",
-        "Sales Value",
-        "Returns Value",
-        "Credit",
-        "Total Collection",
-        "Madfoaat",
-        "Debit",
-        "End Balance",
-        "Motalbet El Fatrah"
-    ]
-
-    return df
-
+targets = load_targets()
+rep_haraka = load_haraka()
+client_haraka = load_client_haraka()
 
 # =========================
-# 📂 CLIENT HARKA (FINAL FIX - FILL DOWN)
+# 📌 TABS
 # =========================
-def load_client_haraka():
+tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+    "Rep Target",
+    "Manager Target",
+    "Area Target",
+    "Supervisor Target",
+    "Evak Target",
+    "Rep Harakah",
+    "Client Harakah"
+])
 
-    df = pd.read_excel("Client Harakah.xlsx")
+# =========================
+# 📊 TARGETS
+# =========================
+with tab1:
+    st.dataframe(targets[targets["Level"] == "Rep"], use_container_width=True)
 
-    df = df.replace(r'^\s*$', pd.NA, regex=True)
-    df = df.dropna(how="all")
+with tab2:
+    st.dataframe(targets[targets["Level"] == "Manager"], use_container_width=True)
 
-    # ❌ حذف الهيدر الداخلي
-    df = df[~df.astype(str).apply(
-        lambda x: x.str.contains(
-            "رصيد افتتاحى|صافى مبيعات|صافى مرتجع مبيعات|مندوب المبيعات",
-            na=False
-        )
-    ).any(axis=1)]
+with tab3:
+    st.dataframe(targets[targets["Level"] == "Area"], use_container_width=True)
 
-    # =========================
-    # 🏷️ أعمدة عامة
-    # =========================
-    df.columns = [f"Col{i}" for i in range(df.shape[1])]
+with tab4:
+    st.dataframe(targets[targets["Level"] == "Supervisor"], use_container_width=True)
 
-    # =========================
-    # 👤 استخراج Rep من صف المندوب
-    # =========================
-    rep_row = df[df.astype(str).apply(
-        lambda x: x.str.contains("مندوب المبيعات", na=False)
-    ).any(axis=1)]
+with tab5:
+    st.dataframe(targets[targets["Level"] == "Evak"], use_container_width=True)
 
-    if not rep_row.empty:
-        df["Rep Code"] = rep_row.iloc[:, 2].values[0]
-        df["Rep Name"] = rep_row.iloc[:, 3].values[0]
-    else:
-        df["Rep Code"] = pd.NA
-        df["Rep Name"] = pd.NA
+# =========================
+# 📊 REP HARKA
+# =========================
+with tab6:
+    st.subheader("Rep Harakah")
+    st.dataframe(rep_haraka, use_container_width=True)
 
-    # =========================
-    # 🔁 Fill Down (مهم جدًا)
-    # =========================
-    df["Rep Code"] = pd.to_numeric(df["Rep Code"], errors="coerce").ffill()
-    df["Rep Name"] = df["Rep Name"].ffill()
-
-    return df
+# =========================
+# 📊 CLIENT HARKA
+# =========================
+with tab7:
+    st.subheader("Client Harakah")
+    st.dataframe(client_haraka, use_container_width=True)
