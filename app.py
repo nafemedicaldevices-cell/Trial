@@ -2,77 +2,104 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
-st.title("📊 Dashboard")
-
-st.write("APP IS RUNNING")
+# =========================
+# 📌 LOAD DATA (مفترض إنك معرفهم من ملفاتك)
+# =========================
+# دول لازم يكونوا راجعين من functions بتاعتك
+# مثال:
+# targets_dict = load_targets()
+# sales_dict = load_sales()
+# codes_df = load_codes()
 
 # =========================
-# SAFE CHECKS
+# 🧠 SAFETY CHECK
 # =========================
-if "sales" not in globals():
-    st.error("Sales not loaded")
+if "targets_dict" not in globals():
+    st.error("targets_dict not loaded")
     st.stop()
 
-if "codes" not in globals():
-    st.error("Codes not loaded")
+if "sales_dict" not in globals():
+    st.error("sales_dict not loaded")
     st.stop()
 
-if "targets" not in globals():
-    st.error("Targets not loaded")
+if "codes_df" not in globals():
+    st.error("codes_df not loaded")
     st.stop()
 
 # =========================
-# FILTER
+# 🎛️ UI
 # =========================
-level = st.selectbox("Level", list(targets.keys()))
+st.title("📊 Sales vs Target Dashboard")
 
-selected_code = st.selectbox(
-    "Select Code",
-    codes["Rep Code"].dropna().unique()
+# اختيار Target sheet
+target_sheet = st.selectbox(
+    "Select Target Sheet",
+    list(targets_dict.keys())
 )
 
-st.write("Selected:", selected_code)
+target_df = targets_dict[target_sheet]
+
+# اختيار Code
+selected_code = st.selectbox(
+    "Select Rep Code",
+    codes_df["Rep Code"].dropna().unique()
+)
+
+# اختيار Sales sheet (لو عندك أكتر من شيت)
+sales_sheet = st.selectbox(
+    "Select Sales Sheet",
+    list(sales_dict.keys())
+)
+
+sales_df = sales_dict[sales_sheet]
 
 # =========================
-# TARGET
+# 🔗 FILTER TARGET
 # =========================
-target_df = targets[level]
+target_df = target_df.merge(
+    codes_df,
+    on="Code",
+    how="left"
+)
 
-target_df = target_df.merge(codes, on="Code", how="left")
-
-target_df = target_df[target_df["Rep Code"] == selected_code]
-
-st.write("Target rows:", len(target_df))
-
-# =========================
-# SALES FILTER
-# =========================
-sales_filtered = sales[
-    sales["Rep Code"].astype(str).str.strip() == str(selected_code).strip()
+target_df = target_df[
+    target_df["Rep Code"].astype(str).str.strip()
+    == str(selected_code).strip()
 ]
 
-st.write("Sales rows:", len(sales_filtered))
+# =========================
+# 🔗 FILTER SALES
+# =========================
+sales_df = sales_df[
+    sales_df["Rep Code"].astype(str).str.strip()
+    == str(selected_code).strip()
+]
 
 # =========================
-# IF EMPTY STOP DEBUG
+# 📊 AGG SALES
 # =========================
-if target_df.empty and sales_filtered.empty:
-    st.warning("No data for selected code")
-    st.stop()
-
-# =========================
-# GROUP
-# =========================
-sales_agg = sales_filtered.groupby("Product Name", as_index=False).agg({
+sales_agg = sales_df.groupby(
+    "Product Name",
+    as_index=False
+).agg({
     "Sales Unit": "sum",
     "Sales Value": "sum"
 })
 
-target_agg = target_df.groupby("Old Product Name", as_index=False).agg({
+# =========================
+# 📊 AGG TARGET
+# =========================
+target_agg = target_df.groupby(
+    "Old Product Name",
+    as_index=False
+).agg({
     "Target (Unit)": "sum",
     "Target (Value)": "sum"
 })
 
+# =========================
+# 🔗 MERGE
+# =========================
 df = target_agg.merge(
     sales_agg,
     left_on="Old Product Name",
@@ -82,6 +109,9 @@ df = target_agg.merge(
 
 df = df.fillna(0)
 
+# =========================
+# 📈 ACHIEVEMENT %
+# =========================
 df["Achievement Unit %"] = np.where(
     df["Target (Unit)"] > 0,
     df["Sales Unit"] / df["Target (Unit)"],
@@ -94,4 +124,43 @@ df["Achievement Value %"] = np.where(
     0
 )
 
-st.dataframe(df, use_container_width=True)
+# =========================
+# 🧾 FINAL TABLE
+# =========================
+final_df = df[[
+    "Old Product Name",
+    "Target (Unit)",
+    "Sales Unit",
+    "Achievement Unit %",
+    "Target (Value)",
+    "Sales Value",
+    "Achievement Value %"
+]]
+
+final_df.columns = [
+    "Product Name",
+    "Target Unit",
+    "Sales Unit",
+    "Achievement Unit %",
+    "Target Value",
+    "Sales Value",
+    "Achievement Value %"
+]
+
+# =========================
+# 📊 DISPLAY
+# =========================
+st.subheader("📌 Performance Table")
+
+st.dataframe(
+    final_df,
+    use_container_width=True
+)
+
+# =========================
+# 📊 DEBUG (مهم جدًا)
+# =========================
+with st.expander("🔍 Debug Info"):
+    st.write("Target rows:", len(target_df))
+    st.write("Sales rows:", len(sales_df))
+    st.write("Merged rows:", len(final_df))
