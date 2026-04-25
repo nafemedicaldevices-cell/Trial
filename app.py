@@ -100,7 +100,7 @@ target_df["Code"] = target_df["Code"].astype(str).str.strip()
 target_df = target_df[target_df["Code"].isin(valid_reps)]
 
 # =========================
-# 📆 MONTH LOGIC (AUTO ONLY)
+# 📆 MONTH ORDER (FOR LOGIC ONLY)
 # =========================
 month_order = [
     "Jan","Feb","Mar","Apr","May","Jun",
@@ -108,27 +108,27 @@ month_order = [
 ]
 
 # =========================
-# 🎯 CALCULATIONS (AUTO)
+# 🎯 CALCULATIONS
 # =========================
-
-monthly_target = target_df[target_df["Month"] == month_order[-1]]["Target (Value)"].sum()
-
-quarterly_target = target_df[
-    target_df["Month"].isin(month_order[-3:])
-]["Target (Value)"].sum()
-
-ytd_target = target_df[
-    target_df["Month"].isin(month_order)
-]["Target (Value)"].sum()
 
 yearly_target = target_df["Target (Value)"].sum()
 
+ytd_target = target_df["Target (Value)"].sum()
+
+quarterly_target = target_df[
+    target_df["Month"].isin(month_order[:9])
+]["Target (Value)"].sum()
+
+monthly_target = target_df[
+    target_df["Month"] == month_order[-1]
+]["Target (Value)"].sum()
+
 # =========================
-# 📊 KPI CARDS
+# 📊 KPI CARDS (ORDERED)
 # =========================
 col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("📅 Monthly Target", f"{monthly_target:,.0f}")
-col2.metric("📊 Quarterly Target", f"{quarterly_target:,.0f}")
-col3.metric("⏳ YTD Target", f"{ytd_target:,.0f}")
-col4.metric("📆 Yearly Target", f"{yearly_target:,.0f}")
+col1.metric("📆 Yearly Target", f"{yearly_target:,.0f}")
+col2.metric("⏳ YTD Target", f"{ytd_target:,.0f}")
+col3.metric("📊 Quarterly Target", f"{quarterly_target:,.0f}")
+col4.metric("📅 Monthly Target", f"{monthly_target:,.0f}")
