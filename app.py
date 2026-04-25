@@ -1,132 +1,44 @@
-import streamlit as st
 import pandas as pd
-from datetime import datetime
-
-st.set_page_config(layout="wide")
-st.title("📊 Sales vs Target Dashboard")
+import numpy as np
+import os
 
 # =========================
-# 📂 LOAD CODES
-# =========================
-codes = pd.read_excel("Code.xlsx")
-codes.columns = codes.columns.str.strip()
-codes["Rep Code"] = codes["Rep Code"].astype(str).str.strip()
-
-# =========================
-# 🔄 FILTER RESET
-# =========================
-def reset_filters():
-    st.session_state.rep_filter = []
-    st.session_state.sup_filter = []
-    st.session_state.manager_filter = []
-    st.session_state.area_filter = []
-
-st.sidebar.button("🔄 Reset Filters", on_click=reset_filters)
-
-# =========================
-# 🎯 FILTERS
-# =========================
-st.sidebar.header("Filters")
-
-rep_list = sorted(codes["Rep Name"].dropna().unique())
-sup_list = sorted(codes["Supervisor Name"].dropna().unique())
-manager_list = sorted(codes["Manager Name"].dropna().unique())
-area_list = sorted(codes["Area Name"].dropna().unique())
-
-rep_filter = st.sidebar.multiselect("Rep", rep_list, key="rep_filter")
-sup_filter = st.sidebar.multiselect("Supervisor", sup_list, key="sup_filter")
-manager_filter = st.sidebar.multiselect("Manager", manager_list, key="manager_filter")
-area_filter = st.sidebar.multiselect("Area", area_list, key="area_filter")
-
-# =========================
-# 🔥 FILTER CODES
-# =========================
-filtered_codes = codes.copy()
-
-if rep_filter:
-    filtered_codes = filtered_codes[filtered_codes["Rep Name"].isin(rep_filter)]
-
-if sup_filter:
-    filtered_codes = filtered_codes[filtered_codes["Supervisor Name"].isin(sup_filter)]
-
-if manager_filter:
-    filtered_codes = filtered_codes[filtered_codes["Manager Name"].isin(manager_filter)]
-
-if area_filter:
-    filtered_codes = filtered_codes[filtered_codes["Area Name"].isin(area_filter)]
-
-valid_reps = filtered_codes["Rep Code"].astype(str).str.strip().unique()
-
-# =========================
-# 📂 LOAD TARGETS
-# =========================
-def load_targets():
-
-    FILES = {"Rep": "Target Rep.xlsx"}
-    all_data = []
-
-    for _, file in FILES.items():
-
-        sheets = pd.read_excel(file, sheet_name=None)
-
-        for _, df in sheets.items():
-
-            df.columns = df.columns.str.strip()
-
-            fixed_cols = ["Year", "Product Code", "Old Product Name", "Sales Price"]
-
-            df = df.melt(
-                id_vars=fixed_cols,
-                var_name="Code",
-                value_name="Target (Year)"
-            )
-
-            df["Target (Year)"] = pd.to_numeric(df["Target (Year)"], errors="coerce")
-
-            df["Target (Unit)"] = df["Target (Year)"] / 12
-            df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
-
-            months = [
-                "Jan","Feb","Mar","Apr","May","Jun",
-                "Jul","Aug","Sep","Oct","Nov","Dec"
-            ]
-
-            df_long = df.loc[df.index.repeat(12)].copy()
-            df_long["Month"] = months * len(df)
-
-            df_long["Target (Value)"] = df["Target (Value)"].repeat(12).values
-
-            all_data.append(df_long)
-
-    return pd.concat(all_data, ignore_index=True)
-
-
-targets = load_targets()
-
-target_df = targets.copy()
-target_df["Code"] = target_df["Code"].astype(str).str.strip()
-target_df = target_df[target_df["Code"].isin(valid_reps)]
-
-# =========================
-# 📂 LOAD SALES (MAIN INVOICE DATA)
+# 📂 SALES CLEANING
 # =========================
 def load_sales():
 
     sales = pd.read_excel("Sales.xlsx")
     sales.columns = sales.columns.str.strip()
 
-    # تنظيف
-    sales["Rep Code"] = sales["Rep Code"].astype(str).str.strip()
+    # =========================
+    # 🔥 FIND REP CODE COLUMN
+    # =========================
+    rep_candidates = [
+        "Rep Code", "RepCode", "Rep_Code",
+        "Sales Rep Code", "مندوب"
+    ]
 
-    for col in ["Sales Value", "Returns Value"]:
-        sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
+    rep_col = None
+    for c in rep_candidates:
+        if c in sales.columns:
+            rep_col = c
+            break
 
-    if "Invoice Discounts" not in sales.columns:
-        sales["Invoice Discounts"] = 0
-    else:
-        sales["Invoice Discounts"] = pd.to_numeric(
-            sales["Invoice Discounts"], errors="coerce"
-        ).fillna(0)
+    if rep_col is None:
+        raise Exception(f"❌ Rep Code not found: {sales.columns.tolist()}")
+
+    sales["Rep Code"] = sales[rep_col].astype(str).str.strip()
+
+    # =========================
+    # NUMERIC CLEANING
+    # =========================
+    num_cols = ["Sales Value", "Returns Value", "Invoice Discounts"]
+
+    for col in num_cols:
+        if col not in sales.columns:
+            sales[col] = 0
+        else:
+            sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
 
     # =========================
     # 💰 NET SALES
@@ -140,83 +52,42 @@ def load_sales():
     return sales
 
 
-sales = load_sales()
-
 # =========================
-# 📊 NET SALES AGGREGATION
+# 📂 TARGETS
 # =========================
-net_sales_df = sales.groupby("Rep Code", as_index=False)["Net Sales"].sum()
+def load_targets():
 
-# =========================
-# 🎯 TARGET AGGREGATION
-# =========================
-target_sum = target_df.groupby("Code", as_index=False)["Target (Value)"].sum()
+    df = pd.read_excel("Target Rep.xlsx", sheet_name=None)
 
-# =========================
-# 🔗 MERGE
-# =========================
-comparison = target_sum.merge(
-    net_sales_df,
-    left_on="Code",
-    right_on="Rep Code",
-    how="left"
-)
+    all_data = []
 
-comparison["Net Sales"] = comparison["Net Sales"].fillna(0)
+    for _, sheet in df.items():
 
-# =========================
-# 📈 ACHIEVEMENT %
-# =========================
-comparison["Achievement %"] = (
-    comparison["Net Sales"] / comparison["Target (Value)"]
-) * 100
+        sheet.columns = sheet.columns.str.strip()
 
-comparison["Achievement %"] = comparison["Achievement %"].fillna(0)
+        fixed_cols = ["Year", "Product Code", "Old Product Name", "Sales Price"]
 
-# =========================
-# 📆 TIME KPIs
-# =========================
-month_order = [
-    "Jan","Feb","Mar","Apr","May","Jun",
-    "Jul","Aug","Sep","Oct","Nov","Dec"
-]
+        sheet = sheet.melt(
+            id_vars=fixed_cols,
+            var_name="Code",
+            value_name="Target (Year)"
+        )
 
-current_month = month_order[datetime.now().month - 1]
-current_index = month_order.index(current_month)
+        sheet["Target (Year)"] = pd.to_numeric(sheet["Target (Year)"], errors="coerce")
 
-yearly_target = target_df["Target (Value)"].sum()
+        sheet["Target (Unit)"] = sheet["Target (Year)"] / 12
+        sheet["Target (Value)"] = sheet["Target (Unit)"] * sheet["Sales Price"]
 
-ytd_target = target_df[
-    target_df["Month"].isin(month_order[:current_index + 1])
-]["Target (Value)"].sum()
+        months = [
+            "Jan","Feb","Mar","Apr","May","Jun",
+            "Jul","Aug","Sep","Oct","Nov","Dec"
+        ]
 
-monthly_target = target_df[
-    target_df["Month"] == current_month
-]["Target (Value)"].sum()
+        df_long = sheet.loc[sheet.index.repeat(12)].copy()
+        df_long["Month"] = months * len(sheet)
 
-total_net_sales = comparison["Net Sales"].sum()
+        df_long["Target (Value)"] = sheet["Target (Value)"].repeat(12).values
 
-achievement = (
-    total_net_sales / yearly_target * 100
-    if yearly_target else 0
-)
+        all_data.append(df_long)
 
-# =========================
-# 📊 KPI CARDS
-# =========================
-col1, col2, col3, col4 = st.columns(4)
-
-col1.metric("🎯 Yearly Target", f"{yearly_target:,.0f}")
-col2.metric("💰 Net Sales", f"{total_net_sales:,.0f}")
-col3.metric("⏳ YTD Target", f"{ytd_target:,.0f}")
-col4.metric("📈 Achievement %", f"{achievement:.2f}%")
-
-# =========================
-# 📊 TABLE
-# =========================
-st.subheader("📊 Rep Performance")
-
-st.dataframe(
-    comparison.sort_values("Achievement %", ascending=False),
-    use_container_width=True
-)
+    return pd.concat(all_data, ignore_index=True)
