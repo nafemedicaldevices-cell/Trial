@@ -3,58 +3,59 @@ import pandas as pd
 import numpy as np
 
 # =========================
-# 📌 LOAD DATA (مفترض إنك معرفهم من ملفاتك)
+# 📦 IMPORT YOUR FUNCTIONS
 # =========================
-# دول لازم يكونوا راجعين من functions بتاعتك
-# مثال:
-# targets_dict = load_targets()
-# sales_dict = load_sales()
-# codes_df = load_codes()
+# المفروض تكون في ملف cleaning.py أو نفس الملف
+from cleaning import load_targets, load_haraka, load_client_haraka, load_overdue
 
 # =========================
-# 🧠 SAFETY CHECK
+# ⚡ LOAD DATA (IMPORTANT FIX)
 # =========================
-if "targets_dict" not in globals():
-    st.error("targets_dict not loaded")
-    st.stop()
+@st.cache_data
+def load_all_data():
 
-if "sales_dict" not in globals():
-    st.error("sales_dict not loaded")
-    st.stop()
+    targets_dict = load_targets()
 
-if "codes_df" not in globals():
-    st.error("codes_df not loaded")
-    st.stop()
+    sales_dict = load_client_haraka()  # أو sales function عندك
+
+    codes_df = load_haraka()["cleaned_rep_haraka"]
+
+    return targets_dict, sales_dict, codes_df
+
+
+targets_dict, sales_dict, codes_df = load_all_data()
 
 # =========================
 # 🎛️ UI
 # =========================
 st.title("📊 Sales vs Target Dashboard")
 
-# اختيار Target sheet
+# =========================
+# FILTERS
+# =========================
 target_sheet = st.selectbox(
     "Select Target Sheet",
     list(targets_dict.keys())
 )
 
-target_df = targets_dict[target_sheet]
-
-# اختيار Code
 selected_code = st.selectbox(
     "Select Rep Code",
     codes_df["Rep Code"].dropna().unique()
 )
 
-# اختيار Sales sheet (لو عندك أكتر من شيت)
 sales_sheet = st.selectbox(
     "Select Sales Sheet",
     list(sales_dict.keys())
 )
 
+# =========================
+# GET DATA
+# =========================
+target_df = targets_dict[target_sheet]
 sales_df = sales_dict[sales_sheet]
 
 # =========================
-# 🔗 FILTER TARGET
+# FILTER TARGET
 # =========================
 target_df = target_df.merge(
     codes_df,
@@ -68,7 +69,7 @@ target_df = target_df[
 ]
 
 # =========================
-# 🔗 FILTER SALES
+# FILTER SALES
 # =========================
 sales_df = sales_df[
     sales_df["Rep Code"].astype(str).str.strip()
@@ -76,7 +77,7 @@ sales_df = sales_df[
 ]
 
 # =========================
-# 📊 AGG SALES
+# AGG SALES
 # =========================
 sales_agg = sales_df.groupby(
     "Product Name",
@@ -87,7 +88,7 @@ sales_agg = sales_df.groupby(
 })
 
 # =========================
-# 📊 AGG TARGET
+# AGG TARGET
 # =========================
 target_agg = target_df.groupby(
     "Old Product Name",
@@ -98,7 +99,7 @@ target_agg = target_df.groupby(
 })
 
 # =========================
-# 🔗 MERGE
+# MERGE
 # =========================
 df = target_agg.merge(
     sales_agg,
@@ -110,7 +111,7 @@ df = target_agg.merge(
 df = df.fillna(0)
 
 # =========================
-# 📈 ACHIEVEMENT %
+# ACHIEVEMENT %
 # =========================
 df["Achievement Unit %"] = np.where(
     df["Target (Unit)"] > 0,
@@ -125,7 +126,7 @@ df["Achievement Value %"] = np.where(
 )
 
 # =========================
-# 🧾 FINAL TABLE
+# FINAL TABLE
 # =========================
 final_df = df[[
     "Old Product Name",
@@ -148,19 +149,6 @@ final_df.columns = [
 ]
 
 # =========================
-# 📊 DISPLAY
+# DISPLAY
 # =========================
-st.subheader("📌 Performance Table")
-
-st.dataframe(
-    final_df,
-    use_container_width=True
-)
-
-# =========================
-# 📊 DEBUG (مهم جدًا)
-# =========================
-with st.expander("🔍 Debug Info"):
-    st.write("Target rows:", len(target_df))
-    st.write("Sales rows:", len(sales_df))
-    st.write("Merged rows:", len(final_df))
+st.dataframe(final_df, use_container_width=True)
