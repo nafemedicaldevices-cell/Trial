@@ -1,4 +1,6 @@
 import streamlit as st
+import pandas as pd
+import numpy as np
 
 from cleaning import load_targets, load_haraka, load_codes, build_sales_vs_target
 
@@ -16,13 +18,13 @@ codes = load_codes()
 df = build_sales_vs_target(targets, sales, codes)
 
 # =========================
-# CLEAN PRODUCT NAME
+# PRODUCT NAME
 # =========================
 df["Product Name"] = df.get("Old Product Name", "Unknown")
 df["Product Name"] = df["Product Name"].astype(str).str.strip()
 
 # =========================
-# FILTERS
+# FILTER
 # =========================
 st.sidebar.header("🔎 Filters")
 
@@ -35,32 +37,41 @@ if product_filter != "All":
     filtered_df = filtered_df[filtered_df["Product Name"] == product_filter]
 
 # =========================
+# SAFE CALCULATIONS
+# =========================
+filtered_df["Target Unit"] = pd.to_numeric(filtered_df["Target (Unit)"], errors="coerce").fillna(0)
+filtered_df["Target Value"] = pd.to_numeric(filtered_df["Target (Value)"], errors="coerce").fillna(0)
+filtered_df["Sales Value"] = pd.to_numeric(filtered_df["Sales Value"], errors="coerce").fillna(0)
+
+# Sales Unit (نفس قيمة البيع لو مفيش unit فعلي)
+filtered_df["Sales Unit"] = filtered_df["Sales Value"]
+
+# =========================
+# ACHIEVEMENT %
+# =========================
+filtered_df["Achievement Unit %"] = np.where(
+    filtered_df["Target Unit"] > 0,
+    (filtered_df["Sales Unit"] / filtered_df["Target Unit"]) * 100,
+    0
+)
+
+filtered_df["Achievement Value %"] = np.where(
+    filtered_df["Target Value"] > 0,
+    (filtered_df["Sales Value"] / filtered_df["Target Value"]) * 100,
+    0
+)
+
+# =========================
 # KPI TABLE
 # =========================
 kpi_table = filtered_df[[
     "Product Name",
-    "Target (Unit)",
-    "Sales Value",
-    "Target (Value)",
-    "Achievement %"
-]].copy()
-
-# Sales Unit
-kpi_table["Sales Unit"] = filtered_df["Sales Value"] / filtered_df["Sales Price"]
-
-# Target Unit (للتأكيد)
-kpi_table["Target Unit"] = filtered_df["Target (Unit)"]
-
-# =========================
-# FINAL FORMAT
-# =========================
-kpi_table = kpi_table[[
-    "Product Name",
     "Target Unit",
     "Sales Unit",
-    "Target (Value)",
+    "Target Value",
     "Sales Value",
-    "Achievement %",
+    "Achievement Unit %",
+    "Achievement Value %"
 ]]
 
 # =========================
