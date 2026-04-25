@@ -1,7 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import os
 
 from cleaning import (
     load_targets,
@@ -10,196 +8,122 @@ from cleaning import (
     load_client_haraka
 )
 
-st.set_page_config(
-    page_title="Sales Dashboard",
-    layout="wide"
-)
+st.set_page_config(layout="wide")
 
-st.title("📊 Sales + KPI Dashboard")
+st.title("📊 Sales Dashboard")
 
 # =========================
-# FILE LOADER
+# 📂 LOAD DATA
 # =========================
-def load_file(path):
-
-    if not os.path.exists(path):
-
-        st.error(
-            f"❌ File not found: {path}"
-        )
-
-        st.stop()
-
-    return pd.read_excel(path)
-
-
 @st.cache_data
-def load_data():
+def load_all():
 
-    sales = load_file("Sales.xlsx")
-    mapping = load_file("Mapping.xlsx")
-    codes = load_file("Code.xlsx")
+    targets = load_targets()
+    rep_haraka = load_haraka()
+    client_haraka = load_client_haraka()
 
-    return sales, mapping, codes
+    # codes من client
+    codes_cols = [
+        "Rep Code","Rep Name",
+        "Supervisor Name",
+        "Manager Name",
+        "Area Name"
+    ]
+
+    codes = client_haraka[codes_cols].drop_duplicates()
+
+    overdue = load_overdue("Overdue.xlsx", codes)
+
+    return targets, rep_haraka, client_haraka, overdue
 
 
-sales, mapping, codes = load_data()
+targets, rep_haraka, client_haraka, overdue = load_all()
 
 # =========================
-# SALES (بدون تغيير)
+# 🎯 FILTERS
 # =========================
-sales.columns = sales.columns.str.strip()
+st.sidebar.header("Filters")
 
-sales.columns = [
+rep_list = sorted(client_haraka["Rep Name"].dropna().unique())
+manager_list = sorted(client_haraka["Manager Name"].dropna().unique())
+area_list = sorted(client_haraka["Area Name"].dropna().unique())
 
-    'Date',
-    'Warehouse Name',
-    'Client Code',
-    'Client Name',
+rep_filter = st.sidebar.multiselect("Rep", rep_list)
+manager_filter = st.sidebar.multiselect("Manager", manager_list)
+area_filter = st.sidebar.multiselect("Area", area_list)
 
-    'Notes',
-    'MF',
-    'Mostanad',
+df = client_haraka.copy()
 
-    'Rep Code',
+if rep_filter:
+    df = df[df["Rep Name"].isin(rep_filter)]
 
-    'Sales Unit Before Edit',
-    'Returns Unit Before Edit',
+if manager_filter:
+    df = df[df["Manager Name"].isin(manager_filter)]
 
-    'Sales Price',
-    'Invoice Discounts',
-    'Sales Value'
+if area_filter:
+    df = df[df["Area Name"].isin(area_filter)]
 
-]
+# =========================
+# 📊 KPIs
+# =========================
+total_sales = df["Sales Value"].sum()
+total_collection = df["Total Collection"].sum()
+total_returns = df["Returns Value"].sum()
 
-for col in [
-    'Old Product Code',
-    'Old Product Name'
-]:
+# overdue filtered
+overdue_f = overdue.copy()
 
-    if col not in sales.columns:
+if rep_filter:
+    overdue_f = overdue_f[overdue_f["Rep Name"].isin(rep_filter)]
 
-        sales[col] = None
+total_overdue = overdue_f["Overdue"].sum()
 
+col1, col2, col3, col4 = st.columns(4)
 
-mask = (
-    sales['Date']
-    .astype(str)
-    .str.strip()
-    == "كود الصنف"
+col1.metric("💰 Sales", f"{total_sales:,.0f}")
+col2.metric("💵 Collection", f"{total_collection:,.0f}")
+col3.metric("🔁 Returns", f"{total_returns:,.0f}")
+col4.metric("⚠️ Overdue", f"{total_overdue:,.0f}")
+
+# =========================
+# 📈 SALES BY REP
+# =========================
+st.subheader("Sales by Rep")
+
+sales_rep = (
+    df.groupby("Rep Name")["Sales Value"]
+    .sum()
+    .sort_values(ascending=False)
 )
 
-sales.loc[
-    mask,
-    'Old Product Code'
-] = sales.loc[
-    mask,
-    'Warehouse Name'
-]
-
-sales.loc[
-    mask,
-    'Old Product Name'
-] = sales.loc[
-    mask,
-    'Client Code'
-]
-
-sales[
-    ['Old Product Code','Old Product Name']
-] = sales[
-    ['Old Product Code','Old Product Name']
-].ffill()
-
-sales = sales[
-
-    sales['Date'].notna() &
-
-    (sales['Date']
-     .astype(str)
-     .str.strip() != '') &
-
-    (~sales['Date']
-     .astype(str)
-     .str.contains(
-         'المندوب|كود الفرع|تاريخ|كود الصنف',
-         na=False
-     ))
-
-].copy()
+st.bar_chart(sales_rep)
 
 # =========================
-# LOAD MODULES
+# 📈 COLLECTION BY REP
 # =========================
-targets = load_targets()
+st.subheader("Collection by Rep")
 
-haraka = load_haraka()
-
-overdue = load_overdue(
-    "Overdue.xlsx",
-    codes
+collection_rep = (
+    df.groupby("Rep Name")["Total Collection"]
+    .sum()
+    .sort_values(ascending=False)
 )
 
-client_haraka = load_client_haraka()
+st.bar_chart(collection_rep)
 
 # =========================
-# TABS
+# ⚠️ OVERDUE TABLE
 # =========================
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+st.subheader("Overdue Details")
 
-    "📊 Sales",
-    "🎯 Targets",
-    "📈 Harakah",
-    "⏳ Overdue",
-    "👤 Client Harakah"
+st.dataframe(
+    overdue_f.sort_values("Overdue", ascending=False),
+    use_container_width=True
+)
 
-])
+# =========================
+# 📋 CLIENT TABLE
+# =========================
+st.subheader("Client Details")
 
-with tab1:
-
-    st.dataframe(
-        sales,
-        use_container_width=True
-    )
-
-with tab2:
-
-    st.subheader("🎯 Targets")
-
-    for level, df in targets.items():
-
-        st.markdown(f"### {level}")
-
-        st.dataframe(
-            df,
-            use_container_width=True
-        )
-
-with tab3:
-
-    st.dataframe(
-        haraka,
-        use_container_width=True
-    )
-
-with tab4:
-
-    st.dataframe(
-        overdue,
-        use_container_width=True
-    )
-
-    st.metric(
-
-        "Overdue Total",
-
-        overdue["Overdue"].sum()
-
-    )
-
-with tab5:
-
-    st.dataframe(
-        client_haraka,
-        use_container_width=True
-    )
+st.dataframe(df, use_container_width=True)
