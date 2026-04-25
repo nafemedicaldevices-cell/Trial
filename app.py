@@ -2,11 +2,10 @@ import streamlit as st
 import pandas as pd
 
 st.set_page_config(layout="wide")
-
-st.title("📊 Dashboard - Base Layer")
+st.title("📊 Sales Dashboard - Multi Level Targets")
 
 # =========================
-# 📂 LOAD CODES
+# 📂 LOAD CODES (HIERARCHY)
 # =========================
 codes = pd.read_excel("Code.xlsx")
 codes.columns = codes.columns.str.strip()
@@ -14,7 +13,7 @@ codes.columns = codes.columns.str.strip()
 codes["Rep Code"] = codes["Rep Code"].astype(str).str.strip()
 
 # =========================
-# 🎯 FILTERS
+# 🎯 FILTERS (HIERARCHY)
 # =========================
 st.sidebar.header("Filters")
 
@@ -45,26 +44,96 @@ if manager_filter:
 if area_filter:
     filtered_codes = filtered_codes[filtered_codes["Area Name"].isin(area_filter)]
 
-valid_reps = filtered_codes["Rep Code"].unique()
+valid_reps = filtered_codes["Rep Code"].astype(str).str.strip().unique()
 
 # =========================
-# 📂 LOAD TARGETS
+# 📂 LOAD TARGETS (ALL LEVELS)
 # =========================
+def load_targets():
+
+    FILES = {
+        "Rep": "Target Rep.xlsx",
+        "Supervisor": "Target Supervisor.xlsx",
+        "Manager": "Target Manager.xlsx",
+        "Area": "Target Area.xlsx"
+    }
+
+    all_targets = {}
+
+    for level, file in FILES.items():
+
+        sheets = pd.read_excel(file, sheet_name=None)
+
+        level_data = []
+
+        for sheet_name, df in sheets.items():
+
+            df.columns = df.columns.str.strip()
+
+            fixed_cols = ["Year", "Product Code", "Old Product Name", "Sales Price"]
+
+            df = df.melt(
+                id_vars=fixed_cols,
+                var_name="Code",
+                value_name="Target (Year)"
+            )
+
+            df["Target (Year)"] = pd.to_numeric(df["Target (Year)"], errors="coerce")
+
+            df["Target (Unit)"] = df["Target (Year)"] / 12
+            df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
+
+            months = [
+                "Jan","Feb","Mar","Apr","May","Jun",
+                "Jul","Aug","Sep","Oct","Nov","Dec"
+            ]
+
+            df_long = df.loc[df.index.repeat(12)].copy()
+
+            df_long["Month"] = months * len(df)
+
+            df_long["Target (Unit)"] = df["Target (Unit)"].repeat(12).values
+            df_long["Target (Value)"] = df["Target (Value)"].repeat(12).values
+
+            df_long["Level"] = level
+
+            level_data.append(df_long)
+
+        all_targets[level] = pd.concat(level_data, ignore_index=True)
+
+    return all_targets
+
+
 targets = load_targets()
 
-target_rep = targets["Rep"].copy()
-target_rep["Code"] = target_rep["Code"].astype(str).str.strip()
+# =========================
+# 🎯 SELECT TARGET LEVEL
+# =========================
+target_level = st.sidebar.selectbox(
+    "Target Level",
+    ["Rep", "Supervisor", "Manager", "Area"]
+)
 
-# فلترة حسب reps
-target_rep = target_rep[target_rep["Code"].isin(valid_reps)]
+target_df = targets[target_level].copy()
+target_df["Code"] = target_df["Code"].astype(str).str.strip()
+
+# فلترة حسب hierarchy
+target_df = target_df[target_df["Code"].isin(valid_reps)]
 
 # =========================
-# 🗓️ PERIOD SETTINGS
+# 🗓️ PERIOD
 # =========================
+period_type = st.sidebar.selectbox(
+    "Period",
+    ["Monthly", "Quarterly", "YTD", "Full Year"]
+)
+
 month_order = [
     "Jan","Feb","Mar","Apr","May","Jun",
     "Jul","Aug","Sep","Oct","Nov","Dec"
 ]
+
+selected_month = st.sidebar.selectbox("Month", month_order)
 
 quarter_map = {
     "Q1": ["Jan","Feb","Mar"],
@@ -73,12 +142,6 @@ quarter_map = {
     "Q4": ["Oct","Nov","Dec"]
 }
 
-period_type = st.sidebar.selectbox(
-    "Period",
-    ["Monthly", "Quarterly", "YTD", "Full Year"]
-)
-
-selected_month = st.sidebar.selectbox("Month", month_order)
 selected_quarter = st.sidebar.selectbox("Quarter", list(quarter_map.keys()))
 
 # =========================
@@ -86,14 +149,14 @@ selected_quarter = st.sidebar.selectbox("Quarter", list(quarter_map.keys()))
 # =========================
 if period_type == "Monthly":
 
-    target_value = target_rep[
-        target_rep["Month"] == selected_month
+    target_value = target_df[
+        target_df["Month"] == selected_month
     ]["Target (Value)"].sum()
 
 elif period_type == "Quarterly":
 
-    target_value = target_rep[
-        target_rep["Month"].isin(quarter_map[selected_quarter])
+    target_value = target_df[
+        target_df["Month"].isin(quarter_map[selected_quarter])
     ]["Target (Value)"].sum()
 
 elif period_type == "YTD":
@@ -101,13 +164,13 @@ elif period_type == "YTD":
     idx = month_order.index(selected_month) + 1
     months = month_order[:idx]
 
-    target_value = target_rep[
-        target_rep["Month"].isin(months)
+    target_value = target_df[
+        target_df["Month"].isin(months)
     ]["Target (Value)"].sum()
 
 else:
 
-    target_value = target_rep["Target (Value)"].sum()
+    target_value = target_df["Target (Value)"].sum()
 
 # =========================
 # 📊 OUTPUT
@@ -116,4 +179,4 @@ st.subheader("🎯 Target Result")
 
 st.metric("Target Value", f"{target_value:,.0f}")
 
-st.dataframe(target_rep, use_container_width=True)
+st.dataframe(target_df, use_container_width=True)
