@@ -145,7 +145,7 @@ yearly_target = targets["Target (Value)"].sum()
 
 ytd_target = targets[
     targets["Month"].isin(month_order[:current_index + 1])
-]["Target (Value")].sum()
+]["Target (Value)"].sum()
 
 quarterly_target = targets[
     targets["Month"].isin(month_order[max(current_index-2,0):current_index+1])
@@ -158,9 +158,13 @@ monthly_target = targets[
 # =========================
 # 💰 SALES KPIS
 # =========================
-monthly_sales = sales[sales["Month"] == current_month]["Net Sales"].sum()
+monthly_sales = sales[
+    sales["Month"] == current_month
+]["Net Sales"].sum()
 
-ytd_sales = sales[sales["Month"] <= current_month]["Net Sales"].sum()
+ytd_sales = sales[
+    sales["Month"] <= current_month
+]["Net Sales"].sum()
 
 yearly_sales = sales["Net Sales"].sum()
 
