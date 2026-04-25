@@ -18,32 +18,45 @@ codes = load_codes()
 df = build_sales_vs_target(targets, sales, codes)
 
 # =========================
-# PRODUCT NAME
+# CLEAN NAMES FROM CODE FILE
 # =========================
+df["Rep Name"] = df.get("Rep Name", df["Rep Code"])
+df["Rep Name"] = df["Rep Name"].astype(str).str.strip()
+
 df["Product Name"] = df.get("Old Product Name", "Unknown")
 df["Product Name"] = df["Product Name"].astype(str).str.strip()
 
 # =========================
-# FILTER
+# FILTERS (NAMES)
 # =========================
 st.sidebar.header("🔎 Filters")
 
+# Rep Name filter
+rep_list = ["All"] + sorted(df["Rep Name"].dropna().unique().tolist())
+rep_filter = st.sidebar.selectbox("👤 Rep Name", rep_list)
+
+# Product filter
 product_list = ["All"] + sorted(df["Product Name"].dropna().unique().tolist())
 product_filter = st.sidebar.selectbox("📦 Product Name", product_list)
 
+# =========================
+# APPLY FILTERS
+# =========================
 filtered_df = df.copy()
+
+if rep_filter != "All":
+    filtered_df = filtered_df[filtered_df["Rep Name"] == rep_filter]
 
 if product_filter != "All":
     filtered_df = filtered_df[filtered_df["Product Name"] == product_filter]
 
 # =========================
-# SAFE CALCULATIONS
+# SAFE NUMBERS
 # =========================
 filtered_df["Target Unit"] = pd.to_numeric(filtered_df["Target (Unit)"], errors="coerce").fillna(0)
 filtered_df["Target Value"] = pd.to_numeric(filtered_df["Target (Value)"], errors="coerce").fillna(0)
 filtered_df["Sales Value"] = pd.to_numeric(filtered_df["Sales Value"], errors="coerce").fillna(0)
 
-# Sales Unit (نفس قيمة البيع لو مفيش unit فعلي)
 filtered_df["Sales Unit"] = filtered_df["Sales Value"]
 
 # =========================
@@ -66,6 +79,7 @@ filtered_df["Achievement Value %"] = np.where(
 # =========================
 kpi_table = filtered_df[[
     "Product Name",
+    "Rep Name",
     "Target Unit",
     "Sales Unit",
     "Target Value",
@@ -75,6 +89,12 @@ kpi_table = filtered_df[[
 ]]
 
 # =========================
-# SHOW
+# DISPLAY (WITH % FORMAT)
 # =========================
-st.dataframe(kpi_table, use_container_width=True)
+st.dataframe(
+    kpi_table.style.format({
+        "Achievement Unit %": "{:.2f}%",
+        "Achievement Value %": "{:.2f}%"
+    }),
+    use_container_width=True
+)
