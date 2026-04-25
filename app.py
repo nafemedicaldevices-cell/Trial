@@ -12,7 +12,7 @@ codes.columns = codes.columns.str.strip()
 codes["Rep Code"] = codes["Rep Code"].astype(str).str.strip()
 
 # =========================
-# 🎯 FILTERS
+# 🎯 HIERARCHY FILTERS ONLY
 # =========================
 st.sidebar.header("Filters")
 
@@ -56,7 +56,7 @@ def load_targets():
 
     all_data = []
 
-    for level, file in FILES.items():
+    for _, file in FILES.items():
 
         sheets = pd.read_excel(file, sheet_name=None)
 
@@ -100,33 +100,25 @@ target_df["Code"] = target_df["Code"].astype(str).str.strip()
 target_df = target_df[target_df["Code"].isin(valid_reps)]
 
 # =========================
-# 🗓️ PERIODS
+# 📆 MONTH LOGIC (AUTO ONLY)
 # =========================
 month_order = [
     "Jan","Feb","Mar","Apr","May","Jun",
     "Jul","Aug","Sep","Oct","Nov","Dec"
 ]
 
-quarter_map = {
-    "Q1": ["Jan","Feb","Mar"],
-    "Q2": ["Apr","May","Jun"],
-    "Q3": ["Jul","Aug","Sep"],
-    "Q4": ["Oct","Nov","Dec"]
-}
-
-selected_month = st.sidebar.selectbox("Month", month_order)
-selected_quarter = st.sidebar.selectbox("Quarter", list(quarter_map.keys()))
-
 # =========================
-# 🎯 CALCULATIONS
+# 🎯 CALCULATIONS (AUTO)
 # =========================
 
-monthly_target = target_df[target_df["Month"] == selected_month]["Target (Value)"].sum()
+monthly_target = target_df[target_df["Month"] == month_order[-1]]["Target (Value)"].sum()
 
-quarterly_target = target_df[target_df["Month"].isin(quarter_map[selected_quarter])]["Target (Value)"].sum()
+quarterly_target = target_df[
+    target_df["Month"].isin(month_order[-3:])
+]["Target (Value)"].sum()
 
 ytd_target = target_df[
-    target_df["Month"].isin(month_order[:month_order.index(selected_month)+1])
+    target_df["Month"].isin(month_order)
 ]["Target (Value)"].sum()
 
 yearly_target = target_df["Target (Value)"].sum()
