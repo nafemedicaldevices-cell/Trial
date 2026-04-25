@@ -16,29 +16,30 @@ df = build_sales_vs_target(targets, sales)
 # =========================
 # CLEAN
 # =========================
-df["Rep Code"] = df["Rep Code"].astype(str)
-
-# لو عندك اسم مندوب
-if "Old Rep Name" in df.columns:
-    df["Rep Name"] = df["Old Rep Name"]
-elif "Rep Name" not in df.columns:
-    df["Rep Name"] = df["Rep Code"]
+df["Rep Name"] = df.get("Old Rep Name", df["Rep Code"])
 
 # =========================
 # FILTERS (NAMES)
 # =========================
 st.sidebar.header("🔎 Filters")
 
-# Rep Name filter
+# Rep Name
 rep_list = ["All"] + sorted(df["Rep Name"].dropna().astype(str).unique().tolist())
-rep_filter = st.sidebar.selectbox("Rep Name", rep_list)
+rep_filter = st.sidebar.selectbox("👤 Rep Name", rep_list)
 
-# Product Name filter (لو موجود)
+# Product Name
 if "Product Name" in df.columns:
     product_list = ["All"] + sorted(df["Product Name"].dropna().astype(str).unique().tolist())
-    product_filter = st.sidebar.selectbox("Product", product_list)
+    product_filter = st.sidebar.selectbox("📦 Product Name", product_list)
 else:
     product_filter = "All"
+
+# Area Name (لو موجود)
+if "Area Name" in df.columns:
+    area_list = ["All"] + sorted(df["Area Name"].dropna().astype(str).unique().tolist())
+    area_filter = st.sidebar.selectbox("🌍 Area Name", area_list)
+else:
+    area_filter = "All"
 
 # =========================
 # APPLY FILTERS
@@ -48,8 +49,11 @@ filtered_df = df.copy()
 if rep_filter != "All":
     filtered_df = filtered_df[filtered_df["Rep Name"] == rep_filter]
 
-if product_filter != "All" and "Product Name" in filtered_df.columns:
+if product_filter != "All":
     filtered_df = filtered_df[filtered_df["Product Name"] == product_filter]
+
+if area_filter != "All":
+    filtered_df = filtered_df[filtered_df["Area Name"] == area_filter]
 
 # =========================
 # SHOW
