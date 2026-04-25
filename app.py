@@ -14,23 +14,29 @@ sales = load_haraka()
 df = build_sales_vs_target(targets, sales)
 
 # =========================
-# CLEAN FOR FILTERS
+# CLEAN
 # =========================
 df["Rep Code"] = df["Rep Code"].astype(str)
 
+# لو عندك اسم مندوب
+if "Old Rep Name" in df.columns:
+    df["Rep Name"] = df["Old Rep Name"]
+elif "Rep Name" not in df.columns:
+    df["Rep Name"] = df["Rep Code"]
+
 # =========================
-# FILTERS
+# FILTERS (NAMES)
 # =========================
 st.sidebar.header("🔎 Filters")
 
-# Rep Filter
-rep_list = ["All"] + sorted(df["Rep Code"].dropna().unique().tolist())
-rep_filter = st.sidebar.selectbox("Rep Code", rep_list)
+# Rep Name filter
+rep_list = ["All"] + sorted(df["Rep Name"].dropna().astype(str).unique().tolist())
+rep_filter = st.sidebar.selectbox("Rep Name", rep_list)
 
-# Product Filter (لو موجود)
-if "Product Code" in df.columns:
-    product_list = ["All"] + sorted(df["Product Code"].dropna().unique().tolist())
-    product_filter = st.sidebar.selectbox("Product Code", product_list)
+# Product Name filter (لو موجود)
+if "Product Name" in df.columns:
+    product_list = ["All"] + sorted(df["Product Name"].dropna().astype(str).unique().tolist())
+    product_filter = st.sidebar.selectbox("Product", product_list)
 else:
     product_filter = "All"
 
@@ -40,12 +46,12 @@ else:
 filtered_df = df.copy()
 
 if rep_filter != "All":
-    filtered_df = filtered_df[filtered_df["Rep Code"] == rep_filter]
+    filtered_df = filtered_df[filtered_df["Rep Name"] == rep_filter]
 
-if product_filter != "All" and "Product Code" in filtered_df.columns:
-    filtered_df = filtered_df[filtered_df["Product Code"] == product_filter]
+if product_filter != "All" and "Product Name" in filtered_df.columns:
+    filtered_df = filtered_df[filtered_df["Product Name"] == product_filter]
 
 # =========================
-# SHOW TABLE
+# SHOW
 # =========================
 st.dataframe(filtered_df, use_container_width=True)
