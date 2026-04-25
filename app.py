@@ -1,49 +1,56 @@
 import streamlit as st
 import pandas as pd
-import os
-import importlib
 
-st.set_page_config(layout="wide")
 st.title("📊 Sales vs Target Dashboard")
 
 # =========================
-# 🔍 DEBUG FILE SYSTEM
+# 📂 LOAD SALES (DIRECT)
 # =========================
-st.sidebar.subheader("📁 Debug")
+sales = pd.read_excel("Sales.xlsx")
+sales.columns = sales.columns.str.strip()
 
-st.sidebar.write("Current Dir:", os.getcwd())
-st.sidebar.write("Files:", os.listdir())
+# auto numeric
+for col in sales.columns:
+    if sales[col].dtype == "object":
+        continue
+    sales[col] = pd.to_numeric(sales[col], errors="coerce").fillna(0)
 
-# =========================
-# 🚀 SAFE IMPORT CLEANING
-# =========================
-try:
-    import cleaning
-    importlib.reload(cleaning)
+# detect rep column
+rep_col = [c for c in sales.columns if "rep" in c.lower() or "مندوب" in c]
 
-    sales = cleaning.load_sales()
-    targets = cleaning.load_targets()
-
-except Exception as e:
-    st.error("❌ Error loading cleaning module")
-    st.exception(e)
+if not rep_col:
+    st.error("❌ Rep column not found")
     st.stop()
 
-# =========================
-# 🔗 CLEAN KEYS
-# =========================
-sales["Rep Code"] = sales["Rep Code"].astype(str).str.strip()
-targets["Code"] = targets["Code"].astype(str).str.strip()
+sales["Rep Code"] = sales[rep_col[0]].astype(str).str.strip()
 
 # =========================
-# 📊 NET SALES
+# 💰 NET SALES
 # =========================
+sales["Net Sales"] = (
+    sales.get("Sales Value", 0)
+    - sales.get("Returns Value", 0)
+    - sales.get("Invoice Discounts", 0)
+)
+
 net_sales = sales.groupby("Rep Code", as_index=False)["Net Sales"].sum()
 
 # =========================
-# 🎯 TARGET
+# 📂 LOAD TARGETS
 # =========================
-target_sum = targets.groupby("Code", as_index=False)["Target (Value)"].sum()
+targets = pd.read_excel("Target Rep.xlsx", sheet_name=0)
+targets.columns = targets.columns.str.strip()
+
+targets = targets.melt(
+    id_vars=["Year", "Product Code", "Old Product Name", "Sales Price"],
+    var_name="Code",
+    value_name="Target"
+)
+
+targets["Target"] = pd.to_numeric(targets["Target"], errors="coerce")
+targets["Target"] = targets["Target"] / 12
+
+target_sum = targets.groupby("Code", as_index=False)["Target"].sum()
 
 # =========================
 # 🔗 MERGE
@@ -57,35 +64,16 @@ df = target_sum.merge(
 
 df["Net Sales"] = df["Net Sales"].fillna(0)
 
-# =========================
-# 📈 KPI %
-# =========================
-df["Achievement %"] = (
-    df["Net Sales"] / df["Target (Value)"]
-) * 100
-
+df["Achievement %"] = (df["Net Sales"] / df["Target"]) * 100
 df["Achievement %"] = df["Achievement %"].fillna(0)
 
 # =========================
-# 📊 KPIs
+# 📊 KPI
 # =========================
-total_target = df["Target (Value)"].sum()
-total_sales = df["Net Sales"].sum()
-
-achievement = (total_sales / total_target * 100) if total_target else 0
-
 col1, col2, col3 = st.columns(3)
 
-col1.metric("🎯 Target", f"{total_target:,.0f}")
-col2.metric("💰 Net Sales", f"{total_sales:,.0f}")
-col3.metric("📈 Achievement %", f"{achievement:.2f}%")
+col1.metric("🎯 Target", f"{df['Target'].sum():,.0f}")
+col2.metric("💰 Net Sales", f"{df['Net Sales'].sum():,.0f}")
+col3.metric("📈 Achievement %", f"{(df['Net Sales'].sum()/df['Target'].sum()*100):.2f}%")
 
-# =========================
-# 📊 TABLE
-# =========================
-st.subheader("📊 Performance Table")
-
-st.dataframe(
-    df.sort_values("Achievement %", ascending=False),
-    use_container_width=True
-)
+st.dataframe(df)
