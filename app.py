@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+from datetime import datetime
 
 st.set_page_config(layout="wide")
 st.title("📊 Target Dashboard")
@@ -12,7 +13,7 @@ codes.columns = codes.columns.str.strip()
 codes["Rep Code"] = codes["Rep Code"].astype(str).str.strip()
 
 # =========================
-# 🎯 HIERARCHY FILTERS ONLY
+# 🎯 FILTERS (HIERARCHY ONLY)
 # =========================
 st.sidebar.header("Filters")
 
@@ -96,31 +97,41 @@ targets = load_targets()
 
 target_df = targets.copy()
 target_df["Code"] = target_df["Code"].astype(str).str.strip()
-
 target_df = target_df[target_df["Code"].isin(valid_reps)]
 
 # =========================
-# 📆 MONTH ORDER (FOR LOGIC ONLY)
+# 📆 TIME LOGIC
 # =========================
 month_order = [
     "Jan","Feb","Mar","Apr","May","Jun",
     "Jul","Aug","Sep","Oct","Nov","Dec"
 ]
 
+current_month = month_order[datetime.now().month - 1]
+current_index = month_order.index(current_month)
+
 # =========================
 # 🎯 CALCULATIONS
 # =========================
 
+# 📆 Yearly
 yearly_target = target_df["Target (Value)"].sum()
 
-ytd_target = target_df["Target (Value)"].sum()
-
-quarterly_target = target_df[
-    target_df["Month"].isin(month_order[:9])
+# ⏳ YTD (Up to Current Month)
+ytd_target = target_df[
+    target_df["Month"].isin(month_order[:current_index + 1])
 ]["Target (Value)"].sum()
 
+# 📊 Quarterly (Rolling 3 months)
+start_q = max(current_index - 2, 0)
+
+quarterly_target = target_df[
+    target_df["Month"].isin(month_order[start_q:current_index + 1])
+]["Target (Value)"].sum()
+
+# 📅 Monthly (Current Month)
 monthly_target = target_df[
-    target_df["Month"] == month_order[-1]
+    target_df["Month"] == current_month
 ]["Target (Value)"].sum()
 
 # =========================
@@ -129,6 +140,6 @@ monthly_target = target_df[
 col1, col2, col3, col4 = st.columns(4)
 
 col1.metric("📆 Yearly Target", f"{yearly_target:,.0f}")
-col2.metric("⏳ YTD Target", f"{ytd_target:,.0f}")
-col3.metric("📊 Quarterly Target", f"{quarterly_target:,.0f}")
-col4.metric("📅 Monthly Target", f"{monthly_target:,.0f}")
+col2.metric("⏳ YTD (Up To Date)", f"{ytd_target:,.0f}")
+col3.metric("📊 Quarterly (Last 3M)", f"{quarterly_target:,.0f}")
+col4.metric("📅 Monthly (Current)", f"{monthly_target:,.0f}")
