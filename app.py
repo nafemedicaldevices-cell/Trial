@@ -29,13 +29,21 @@ def load_all():
 
     overdue = load_overdue("Overdue.xlsx", codes)
 
-    return targets, rep_haraka, client_haraka, overdue, codes
+    # 🔥 SALES
+    sales = pd.read_excel("Sales.xlsx")
+    sales.columns = sales.columns.str.strip()
+
+    sales["Rep Code"] = sales["Rep Code"].astype(str).str.strip()
+    sales["Date"] = pd.to_datetime(sales["Date"], errors="coerce")
+    sales["Month"] = sales["Date"].dt.strftime("%b")
+
+    return targets, rep_haraka, client_haraka, overdue, codes, sales
 
 
-targets, rep_haraka, client_haraka, overdue, codes = load_all()
+targets, rep_haraka, client_haraka, overdue, codes, sales = load_all()
 
 # =========================
-# 🎯 FILTERS (FROM CODES)
+# 🎯 FILTERS
 # =========================
 st.sidebar.header("Filters")
 
@@ -48,6 +56,30 @@ rep_filter = st.sidebar.multiselect("Rep", rep_list)
 sup_filter = st.sidebar.multiselect("Supervisor", sup_list)
 manager_filter = st.sidebar.multiselect("Manager", manager_list)
 area_filter = st.sidebar.multiselect("Area", area_list)
+
+# =========================
+# 🗓️ PERIOD FILTER
+# =========================
+period_type = st.sidebar.selectbox(
+    "Period",
+    ["Monthly", "Quarterly", "YTD", "Full Year"]
+)
+
+month_order = [
+    "Jan","Feb","Mar","Apr","May","Jun",
+    "Jul","Aug","Sep","Oct","Nov","Dec"
+]
+
+selected_month = st.sidebar.selectbox("Month", month_order)
+
+quarter_map = {
+    "Q1": ["Jan","Feb","Mar"],
+    "Q2": ["Apr","May","Jun"],
+    "Q3": ["Jul","Aug","Sep"],
+    "Q4": ["Oct","Nov","Dec"]
+}
+
+quarter = st.sidebar.selectbox("Quarter", list(quarter_map.keys()))
 
 # =========================
 # 🔥 FILTER CODES FIRST
@@ -69,33 +101,73 @@ if area_filter:
 valid_reps = filtered_codes["Rep Code"].unique()
 
 # =========================
-# 🔗 APPLY FILTERS TO DATA
+# 🔗 APPLY FILTERS
 # =========================
-client_haraka_f = client_haraka[
-    client_haraka["Rep Code"].isin(valid_reps)
-]
+client_haraka_f = client_haraka[client_haraka["Rep Code"].isin(valid_reps)]
+rep_haraka_f = rep_haraka[rep_haraka["Rep Code"].isin(valid_reps)]
+overdue_f = overdue[overdue["Rep Code"].isin(valid_reps)]
+sales_f = sales[sales["Rep Code"].isin(valid_reps)]
 
-rep_haraka_f = rep_haraka[
-    rep_haraka["Rep Code"].isin(valid_reps)
-]
+# =========================
+# 🎯 TARGET CALCULATION
+# =========================
+target_rep = targets["Rep"].copy()
+target_rep["Code"] = target_rep["Code"].astype(str).str.strip()
 
-overdue_f = overdue[
-    overdue["Rep Code"].isin(valid_reps)
-]
+target_rep = target_rep[target_rep["Code"].isin(valid_reps)]
+
+if period_type == "Monthly":
+
+    target_value = target_rep[
+        target_rep["Month"] == selected_month
+    ]["Target (Value)"].sum()
+
+    sales_value = sales_f[
+        sales_f["Month"] == selected_month
+    ]["Sales Value"].sum()
+
+elif period_type == "Quarterly":
+
+    months = quarter_map[quarter]
+
+    target_value = target_rep[
+        target_rep["Month"].isin(months)
+    ]["Target (Value)"].sum()
+
+    sales_value = sales_f[
+        sales_f["Month"].isin(months)
+    ]["Sales Value"].sum()
+
+elif period_type == "YTD":
+
+    idx = month_order.index(selected_month) + 1
+    months = month_order[:idx]
+
+    target_value = target_rep[
+        target_rep["Month"].isin(months)
+    ]["Target (Value)"].sum()
+
+    sales_value = sales_f[
+        sales_f["Month"].isin(months)
+    ]["Sales Value"].sum()
+
+else:  # Full Year
+
+    target_value = target_rep["Target (Value)"].sum()
+    sales_value = sales_f["Sales Value"].sum()
 
 # =========================
 # 📊 KPIs
 # =========================
-total_sales = client_haraka_f["Sales Value"].sum()
+achievement = (sales_value / target_value * 100) if target_value > 0 else 0
 total_collection = client_haraka_f["Total Collection"].sum()
-total_returns = client_haraka_f["Returns Value"].sum()
 total_overdue = overdue_f["Overdue"].sum()
 
 col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("💰 Sales", f"{total_sales:,.0f}")
-col2.metric("💵 Collection", f"{total_collection:,.0f}")
-col3.metric("🔁 Returns", f"{total_returns:,.0f}")
+col1.metric("🎯 Target", f"{target_value:,.0f}")
+col2.metric("💰 Sales", f"{sales_value:,.0f}")
+col3.metric("📈 Achievement %", f"{achievement:.1f}%")
 col4.metric("⚠️ Overdue", f"{total_overdue:,.0f}")
 
 # =========================
@@ -104,8 +176,7 @@ col4.metric("⚠️ Overdue", f"{total_overdue:,.0f}")
 st.subheader("Sales by Rep")
 
 sales_rep = (
-    client_haraka_f
-    .groupby("Rep Name")["Sales Value"]
+    sales_f.groupby("Rep Code")["Sales Value"]
     .sum()
     .sort_values(ascending=False)
 )
@@ -113,35 +184,27 @@ sales_rep = (
 st.bar_chart(sales_rep)
 
 # =========================
-# 📈 COLLECTION BY REP
+# 📈 TARGET VS SALES
 # =========================
-st.subheader("Collection by Rep")
+st.subheader("Target vs Sales")
 
-collection_rep = (
-    client_haraka_f
-    .groupby("Rep Name")["Total Collection"]
-    .sum()
-    .sort_values(ascending=False)
-)
+compare_df = pd.DataFrame({
+    "Target": [target_value],
+    "Sales": [sales_value]
+})
 
-st.bar_chart(collection_rep)
+st.bar_chart(compare_df)
 
 # =========================
 # ⚠️ OVERDUE TABLE
 # =========================
 st.subheader("Overdue Details")
 
-st.dataframe(
-    overdue_f.sort_values("Overdue", ascending=False),
-    use_container_width=True
-)
+st.dataframe(overdue_f, use_container_width=True)
 
 # =========================
 # 📋 CLIENT TABLE
 # =========================
 st.subheader("Client Details")
 
-st.dataframe(
-    client_haraka_f,
-    use_container_width=True
-)
+st.dataframe(client_haraka_f, use_container_width=True)
