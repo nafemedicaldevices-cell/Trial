@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 
 st.set_page_config(layout="wide")
-st.title("📊 Target Dashboard")
+st.title("📊 Sales vs Target Dashboard")
 
 # =========================
 # 📂 LOAD CODES
@@ -13,18 +13,7 @@ codes.columns = codes.columns.str.strip()
 codes["Rep Code"] = codes["Rep Code"].astype(str).str.strip()
 
 # =========================
-# 🔄 RESET FILTERS LOGIC
-# =========================
-def reset_filters():
-    st.session_state.rep_filter = []
-    st.session_state.sup_filter = []
-    st.session_state.manager_filter = []
-    st.session_state.area_filter = []
-
-st.sidebar.button("🔄 Reset Filters", on_click=reset_filters)
-
-# =========================
-# 🎯 FILTERS
+# 🎯 FILTERS (HIERARCHY)
 # =========================
 st.sidebar.header("Filters")
 
@@ -33,29 +22,10 @@ sup_list = sorted(codes["Supervisor Name"].dropna().unique())
 manager_list = sorted(codes["Manager Name"].dropna().unique())
 area_list = sorted(codes["Area Name"].dropna().unique())
 
-rep_filter = st.sidebar.multiselect(
-    "Rep",
-    rep_list,
-    key="rep_filter"
-)
-
-sup_filter = st.sidebar.multiselect(
-    "Supervisor",
-    sup_list,
-    key="sup_filter"
-)
-
-manager_filter = st.sidebar.multiselect(
-    "Manager",
-    manager_list,
-    key="manager_filter"
-)
-
-area_filter = st.sidebar.multiselect(
-    "Area",
-    area_list,
-    key="area_filter"
-)
+rep_filter = st.sidebar.multiselect("Rep", rep_list)
+sup_filter = st.sidebar.multiselect("Supervisor", sup_list)
+manager_filter = st.sidebar.multiselect("Manager", manager_list)
+area_filter = st.sidebar.multiselect("Area", area_list)
 
 # =========================
 # 🔥 FILTER CODES
@@ -124,10 +94,36 @@ def load_targets():
 
 
 targets = load_targets()
+targets["Code"] = targets["Code"].astype(str).str.strip()
+targets = targets[targets["Code"].isin(valid_reps)]
 
-target_df = targets.copy()
-target_df["Code"] = target_df["Code"].astype(str).str.strip()
-target_df = target_df[target_df["Code"].isin(valid_reps)]
+# =========================
+# 📂 LOAD SALES
+# =========================
+def load_sales():
+
+    df = pd.read_excel("Sales.xlsx")
+    df.columns = df.columns.str.strip()
+
+    df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+
+    for col in ["Sales Value", "Returns Value", "Invoice Discounts"]:
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+
+    df["Net Sales"] = (
+        df["Sales Value"]
+        - df["Returns Value"]
+        - df["Invoice Discounts"]
+    )
+
+    df["Rep Code"] = df["Rep Code"].astype(str).str.strip()
+
+    df = df[df["Rep Code"].isin(valid_reps)]
+
+    return df
+
+
+sales = load_sales()
 
 # =========================
 # 📆 TIME LOGIC
@@ -137,33 +133,56 @@ month_order = [
     "Jul","Aug","Sep","Oct","Nov","Dec"
 ]
 
-current_month = month_order[datetime.now().month - 1]
-current_index = month_order.index(current_month)
+current_month = datetime.now().month
+current_index = current_month - 1
+
+sales["Month"] = sales["Date"].dt.month
 
 # =========================
-# 🎯 CALCULATIONS
+# 🎯 TARGET KPIS
 # =========================
+yearly_target = targets["Target (Value)"].sum()
 
-yearly_target = target_df["Target (Value)"].sum()
+ytd_target = targets[
+    targets["Month"].isin(month_order[:current_index + 1])
+]["Target (Value")].sum()
 
-ytd_target = target_df[
-    target_df["Month"].isin(month_order[:current_index + 1])
+quarterly_target = targets[
+    targets["Month"].isin(month_order[max(current_index-2,0):current_index+1])
 ]["Target (Value)"].sum()
 
-quarterly_target = target_df[
-    target_df["Month"].isin(month_order[max(current_index-2,0):current_index+1])
-]["Target (Value)"].sum()
-
-monthly_target = target_df[
-    target_df["Month"] == current_month
+monthly_target = targets[
+    targets["Month"] == month_order[current_index]
 ]["Target (Value)"].sum()
 
 # =========================
-# 📊 KPI CARDS
+# 💰 SALES KPIS
 # =========================
-col1, col2, col3, col4 = st.columns(4)
+monthly_sales = sales[sales["Month"] == current_month]["Net Sales"].sum()
 
-col1.metric("📆 Yearly Target", f"{yearly_target:,.0f}")
-col2.metric("⏳ YTD (Up To Date)", f"{ytd_target:,.0f}")
-col3.metric("📊 Quarterly (Last 3M)", f"{quarterly_target:,.0f}")
-col4.metric("📅 Monthly (Current)", f"{monthly_target:,.0f}")
+ytd_sales = sales[sales["Month"] <= current_month]["Net Sales"].sum()
+
+yearly_sales = sales["Net Sales"].sum()
+
+# =========================
+# 📊 TARGET CARDS
+# =========================
+st.subheader("🎯 Targets")
+
+c1, c2, c3, c4 = st.columns(4)
+
+c1.metric("📆 Yearly Target", f"{yearly_target:,.0f}")
+c2.metric("⏳ YTD Target", f"{ytd_target:,.0f}")
+c3.metric("📊 Quarterly Target", f"{quarterly_target:,.0f}")
+c4.metric("📅 Monthly Target", f"{monthly_target:,.0f}")
+
+# =========================
+# 📊 SALES CARDS
+# =========================
+st.subheader("💰 Sales (Net Sales)")
+
+s1, s2, s3 = st.columns(3)
+
+s1.metric("📅 Monthly Sales", f"{monthly_sales:,.0f}")
+s2.metric("⏳ YTD Sales", f"{ytd_sales:,.0f}")
+s3.metric("📆 Yearly Sales", f"{yearly_sales:,.0f}")
