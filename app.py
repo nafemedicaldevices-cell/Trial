@@ -13,7 +13,18 @@ codes.columns = codes.columns.str.strip()
 codes["Rep Code"] = codes["Rep Code"].astype(str).str.strip()
 
 # =========================
-# 🎯 FILTERS (HIERARCHY ONLY)
+# 🔄 RESET FILTERS LOGIC
+# =========================
+def reset_filters():
+    st.session_state.rep_filter = []
+    st.session_state.sup_filter = []
+    st.session_state.manager_filter = []
+    st.session_state.area_filter = []
+
+st.sidebar.button("🔄 Reset Filters", on_click=reset_filters)
+
+# =========================
+# 🎯 FILTERS
 # =========================
 st.sidebar.header("Filters")
 
@@ -22,10 +33,29 @@ sup_list = sorted(codes["Supervisor Name"].dropna().unique())
 manager_list = sorted(codes["Manager Name"].dropna().unique())
 area_list = sorted(codes["Area Name"].dropna().unique())
 
-rep_filter = st.sidebar.multiselect("Rep", rep_list)
-sup_filter = st.sidebar.multiselect("Supervisor", sup_list)
-manager_filter = st.sidebar.multiselect("Manager", manager_list)
-area_filter = st.sidebar.multiselect("Area", area_list)
+rep_filter = st.sidebar.multiselect(
+    "Rep",
+    rep_list,
+    key="rep_filter"
+)
+
+sup_filter = st.sidebar.multiselect(
+    "Supervisor",
+    sup_list,
+    key="sup_filter"
+)
+
+manager_filter = st.sidebar.multiselect(
+    "Manager",
+    manager_list,
+    key="manager_filter"
+)
+
+area_filter = st.sidebar.multiselect(
+    "Area",
+    area_list,
+    key="area_filter"
+)
 
 # =========================
 # 🔥 FILTER CODES
@@ -114,28 +144,22 @@ current_index = month_order.index(current_month)
 # 🎯 CALCULATIONS
 # =========================
 
-# 📆 Yearly
 yearly_target = target_df["Target (Value)"].sum()
 
-# ⏳ YTD (Up to Current Month)
 ytd_target = target_df[
     target_df["Month"].isin(month_order[:current_index + 1])
 ]["Target (Value)"].sum()
 
-# 📊 Quarterly (Rolling 3 months)
-start_q = max(current_index - 2, 0)
-
 quarterly_target = target_df[
-    target_df["Month"].isin(month_order[start_q:current_index + 1])
+    target_df["Month"].isin(month_order[max(current_index-2,0):current_index+1])
 ]["Target (Value)"].sum()
 
-# 📅 Monthly (Current Month)
 monthly_target = target_df[
     target_df["Month"] == current_month
 ]["Target (Value)"].sum()
 
 # =========================
-# 📊 KPI CARDS (ORDERED)
+# 📊 KPI CARDS
 # =========================
 col1, col2, col3, col4 = st.columns(4)
 
