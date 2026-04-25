@@ -14,47 +14,30 @@ sales = load_haraka()
 df = build_sales_vs_target(targets, sales)
 
 # =========================
-# CLEAN NAMES (DISPLAY ONLY)
+# CLEAN NAMES (IMPORTANT)
 # =========================
-df["Rep Name"] = df.get("Old Rep Name", "Unknown")
+df["Rep Name"] = df.get("Old Rep Name", df["Rep Code"])
+df["Rep Name"] = df["Rep Name"].astype(str).str.strip()
+
+df = df[df["Rep Name"].notna()]
+df = df[df["Rep Name"] != "nan"]
 
 # =========================
-# FILTERS (NAMES ONLY)
+# FILTERS
 # =========================
 st.sidebar.header("🔎 Filters")
 
-rep_list = ["All"] + sorted(df["Rep Name"].dropna().unique().tolist())
-rep_filter = st.sidebar.selectbox("👤 Rep Name", rep_list)
+rep_list = sorted(df["Rep Name"].unique().tolist())
+rep_filter = st.sidebar.selectbox("👤 Rep Name", ["All"] + rep_list)
 
 # =========================
-# APPLY FILTER USING CODE INTERNALLY
+# APPLY FILTER (BY CODE INTERNALLY)
 # =========================
 filtered_df = df.copy()
 
 if rep_filter != "All":
-    # هنا الربط الحقيقي (بالكود لكن بدون ما المستخدم يشوفه)
-    rep_codes = df[df["Rep Name"] == rep_filter]["Rep Code"].unique()
-    filtered_df = filtered_df[filtered_df["Rep Code"].isin(rep_codes)]
-
-# =========================
-# PRODUCT FILTER (لو موجود)
-# =========================
-if "Product Name" in df.columns:
-    product_list = ["All"] + sorted(df["Product Name"].dropna().astype(str).unique().tolist())
-    product_filter = st.sidebar.selectbox("📦 Product Name", product_list)
-
-    if product_filter != "All":
-        filtered_df = filtered_df[filtered_df["Product Name"] == product_filter]
-
-# =========================
-# AREA FILTER (لو موجود)
-# =========================
-if "Area Name" in df.columns:
-    area_list = ["All"] + sorted(df["Area Name"].dropna().astype(str).unique().tolist())
-    area_filter = st.sidebar.selectbox("🌍 Area Name", area_list)
-
-    if area_filter != "All":
-        filtered_df = filtered_df[filtered_df["Area Name"] == area_filter]
+    codes = df[df["Rep Name"] == rep_filter]["Rep Code"].unique()
+    filtered_df = filtered_df[filtered_df["Rep Code"].isin(codes)]
 
 # =========================
 # SHOW
