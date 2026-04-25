@@ -22,17 +22,76 @@ def load_all():
     rep_haraka = load_haraka()
     client_haraka = load_client_haraka()
 
+    # =========================
     # 🔥 MASTER CODES
+    # =========================
     codes = pd.read_excel("Code.xlsx")
     codes.columns = codes.columns.str.strip()
     codes["Rep Code"] = codes["Rep Code"].astype(str).str.strip()
 
+    # =========================
+    # 🔥 OVERDUE
+    # =========================
     overdue = load_overdue("Overdue.xlsx", codes)
 
-    # 🔥 SALES
+    # =========================
+    # 🔥 SALES (FIXED)
+    # =========================
     sales = pd.read_excel("Sales.xlsx")
     sales.columns = sales.columns.str.strip()
 
+    # 👇 DEBUG (لو عايزة تشوفي الأعمدة في اللوج)
+    print("Sales Columns:", sales.columns.tolist())
+
+    # --- Rep Code detection ---
+    possible_rep_cols = [
+        "Rep Code", "RepCode", "Code", "Rep_Code", "كود المندوب"
+    ]
+
+    rep_col = None
+    for col in possible_rep_cols:
+        if col in sales.columns:
+            rep_col = col
+            break
+
+    if rep_col is None:
+        raise Exception("❌ مفيش عمود Rep Code في Sales.xlsx")
+
+    sales = sales.rename(columns={rep_col: "Rep Code"})
+
+    # --- Date detection ---
+    possible_date_cols = [
+        "Date", "Invoice Date", "Sales Date", "التاريخ"
+    ]
+
+    date_col = None
+    for col in possible_date_cols:
+        if col in sales.columns:
+            date_col = col
+            break
+
+    if date_col is None:
+        raise Exception("❌ مفيش عمود Date في Sales.xlsx")
+
+    sales = sales.rename(columns={date_col: "Date"})
+
+    # --- Sales Value detection ---
+    possible_value_cols = [
+        "Sales Value", "Value", "Net Sales", "Sales", "القيمة"
+    ]
+
+    val_col = None
+    for col in possible_value_cols:
+        if col in sales.columns:
+            val_col = col
+            break
+
+    if val_col is None:
+        raise Exception("❌ مفيش عمود Sales Value في Sales.xlsx")
+
+    sales = sales.rename(columns={val_col: "Sales Value"})
+
+    # تنظيف
     sales["Rep Code"] = sales["Rep Code"].astype(str).str.strip()
     sales["Date"] = pd.to_datetime(sales["Date"], errors="coerce")
     sales["Month"] = sales["Date"].dt.strftime("%b")
@@ -58,7 +117,7 @@ manager_filter = st.sidebar.multiselect("Manager", manager_list)
 area_filter = st.sidebar.multiselect("Area", area_list)
 
 # =========================
-# 🗓️ PERIOD FILTER
+# 🗓️ PERIOD
 # =========================
 period_type = st.sidebar.selectbox(
     "Period",
@@ -104,54 +163,37 @@ valid_reps = filtered_codes["Rep Code"].unique()
 # 🔗 APPLY FILTERS
 # =========================
 client_haraka_f = client_haraka[client_haraka["Rep Code"].isin(valid_reps)]
-rep_haraka_f = rep_haraka[rep_haraka["Rep Code"].isin(valid_reps)]
 overdue_f = overdue[overdue["Rep Code"].isin(valid_reps)]
 sales_f = sales[sales["Rep Code"].isin(valid_reps)]
 
 # =========================
-# 🎯 TARGET CALCULATION
+# 🎯 TARGET
 # =========================
 target_rep = targets["Rep"].copy()
 target_rep["Code"] = target_rep["Code"].astype(str).str.strip()
-
 target_rep = target_rep[target_rep["Code"].isin(valid_reps)]
 
 if period_type == "Monthly":
 
-    target_value = target_rep[
-        target_rep["Month"] == selected_month
-    ]["Target (Value)"].sum()
-
-    sales_value = sales_f[
-        sales_f["Month"] == selected_month
-    ]["Sales Value"].sum()
+    target_value = target_rep[target_rep["Month"] == selected_month]["Target (Value)"].sum()
+    sales_value = sales_f[sales_f["Month"] == selected_month]["Sales Value"].sum()
 
 elif period_type == "Quarterly":
 
     months = quarter_map[quarter]
 
-    target_value = target_rep[
-        target_rep["Month"].isin(months)
-    ]["Target (Value)"].sum()
-
-    sales_value = sales_f[
-        sales_f["Month"].isin(months)
-    ]["Sales Value"].sum()
+    target_value = target_rep[target_rep["Month"].isin(months)]["Target (Value)"].sum()
+    sales_value = sales_f[sales_f["Month"].isin(months)]["Sales Value"].sum()
 
 elif period_type == "YTD":
 
     idx = month_order.index(selected_month) + 1
     months = month_order[:idx]
 
-    target_value = target_rep[
-        target_rep["Month"].isin(months)
-    ]["Target (Value)"].sum()
+    target_value = target_rep[target_rep["Month"].isin(months)]["Target (Value)"].sum()
+    sales_value = sales_f[sales_f["Month"].isin(months)]["Sales Value"].sum()
 
-    sales_value = sales_f[
-        sales_f["Month"].isin(months)
-    ]["Sales Value"].sum()
-
-else:  # Full Year
+else:
 
     target_value = target_rep["Target (Value)"].sum()
     sales_value = sales_f["Sales Value"].sum()
@@ -171,20 +213,7 @@ col3.metric("📈 Achievement %", f"{achievement:.1f}%")
 col4.metric("⚠️ Overdue", f"{total_overdue:,.0f}")
 
 # =========================
-# 📈 SALES BY REP
-# =========================
-st.subheader("Sales by Rep")
-
-sales_rep = (
-    sales_f.groupby("Rep Code")["Sales Value"]
-    .sum()
-    .sort_values(ascending=False)
-)
-
-st.bar_chart(sales_rep)
-
-# =========================
-# 📈 TARGET VS SALES
+# 📈 CHART
 # =========================
 st.subheader("Target vs Sales")
 
@@ -196,15 +225,10 @@ compare_df = pd.DataFrame({
 st.bar_chart(compare_df)
 
 # =========================
-# ⚠️ OVERDUE TABLE
+# 📋 TABLES
 # =========================
-st.subheader("Overdue Details")
-
+st.subheader("Overdue")
 st.dataframe(overdue_f, use_container_width=True)
 
-# =========================
-# 📋 CLIENT TABLE
-# =========================
-st.subheader("Client Details")
-
+st.subheader("Client Harakah")
 st.dataframe(client_haraka_f, use_container_width=True)
