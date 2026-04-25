@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 
 from cleaning import load_targets, load_haraka, load_codes, build_sales_vs_target
 
@@ -23,7 +22,7 @@ df["Product Name"] = df.get("Old Product Name", "Unknown")
 df["Product Name"] = df["Product Name"].astype(str).str.strip()
 
 # =========================
-# FILTERS (OPTIONAL)
+# FILTERS
 # =========================
 st.sidebar.header("🔎 Filters")
 
@@ -46,17 +45,22 @@ kpi_table = filtered_df[[
     "Achievement %"
 ]].copy()
 
-# Sales Unit (مشتقة)
-kpi_table["Sales Unit"] = kpi_table["Sales Value"] / filtered_df["Sales Price"]
+# Sales Unit
+kpi_table["Sales Unit"] = filtered_df["Sales Value"] / filtered_df["Sales Price"]
 
-# ترتيب الأعمدة
+# Target Unit (للتأكيد)
+kpi_table["Target Unit"] = filtered_df["Target (Unit)"]
+
+# =========================
+# FINAL FORMAT
+# =========================
 kpi_table = kpi_table[[
     "Product Name",
-    "Target (Unit)",
+    "Target Unit",
     "Sales Unit",
     "Target (Value)",
     "Sales Value",
-    "Achievement %"
+    "Achievement %",
 ]]
 
 # =========================
