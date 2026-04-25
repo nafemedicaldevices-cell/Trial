@@ -1,100 +1,99 @@
-import streamlit as st
 import pandas as pd
 import numpy as np
 
-from cleaning import load_targets, load_haraka, load_codes, build_sales_vs_target
+def build_dashboard(targets, sales, codes, level, selected_code):
 
-st.set_page_config(page_title="Sales Dashboard", layout="wide")
+    # =========================
+    # 🔗 FILTER TARGETS
+    # =========================
+    target_df = targets[level]
 
-st.title("📊 Sales KPI Dashboard")
+    target_df = target_df.merge(
+        codes,
+        on="Code",
+        how="left"
+    )
 
-# =========================
-# LOAD DATA
-# =========================
-targets = load_targets()
-sales = load_haraka()
-codes = load_codes()
+    target_df = target_df[
+        target_df["Rep Code"] == selected_code
+    ]
 
-df = build_sales_vs_target(targets, sales, codes)
+    # =========================
+    # 🔗 FILTER SALES
+    # =========================
+    sales = sales[
+        sales["Rep Code"].astype(str).str.strip() == str(selected_code).strip()
+    ]
 
-# =========================
-# CLEAN NAMES FROM CODE FILE
-# =========================
-df["Rep Name"] = df.get("Rep Name", df["Rep Code"])
-df["Rep Name"] = df["Rep Name"].astype(str).str.strip()
+    # =========================
+    # 📊 GROUP SALES BY PRODUCT
+    # =========================
+    sales_agg = sales.groupby(
+        "Product Name", as_index=False
+    ).agg({
+        "Sales Unit": "sum",
+        "Sales Value": "sum"
+    })
 
-df["Product Name"] = df.get("Old Product Name", "Unknown")
-df["Product Name"] = df["Product Name"].astype(str).str.strip()
+    # =========================
+    # 📊 TARGET AGG
+    # =========================
+    target_agg = target_df.groupby(
+        "Old Product Name", as_index=False
+    ).agg({
+        "Target (Unit)": "sum",
+        "Target (Value)": "sum"
+    })
 
-# =========================
-# FILTERS (NAMES)
-# =========================
-st.sidebar.header("🔎 Filters")
+    # =========================
+    # 🔗 MERGE
+    # =========================
+    df = target_agg.merge(
+        sales_agg,
+        left_on="Old Product Name",
+        right_on="Product Name",
+        how="left"
+    )
 
-# Rep Name filter
-rep_list = ["All"] + sorted(df["Rep Name"].dropna().unique().tolist())
-rep_filter = st.sidebar.selectbox("👤 Rep Name", rep_list)
+    df["Sales Unit"] = df["Sales Unit"].fillna(0)
+    df["Sales Value"] = df["Sales Value"].fillna(0)
 
-# Product filter
-product_list = ["All"] + sorted(df["Product Name"].dropna().unique().tolist())
-product_filter = st.sidebar.selectbox("📦 Product Name", product_list)
+    # =========================
+    # 📊 ACHIEVEMENT %
+    # =========================
+    df["Achievement Unit %"] = np.where(
+        df["Target (Unit)"] > 0,
+        df["Sales Unit"] / df["Target (Unit)"],
+        0
+    )
 
-# =========================
-# APPLY FILTERS
-# =========================
-filtered_df = df.copy()
+    df["Achievement Value %"] = np.where(
+        df["Target (Value)"] > 0,
+        df["Sales Value"] / df["Target (Value)"],
+        0
+    )
 
-if rep_filter != "All":
-    filtered_df = filtered_df[filtered_df["Rep Name"] == rep_filter]
+    # =========================
+    # FINAL SHAPE
+    # =========================
+    df = df[[
+        "Old Product Name",
+        "Target (Unit)",
+        "Sales Unit",
+        "Achievement Unit %",
+        "Target (Value)",
+        "Sales Value",
+        "Achievement Value %"
+    ]]
 
-if product_filter != "All":
-    filtered_df = filtered_df[filtered_df["Product Name"] == product_filter]
+    df.columns = [
+        "Product Name",
+        "Target Unit",
+        "Sales Unit",
+        "Achievement Unit %",
+        "Target Value",
+        "Sales Value",
+        "Achievement Value %"
+    ]
 
-# =========================
-# SAFE NUMBERS
-# =========================
-filtered_df["Target Unit"] = pd.to_numeric(filtered_df["Target (Unit)"], errors="coerce").fillna(0)
-filtered_df["Target Value"] = pd.to_numeric(filtered_df["Target (Value)"], errors="coerce").fillna(0)
-filtered_df["Sales Value"] = pd.to_numeric(filtered_df["Sales Value"], errors="coerce").fillna(0)
-
-filtered_df["Sales Unit"] = filtered_df["Sales Value"]
-
-# =========================
-# ACHIEVEMENT %
-# =========================
-filtered_df["Achievement Unit %"] = np.where(
-    filtered_df["Target Unit"] > 0,
-    (filtered_df["Sales Unit"] / filtered_df["Target Unit"]) * 100,
-    0
-)
-
-filtered_df["Achievement Value %"] = np.where(
-    filtered_df["Target Value"] > 0,
-    (filtered_df["Sales Value"] / filtered_df["Target Value"]) * 100,
-    0
-)
-
-# =========================
-# KPI TABLE
-# =========================
-kpi_table = filtered_df[[
-    "Product Name",
-    "Rep Name",
-    "Target Unit",
-    "Sales Unit",
-    "Target Value",
-    "Sales Value",
-    "Achievement Unit %",
-    "Achievement Value %"
-]]
-
-# =========================
-# DISPLAY (WITH % FORMAT)
-# =========================
-st.dataframe(
-    kpi_table.style.format({
-        "Achievement Unit %": "{:.2f}%",
-        "Achievement Value %": "{:.2f}%"
-    }),
-    use_container_width=True
-)
+    return df
