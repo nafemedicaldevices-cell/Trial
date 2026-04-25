@@ -1,96 +1,94 @@
-import streamlit as st
 import pandas as pd
-from datetime import datetime
-
-from cleaning import load_sales, load_targets
-
-st.set_page_config(layout="wide")
-st.title("📊 KPI Dashboard - Sales vs Target")
+import numpy as np
+import os
 
 # =========================
-# 🚀 LOAD DATA
+# 🎯 LOAD TARGETS
 # =========================
-sales = load_sales()
-targets = load_targets()
+def load_targets():
+
+    FILES = {
+        "Rep": "Target Rep.xlsx",
+    }
+
+    all_data = []
+
+    for _, file in FILES.items():
+
+        sheets = pd.read_excel(file, sheet_name=None)
+
+        for _, df in sheets.items():
+
+            df.columns = df.columns.str.strip()
+
+            fixed_cols = ["Year", "Product Code", "Old Product Name", "Sales Price"]
+
+            df = df.melt(
+                id_vars=fixed_cols,
+                var_name="Code",
+                value_name="Target (Year)"
+            )
+
+            df["Target (Year)"] = pd.to_numeric(df["Target (Year)"], errors="coerce")
+
+            df["Target (Unit)"] = df["Target (Year)"] / 12
+            df["Target (Value)"] = df["Target (Unit)"] * df["Sales Price"]
+
+            months = [
+                "Jan","Feb","Mar","Apr","May","Jun",
+                "Jul","Aug","Sep","Oct","Nov","Dec"
+            ]
+
+            df_long = df.loc[df.index.repeat(12)].copy()
+            df_long["Month"] = months * len(df)
+
+            df_long["Target (Value)"] = df["Target (Value)"].repeat(12).values
+
+            df_long["Code"] = df_long["Code"].astype(str).str.strip()
+
+            all_data.append(df_long)
+
+    return pd.concat(all_data, ignore_index=True)
+
 
 # =========================
-# 🔗 CLEAN KEYS
+# 💰 LOAD SALES (SAFE)
 # =========================
-sales["Rep Code"] = sales["Rep Code"].astype(str).str.strip()
-targets["Code"] = targets["Code"].astype(str).str.strip()
+def load_sales():
 
-# =========================
-# 📊 NET SALES
-# =========================
-net_sales = sales.groupby("Rep Code", as_index=False)["Net Sales"].sum()
+    if not os.path.exists("Sales.xlsx"):
+        raise Exception("❌ Sales.xlsx not found")
 
-# =========================
-# 🎯 TARGET
-# =========================
-target_sum = targets.groupby("Code", as_index=False)["Target (Value)"].sum()
+    df = pd.read_excel("Sales.xlsx")
 
-# =========================
-# 🔗 MERGE
-# =========================
-df = target_sum.merge(
-    net_sales,
-    left_on="Code",
-    right_on="Rep Code",
-    how="left"
-)
+    df.columns = df.columns.str.strip()
 
-df["Net Sales"] = df["Net Sales"].fillna(0)
+    # 🔥 auto detect rep column
+    rep_candidates = ["Rep Code", "Rep", "Sales Rep Code"]
 
-# =========================
-# 📈 ACHIEVEMENT %
-# =========================
-df["Achievement %"] = (
-    df["Net Sales"] / df["Target (Value)"]
-) * 100
+    rep_col = None
+    for c in rep_candidates:
+        if c in df.columns:
+            rep_col = c
+            break
 
-df["Achievement %"] = df["Achievement %"].fillna(0)
+    if rep_col is None:
+        raise Exception(f"❌ No Rep column found: {df.columns.tolist()}")
 
-# =========================
-# 📊 GLOBAL KPIs
-# =========================
-total_target = df["Target (Value)"].sum()
-total_sales = df["Net Sales"].sum()
+    df["Rep Code"] = df[rep_col].astype(str).str.strip()
 
-achievement = (total_sales / total_target * 100) if total_target else 0
+    # numeric cleanup
+    for col in ["Sales Value", "Returns Value", "Invoice Discounts"]:
+        if col not in df.columns:
+            df[col] = 0
+        else:
+            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
 
-# =========================
-# 📌 KPI CARDS
-# =========================
-col1, col2, col3 = st.columns(3)
+    # net sales
+    df["Net Sales"] = (
+        df["Sales Value"]
+        - df["Returns Value"]
+        - df["Invoice Discounts"]
+    )
 
-col1.metric("🎯 Total Target", f"{total_target:,.0f}")
-col2.metric("💰 Net Sales", f"{total_sales:,.0f}")
-col3.metric("📈 Achievement %", f"{achievement:.2f}%")
-
-# =========================
-# 🏆 TOP / BOTTOM
-# =========================
-st.subheader("🏆 Performance Ranking")
-
-top = df.sort_values("Achievement %", ascending=False).head(10)
-bottom = df.sort_values("Achievement %", ascending=True).head(10)
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.markdown("### 🔥 Top 10 Reps")
-    st.dataframe(top, use_container_width=True)
-
-with col2:
-    st.markdown("### ⚠️ Bottom 10 Reps")
-    st.dataframe(bottom, use_container_width=True)
-
-# =========================
-# 📊 FULL TABLE
-# =========================
-st.subheader("📊 Full Performance Table")
-
-st.dataframe(
-    df.sort_values("Achievement %", ascending=False),
-    use_container_width=True
-)
+    return df
