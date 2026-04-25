@@ -1,10 +1,11 @@
 import streamlit as st
+import pandas as pd
 
 from cleaning import load_targets, load_haraka, load_codes, build_sales_vs_target
 
 st.set_page_config(page_title="Sales Dashboard", layout="wide")
 
-st.title("📊 Sales vs Target Dashboard")
+st.title("📊 Sales KPI Dashboard")
 
 # =========================
 # LOAD DATA
@@ -13,44 +14,52 @@ targets = load_targets()
 sales = load_haraka()
 codes = load_codes()
 
-# =========================
-# BUILD FINAL DF (IMPORTANT FIX)
-# =========================
 df = build_sales_vs_target(targets, sales, codes)
 
 # =========================
-# CLEAN NAMES
+# CLEAN PRODUCT NAME
 # =========================
-df["Rep Name"] = df["Rep Name"].astype(str).str.strip()
+df["Product Name"] = df.get("Old Product Name", "Unknown")
+df["Product Name"] = df["Product Name"].astype(str).str.strip()
 
 # =========================
-# FILTERS (NAMES FROM CODE FILE)
+# FILTERS (OPTIONAL)
 # =========================
 st.sidebar.header("🔎 Filters")
 
-# Rep Name filter
-rep_list = ["All"] + sorted(df["Rep Name"].dropna().unique().tolist())
-rep_filter = st.sidebar.selectbox("👤 Rep Name", rep_list)
+product_list = ["All"] + sorted(df["Product Name"].dropna().unique().tolist())
+product_filter = st.sidebar.selectbox("📦 Product Name", product_list)
 
-# Area Name filter
-if "Area Name" in df.columns:
-    area_list = ["All"] + sorted(df["Area Name"].dropna().unique().tolist())
-    area_filter = st.sidebar.selectbox("🌍 Area Name", area_list)
-else:
-    area_filter = "All"
-
-# =========================
-# APPLY FILTERS
-# =========================
 filtered_df = df.copy()
 
-if rep_filter != "All":
-    filtered_df = filtered_df[filtered_df["Rep Name"] == rep_filter]
-
-if area_filter != "All":
-    filtered_df = filtered_df[filtered_df["Area Name"] == area_filter]
+if product_filter != "All":
+    filtered_df = filtered_df[filtered_df["Product Name"] == product_filter]
 
 # =========================
-# SHOW TABLE
+# KPI TABLE
 # =========================
-st.dataframe(filtered_df, use_container_width=True)
+kpi_table = filtered_df[[
+    "Product Name",
+    "Target (Unit)",
+    "Sales Value",
+    "Target (Value)",
+    "Achievement %"
+]].copy()
+
+# Sales Unit (مشتقة)
+kpi_table["Sales Unit"] = kpi_table["Sales Value"] / filtered_df["Sales Price"]
+
+# ترتيب الأعمدة
+kpi_table = kpi_table[[
+    "Product Name",
+    "Target (Unit)",
+    "Sales Unit",
+    "Target (Value)",
+    "Sales Value",
+    "Achievement %"
+]]
+
+# =========================
+# SHOW
+# =========================
+st.dataframe(kpi_table, use_container_width=True)
