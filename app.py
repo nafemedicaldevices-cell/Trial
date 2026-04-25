@@ -2,18 +2,17 @@ import streamlit as st
 import pandas as pd
 
 st.set_page_config(layout="wide")
-st.title("📊 Sales Dashboard - Multi Level Targets")
+st.title("📊 Target Dashboard")
 
 # =========================
-# 📂 LOAD CODES (HIERARCHY)
+# 📂 LOAD CODES
 # =========================
 codes = pd.read_excel("Code.xlsx")
 codes.columns = codes.columns.str.strip()
-
 codes["Rep Code"] = codes["Rep Code"].astype(str).str.strip()
 
 # =========================
-# 🎯 FILTERS (HIERARCHY)
+# 🎯 FILTERS
 # =========================
 st.sidebar.header("Filters")
 
@@ -47,26 +46,21 @@ if area_filter:
 valid_reps = filtered_codes["Rep Code"].astype(str).str.strip().unique()
 
 # =========================
-# 📂 LOAD TARGETS (ALL LEVELS)
+# 📂 LOAD TARGETS
 # =========================
 def load_targets():
 
     FILES = {
-        "Rep": "Target Rep.xlsx",
-        "Supervisor": "Target Supervisor.xlsx",
-        "Manager": "Target Manager.xlsx",
-        "Area": "Target Area.xlsx"
+        "Rep": "Target Rep.xlsx"
     }
 
-    all_targets = {}
+    all_data = []
 
     for level, file in FILES.items():
 
         sheets = pd.read_excel(file, sheet_name=None)
 
-        level_data = []
-
-        for sheet_name, df in sheets.items():
+        for _, df in sheets.items():
 
             df.columns = df.columns.str.strip()
 
@@ -89,51 +83,29 @@ def load_targets():
             ]
 
             df_long = df.loc[df.index.repeat(12)].copy()
-
             df_long["Month"] = months * len(df)
 
-            df_long["Target (Unit)"] = df["Target (Unit)"].repeat(12).values
             df_long["Target (Value)"] = df["Target (Value)"].repeat(12).values
 
-            df_long["Level"] = level
+            all_data.append(df_long)
 
-            level_data.append(df_long)
-
-        all_targets[level] = pd.concat(level_data, ignore_index=True)
-
-    return all_targets
+    return pd.concat(all_data, ignore_index=True)
 
 
 targets = load_targets()
 
-# =========================
-# 🎯 SELECT TARGET LEVEL
-# =========================
-target_level = st.sidebar.selectbox(
-    "Target Level",
-    ["Rep", "Supervisor", "Manager", "Area"]
-)
-
-target_df = targets[target_level].copy()
+target_df = targets.copy()
 target_df["Code"] = target_df["Code"].astype(str).str.strip()
 
-# فلترة حسب hierarchy
 target_df = target_df[target_df["Code"].isin(valid_reps)]
 
 # =========================
-# 🗓️ PERIOD
+# 🗓️ PERIODS
 # =========================
-period_type = st.sidebar.selectbox(
-    "Period",
-    ["Monthly", "Quarterly", "YTD", "Full Year"]
-)
-
 month_order = [
     "Jan","Feb","Mar","Apr","May","Jun",
     "Jul","Aug","Sep","Oct","Nov","Dec"
 ]
-
-selected_month = st.sidebar.selectbox("Month", month_order)
 
 quarter_map = {
     "Q1": ["Jan","Feb","Mar"],
@@ -142,41 +114,29 @@ quarter_map = {
     "Q4": ["Oct","Nov","Dec"]
 }
 
+selected_month = st.sidebar.selectbox("Month", month_order)
 selected_quarter = st.sidebar.selectbox("Quarter", list(quarter_map.keys()))
 
 # =========================
-# 🎯 TARGET CALCULATION
+# 🎯 CALCULATIONS
 # =========================
-if period_type == "Monthly":
 
-    target_value = target_df[
-        target_df["Month"] == selected_month
-    ]["Target (Value)"].sum()
+monthly_target = target_df[target_df["Month"] == selected_month]["Target (Value)"].sum()
 
-elif period_type == "Quarterly":
+quarterly_target = target_df[target_df["Month"].isin(quarter_map[selected_quarter])]["Target (Value)"].sum()
 
-    target_value = target_df[
-        target_df["Month"].isin(quarter_map[selected_quarter])
-    ]["Target (Value)"].sum()
+ytd_target = target_df[
+    target_df["Month"].isin(month_order[:month_order.index(selected_month)+1])
+]["Target (Value)"].sum()
 
-elif period_type == "YTD":
-
-    idx = month_order.index(selected_month) + 1
-    months = month_order[:idx]
-
-    target_value = target_df[
-        target_df["Month"].isin(months)
-    ]["Target (Value)"].sum()
-
-else:
-
-    target_value = target_df["Target (Value)"].sum()
+yearly_target = target_df["Target (Value)"].sum()
 
 # =========================
-# 📊 OUTPUT
+# 📊 KPI CARDS
 # =========================
-st.subheader("🎯 Target Result")
+col1, col2, col3, col4 = st.columns(4)
 
-st.metric("Target Value", f"{target_value:,.0f}")
-
-st.dataframe(target_df, use_container_width=True)
+col1.metric("📅 Monthly Target", f"{monthly_target:,.0f}")
+col2.metric("📊 Quarterly Target", f"{quarterly_target:,.0f}")
+col3.metric("⏳ YTD Target", f"{ytd_target:,.0f}")
+col4.metric("📆 Yearly Target", f"{yearly_target:,.0f}")
